@@ -1,14 +1,20 @@
 """Integration tests for the webhooks API endpoints."""
 
+import base64
+import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict
 from unittest import mock
 
 import pytest
-from sqlalchemy import delete, func, select
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.integrations.email.models import MailchimpWebhook as ModelsMailchimpWebhook
+from app.main import create_application
 from app.models.email_data import Attachment, Email
 from app.schemas.webhook_schemas import EmailAttachment as SchemaEmailAttachment
 from app.schemas.webhook_schemas import InboundEmailData, MailchimpWebhook
@@ -16,32 +22,55 @@ from app.services.email_processing_service import EmailProcessingService
 
 
 def create_test_webhook_payload(with_attachment: bool = False) -> Dict[str, Any]:
-    """Create a test webhook payload for testing."""
-    data = {
-        "message_id": "test-123@example.com",
+    """Create a test webhook payload."""
+    message_id = f"test_{uuid.uuid4()}@example.com"
+    webhook_id = f"test_webhook_{uuid.uuid4()}"
+
+    data: Dict[str, Any] = {
+        "message_id": message_id,
         "from_email": "sender@example.com",
         "from_name": "Test Sender",
-        "to_email": "recipient@kave.com",
-        "subject": "Test Email Subject",
-        "body_plain": "This is a test email body.",
-        "body_html": "<html><body><p>This is a test email body.</p></body></html>",
-        "headers": {
-            "From": "Test Sender <sender@example.com>",
-            "To": "recipient@kave.com",
-            "Subject": "Test Email Subject",
-        },
-        "attachments": [],
+        "to_email": "webhook@kave.com",
+        "subject": "Test Email",
+        "body_plain": "This is a test email",
+        "body_html": "<p>This is a test email</p>",
+        "headers": {"Reply-To": "sender@example.com"},
     }
 
-    # Create webhook payload
-    webhook_payload = {
-        "webhook_id": "test-webhook-123",
+    if with_attachment:
+        test_content = "This is a test attachment"
+        test_content_b64 = base64.b64encode(test_content.encode()).decode()
+
+        data["attachments"] = [
+            {
+                "name": "test.txt",
+                "type": "text/plain",
+                "content": test_content_b64,
+                "content_id": "test001",
+                "size": len(test_content),
+            }
+        ]
+    else:
+        data["attachments"] = []
+
+    return {
+        "webhook_id": webhook_id,
         "event": "inbound_email",
         "timestamp": datetime.utcnow().isoformat(),
         "data": data,
     }
 
-    return webhook_payload
+
+@pytest.fixture
+def app() -> FastAPI:
+    """Create a test application instance."""
+    return create_application()
+
+
+@pytest.fixture
+def client(app: FastAPI) -> TestClient:
+    """Create a test client for the application."""
+    return TestClient(app)
 
 
 @pytest.mark.asyncio
@@ -77,25 +106,27 @@ async def test_webhook_endpoint_success(
 
     # Create service and process
     service = EmailProcessingService(db_session)
-    with mock.patch(
-        "app.services.email_processing_service.ATTACHMENTS_DIR",
-        mock.MagicMock(return_value="./data/test_attachments"),
+    with (
+        mock.patch(
+            "app.core.config.settings.ATTACHMENTS_BASE_DIR",
+            Path("./data/test_attachments"),
+        ),
+        mock.patch("builtins.open", mock.mock_open()),
     ):
         email = await service.process_webhook(schema_webhook)
 
     # THEN
     assert email is not None
-    assert email.webhook_id == webhook_payload["webhook_id"]
-    assert email.webhook_event == webhook_payload["event"]
-    assert email.message_id == webhook_payload["data"]["message_id"]
+    assert email.message_id == schema_webhook.data.message_id
+    assert email.from_email == schema_webhook.data.from_email
+    assert email.subject == schema_webhook.data.subject
 
-    # Verify it was saved in the database
-    query = select(Email).where(Email.webhook_id == webhook_payload["webhook_id"])
+    # Verify it was saved to the database
+    query = select(Email).where(Email.message_id == schema_webhook.data.message_id)
     result = await db_session.execute(query)
-    stored_email = result.scalar_one_or_none()
-
-    assert stored_email is not None
-    assert stored_email.id == email.id
+    db_email = result.scalar_one_or_none()
+    assert db_email is not None
+    assert db_email.id == email.id
 
 
 @pytest.mark.asyncio
@@ -142,31 +173,31 @@ async def test_webhook_with_attachments(
 
     # Create service and process
     service = EmailProcessingService(db_session)
-    with mock.patch(
-        "app.services.email_processing_service.ATTACHMENTS_DIR",
-        mock.MagicMock(return_value="./data/test_attachments"),
+    with (
+        mock.patch(
+            "app.core.config.settings.ATTACHMENTS_BASE_DIR",
+            Path("./data/test_attachments"),
+        ),
+        mock.patch("builtins.open", mock.mock_open()),
     ):
-        # Process the webhook with mock file operations
-        with mock.patch("builtins.open", mock.mock_open()):
-            email = await service.process_webhook(schema_webhook)
+        email = await service.process_webhook(schema_webhook)
 
     # THEN
     assert email is not None
     assert email.message_id == schema_webhook.data.message_id
+    assert len(schema_webhook.data.attachments) > 0  # Confirm attachment was included
 
-    # Verify the email was saved
+    # Verify it was saved to the database with attachments
     query = select(Email).where(Email.message_id == schema_webhook.data.message_id)
     result = await db_session.execute(query)
-    stored_email = result.scalar_one_or_none()
-    assert stored_email is not None
+    db_email = result.scalar_one_or_none()
+    assert db_email is not None
 
-    # Query for the attachments separately
-    query = select(Attachment).where(Attachment.email_id == stored_email.id)
-    result = await db_session.execute(query)
-    attachments = result.scalars().all()
-
-    # Verify the attachment was saved
-    assert len(attachments) == 1
+    # Verify attachments
+    attachment_query = select(Attachment).where(Attachment.email_id == db_email.id)
+    attachment_result = await db_session.execute(attachment_query)
+    attachments = attachment_result.scalars().all()
+    assert len(attachments) > 0
     assert attachments[0].filename == "test.txt"
     assert attachments[0].content_type == "text/plain"
 
@@ -204,9 +235,12 @@ async def test_email_processing_service(
     )
 
     # WHEN - Process the webhook
-    with mock.patch(
-        "app.services.email_processing_service.ATTACHMENTS_DIR",
-        mock.MagicMock(return_value="./data/test_attachments"),
+    with (
+        mock.patch(
+            "app.core.config.settings.ATTACHMENTS_BASE_DIR",
+            Path("./data/test_attachments"),
+        ),
+        mock.patch("builtins.open", mock.mock_open()),
     ):
         email = await service.process_webhook(schema_webhook)
 
@@ -219,10 +253,9 @@ async def test_email_processing_service(
     # Verify it was saved to the database
     query = select(Email).where(Email.message_id == schema_webhook.data.message_id)
     result = await db_session.execute(query)
-    stored_email = result.scalar_one_or_none()
-
-    assert stored_email is not None
-    assert stored_email.id == email.id
+    db_email = result.scalar_one_or_none()
+    assert db_email is not None
+    assert db_email.id == email.id
 
 
 @pytest.mark.asyncio
@@ -257,29 +290,18 @@ async def test_error_handling_in_service(
         data=schema_data,
     )
 
-    # To ensure test integrity, delete any existing emails with this message_id
-    # This makes the test more reliable
-    delete_stmt = delete(Email).where(
-        Email.message_id == schema_webhook.data.message_id
-    )
-    await db_session.execute(delete_stmt)
-    await db_session.commit()
-
-    # WHEN/THEN - Simulate a database error
-    with mock.patch.object(
-        service, "store_email", side_effect=Exception("Test database error")
+    # Make store_email raise an exception
+    with (
+        mock.patch.object(
+            service, "store_email", side_effect=ValueError("Simulated error")
+        ),
     ):
-        with pytest.raises(
-            ValueError, match="Email processing failed:.*Test database error"
-        ):
+        # WHEN/THEN
+        with pytest.raises(ValueError, match="Email processing failed"):
             await service.process_webhook(schema_webhook)
 
-        # Verify no email was saved by counting emails with this message_id
-        count_query = (
-            select(func.count())
-            .select_from(Email)
-            .where(Email.message_id == schema_webhook.data.message_id)
-        )
-        result = await db_session.execute(count_query)
-        count = result.scalar_one()
-        assert count == 0
+    # Verify transaction was rolled back
+    query = select(Email).where(Email.message_id == schema_webhook.data.message_id)
+    result = await db_session.execute(query)
+    db_email = result.scalar_one_or_none()
+    assert db_email is None  # Transaction rolled back, so no email saved

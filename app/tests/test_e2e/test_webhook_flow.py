@@ -88,7 +88,7 @@ async def test_webhook_e2e_flow(app: FastAPI, webhook_signature: str) -> None:
                 return_value=True,
             ),
             mock.patch(
-                "app.services.email_processing_service.ATTACHMENTS_DIR",
+                "app.core.config.settings.ATTACHMENTS_BASE_DIR",
                 test_attachments_dir,
             ),
             mock.patch("builtins.open", mock.mock_open()),

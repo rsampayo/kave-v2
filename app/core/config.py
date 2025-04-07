@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -27,6 +29,9 @@ class Settings(BaseSettings):
     # MailChimp
     MAILCHIMP_API_KEY: str
     MAILCHIMP_WEBHOOK_SECRET: str
+
+    # File Storage
+    ATTACHMENTS_BASE_DIR: Path = Path("data/attachments")
 
     @classmethod
     @field_validator("DATABASE_URL")

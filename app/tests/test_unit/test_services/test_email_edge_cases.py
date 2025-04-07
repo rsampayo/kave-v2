@@ -75,7 +75,7 @@ async def test_process_very_large_attachment(
     # Mock the file operations to avoid actually writing a large file
     with (
         patch(
-            "app.services.email_processing_service.ATTACHMENTS_DIR",
+            "app.core.config.settings.ATTACHMENTS_BASE_DIR",
             test_attachments_dir,
         ),
         patch("builtins.open") as mock_open_obj,
@@ -164,7 +164,7 @@ async def test_process_many_attachments(
     # Mock file operations
     with (
         patch(
-            "app.services.email_processing_service.ATTACHMENTS_DIR",
+            "app.core.config.settings.ATTACHMENTS_BASE_DIR",
             test_attachments_dir,
         ),
         patch("builtins.open", mock_open()),
@@ -284,7 +284,7 @@ async def test_attachment_with_invalid_base64(
 
     try:
         with patch(
-            "app.services.email_processing_service.ATTACHMENTS_DIR",
+            "app.core.config.settings.ATTACHMENTS_BASE_DIR",
             test_attachments_dir,
         ):
             # WHEN/THEN - Should raise a binascii error due to invalid base64

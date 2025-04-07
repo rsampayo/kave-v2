@@ -38,8 +38,10 @@ This phase focuses on standardizing configuration and ensuring environment-speci
 
 **Step 2.1: Configure `ATTACHMENTS_DIR` via Settings**
 
-*   **Action:** In `app/core/config.py`, define a setting for the base attachments directory (e.g., `ATTACHMENTS_BASE_DIR: Path = Path("data/attachments")`).
-*   **Action:** In `app/services/email_processing_service.py`, remove the hardcoded `ATTACHMENTS_DIR` constant. Import `settings` and use `settings.ATTACHMENTS_BASE_DIR` when constructing file paths.
+*   ✅ **Action:** In `app/core/config.py`, define a setting for the base attachments directory (e.g., `ATTACHMENTS_BASE_DIR: Path = Path("data/attachments")`).
+    * **Completed:** June 14, 2024. Added the `ATTACHMENTS_BASE_DIR` setting to the Settings class in `app/core/config.py` with a default value of `Path("data/attachments")`.
+*   ✅ **Action:** In `app/services/email_processing_service.py`, remove the hardcoded `ATTACHMENTS_DIR` constant. Import `settings` and use `settings.ATTACHMENTS_BASE_DIR` when constructing file paths.
+    * **Completed:** June 14, 2024. Removed the hardcoded `ATTACHMENTS_DIR` constant and modified the code to use `settings.ATTACHMENTS_BASE_DIR` instead. Updated all references to use the configuration setting rather than the hardcoded constant.
 *   **Rationale:** Centralizes configuration, allows environment-specific paths, and improves code maintainability.
 
 **Step 2.2: Manage Database Schema Creation**

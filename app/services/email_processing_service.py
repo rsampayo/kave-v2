@@ -3,22 +3,19 @@ import logging
 import os
 import uuid
 from datetime import datetime
-from pathlib import Path
 from typing import List, Optional
 
 from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.email_data import Attachment, Email, EmailAttachment
 from app.schemas.webhook_schemas import EmailAttachment as SchemaEmailAttachment
 from app.schemas.webhook_schemas import InboundEmailData, MailchimpWebhook
 
 logger = logging.getLogger(__name__)
-
-# Directory to store attachments
-ATTACHMENTS_DIR = Path("data/attachments")
 
 
 # Adapter functions to convert between schema and model types
@@ -158,13 +155,15 @@ class EmailProcessingService:
         result = []
 
         # Ensure attachments directory exists
-        os.makedirs(ATTACHMENTS_DIR, exist_ok=True)
+        os.makedirs(settings.ATTACHMENTS_BASE_DIR, exist_ok=True)
 
         for attach_data in attachments:
             # Create path for storing the attachment with a unique identifier
             filename = attach_data.name
             unique_id = str(uuid.uuid4())[:8]  # Use first 8 chars of UUID for brevity
-            file_path = ATTACHMENTS_DIR / f"{email_id}_{unique_id}_{filename}"
+            file_path = (
+                settings.ATTACHMENTS_BASE_DIR / f"{email_id}_{unique_id}_{filename}"
+            )
 
             # Create the attachment model
             attachment = Attachment(
@@ -198,7 +197,7 @@ class EmailProcessingService:
             message_id: The unique message ID
 
         Returns:
-            Optional[Email]: The email if found, None otherwise
+            Optional[Email]: The email or None if not found
         """
         query = select(Email).where(Email.message_id == message_id)
         result = await self.db.execute(query)
