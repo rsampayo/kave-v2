@@ -11,6 +11,8 @@ include = '\.pyi?$'
 profile = "black"
 line_length = 88
 multi_line_output = 3
+skip = ["venv", "venv_new", ".env", ".venv"]
+skip_glob = ["*/venv/*", "*/venv_new/*"]
 
 [tool.mypy]
 python_version = "3.11"
