@@ -90,7 +90,6 @@ Thumbs.db
 .env.production.local
 
 # Files from git status
-REFACTORING_PLAN.md
 data/attachments/
 mock_webhook.json
 mock_webhook_with_attachment.json
