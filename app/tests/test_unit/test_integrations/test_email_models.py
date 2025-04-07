@@ -1,8 +1,10 @@
-import pytest
 from datetime import datetime
-from typing import Dict, Any
 
-from app.integrations.email.models import EmailAttachment, InboundEmailData, MailchimpWebhook
+from app.integrations.email.models import (
+    EmailAttachment,
+    InboundEmailData,
+    MailchimpWebhook,
+)
 
 
 class TestEmailAttachment:
@@ -89,7 +91,6 @@ class TestInboundEmailData:
     def test_inbound_email_data_to_dict_with_attachments(self) -> None:
         """Test the to_dict method with attachments."""
         # Arrange
-        now = datetime.now()
         attachment1 = EmailAttachment(
             name="test1.pdf",
             type="application/pdf",
@@ -100,7 +101,6 @@ class TestInboundEmailData:
             type="image/jpeg",
             url="https://example.com/test2.jpg"
         )
-        
         email_data = InboundEmailData(
             message_id="test123",
             from_email="sender@example.com",
@@ -160,7 +160,6 @@ class TestMailchimpWebhook:
             from_email="sender@example.com",
             subject="Test Subject"
         )
-        
         webhook = MailchimpWebhook(
             type="inbound",
             fired_at=now,
@@ -199,4 +198,4 @@ class TestMailchimpWebhook:
         assert result["data"] == {}
         assert result["event"] is None
         assert result["webhook_id"] is None
-        assert result["test_mode"] is None 
+        assert result["test_mode"] is None
