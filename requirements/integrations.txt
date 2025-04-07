@@ -1,0 +1,6 @@
+-r base.txt
+# For parsing emails and attachments
+python-dateutil>=2.8.2,<3.0.0
+# For MailChimp integration
+mailchimp-marketing>=3.0.0,<4.0.0
+mailchimp-transactional>=1.0.0,<2.0.0 

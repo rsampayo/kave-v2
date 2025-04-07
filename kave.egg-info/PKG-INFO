@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: kave
+Version: 0.1.0
+Requires-Dist: fastapi
+Requires-Dist: sqlalchemy
+Requires-Dist: pytest
+Requires-Dist: pytest-asyncio
+Dynamic: requires-dist

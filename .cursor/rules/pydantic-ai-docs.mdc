@@ -1,0 +1,2467 @@
+---
+description: Pydantic ai documentation
+globs: 
+alwaysApply: false
+---
+```markdown
+# PydanticAI Framework Knowledge Base for FastAPI Integration
+
+**Document Purpose:** This document provides an exhaustive analysis of the PydanticAI framework, specifically tailored for consumption by a Coder AI assistant. The goal is to equip the Coder AI with the deep knowledge required to assist human developers in integrating, configuring, developing with, troubleshooting, and optimizing PydanticAI within FastAPI applications.
+
+**Source Repository Structure (Summarized):**
+*   `/docs`: Contains MkDocs documentation source files (Markdown).
+    *   `/docs/api`: Detailed API reference for various modules.
+    *   `/docs/examples`: Usage examples demonstrating different features.
+    *   Key files: `agents.md`, `tools.md`, `results.md`, `models.md`, `dependencies.md`, `install.md`, `testing.md`, `logfire.md`, `mcp/index.md`, `graph.md`.
+*   `/docs-site`: Contains configuration and source for the documentation website deployment (using Cloudflare Workers, TypeScript, Wrangler). Less relevant for core framework analysis but indicates deployment infrastructure.
+
+*(Note: Actual source code files like `.py` files were not provided, analysis is based on the extensive documentation and examples.)*
+
+---
+
+## Framework Deep Dive: Identity, Purpose, and Philosophy
+
+### Official Name & Aliases
+
+*   **Official Name:** PydanticAI
+*   **Aliases:** `pydantic-ai` (package name), potentially referred to simply as "Pydantic AI".
+
+### Primary Language(s) & Versions
+
+*   **Primary Language:** Python
+*   **Version Requirements:** Requires Python 3.9+ (as indicated in `install.md`). Relies heavily on Pydantic V2 features.
+
+### Detailed Core Problem Solved
+
+PydanticAI addresses the significant challenges developers face when building applications that interact reliably and predictably with Large Language Models (LLMs). The core problems it tackles are:
+
+1.  **Unstructured LLM Output:** LLMs often produce free-form text responses, which are difficult to parse and use programmatically in a reliable way. Applications frequently need structured data (e.g., JSON objects, specific data types) to function correctly. PydanticAI leverages Pydantic models to define the desired output structure, prompting the LLM to return data in that format and automatically validating the received data against the Pydantic model. This significantly increases the reliability of extracting structured information from LLMs.
+2.  **Complex Tool/Function Calling:** Modern LLMs support "function calling" or "tool use," allowing them to interact with external systems (APIs, databases, etc.) to gather information or perform actions. Managing the schema definition for these tools, validating the arguments provided by the LLM, executing the tools, and returning the results back to the LLM can be complex and error-prone. PydanticAI simplifies this by using standard Python functions (decorated as tools) and Pydantic models for argument validation. It handles the orchestration of detecting tool calls, validating arguments, executing the corresponding Python function, and formatting the results for the LLM.
+3.  **Managing Agent State and Context:** Conversations with LLMs often require maintaining context (message history). Furthermore, tools or prompts might need access to external resources like database connections or API clients. PydanticAI provides mechanisms for managing message history and injecting dependencies (like database connections, API keys, user context) into tools and dynamic system prompts in a type-safe manner.
+4.  **Observability and Debugging:** Understanding *why* an LLM interaction failed or produced an unexpected result is difficult due to the non-deterministic and opaque nature of LLMs. PydanticAI integrates seamlessly with observability tools like Pydantic Logfire, providing detailed tracing of agent runs, including prompts, responses, tool calls, and errors, making debugging and monitoring significantly easier.
+5.  **Model Agnosticism:** Different LLM providers (OpenAI, Anthropic, Google, etc.) have varying APIs and SDKs. PydanticAI provides a consistent interface (`Agent`) for interacting with multiple LLM backends, allowing developers to switch models or use multiple models with minimal code changes. It abstracts away provider-specific details.
+6.  **Building Complex Workflows:** Simple request-response interactions are often insufficient. PydanticAI supports multi-step reasoning, agent delegation (agents calling other agents via tools), and integration with its companion library `pydantic-graph` for building sophisticated, stateful, multi-agent applications using a finite state machine approach.
+
+In essence, PydanticAI aims to make building robust, production-ready applications with generative AI less painful by applying familiar Python best practices (like type hinting via Pydantic, standard function definitions, dependency injection) to the GenAI domain.
+
+### Design Philosophy & Goals
+
+Based on the documentation and examples, the design philosophy and goals appear to be:
+
+1.  **Pythonic and Ergonomic:** Leverage standard Python features (functions, decorators, type hints, dataclasses) and best practices to provide an intuitive and developer-friendly experience, mirroring the philosophy of FastAPI. Avoid overly complex abstractions or "magic."
+2.  **Type Safety First:** Utilize Pydantic heavily for defining data structures (results, tool arguments) and enabling static type checking throughout the agent definition and execution process. This aims to catch errors early and improve code reliability and maintainability.
+3.  **Leverage Pydantic:** Deeply integrate with Pydantic not just for validation but also for schema generation (for tool/result types passed to LLMs) and data serialization.
+4.  **Modularity and Composability:** Design agents as reusable components that can be combined, delegated to, or orchestrated within larger application flows or graphs.
+5.  **Observability:** Build in observability from the ground up, with first-class support for OpenTelemetry and Pydantic Logfire, recognizing the difficulty of debugging LLM interactions.
+6.  **Model Agnosticism:** Provide a consistent high-level API (`Agent`) while abstracting the specifics of different LLM provider APIs and SDKs.
+7.  **Focus on Production Readiness:** Address challenges beyond simple LLM calls, such as reliable structured output, robust tool usage, error handling (retries, fallbacks), state management, and testing, which are crucial for production applications.
+8.  **Avoid Reinventing the Wheel:** Where possible, use existing Python standards and libraries (e.g., Pydantic for validation, standard functions for tools, standard context managers for resource management) rather than creating bespoke mechanisms.
+
+The trade-offs seem to favor explicitness and type safety over implicit magic, and composability over monolithic frameworks. It leans towards developers who appreciate Python's type system and prefer clear control flow.
+
+### Key Features & Capabilities (Exhaustive)
+
+*   **Agent Abstraction (`Agent`):**
+    *   Central class for defining and running LLM interactions.
+    *   Generic over dependency type (`DepsT`) and result type (`ResultDataT`).
+    *   Configuration of default model, system prompts, tools, result type, dependencies type, retry logic, instrumentation, etc.
+*   **Model Agnosticism:**
+    *   Built-in support for OpenAI, Anthropic, Google Gemini (Generative Language API & Vertex AI), Groq, Mistral, Cohere, Bedrock.
+    *   OpenAI-compatible API support for others like Ollama, OpenRouter, Azure AI, DeepSeek, xAI Grok, Perplexity, Fireworks AI, Together AI.
+    *   Extensible `Model` interface for adding custom model support.
+    *   Provider system (`OpenAIProvider`, `GoogleVertexProvider`, etc.) for configuring connection details (API keys, base URLs, custom clients).
+*   **Structured Output:**
+    *   Define desired output structure using Pydantic models or `TypedDict`.
+    *   Automatic generation of JSON schema for the result type, passed to the LLM as a tool.
+    *   Automatic validation of the LLM's response against the Pydantic model.
+    *   Support for Union types as results, registering each member as a separate tool.
+    *   Handles wrapping non-object schemas (like `list[str]`) into a schema the LLM can use.
+*   **Function Tool Calling:**
+    *   Define tools using standard Python functions.
+    *   Use decorators (`@agent.tool`, `@agent.tool_plain`) or list functions/`Tool` objects during Agent initialization.
+    *   Automatic generation of JSON schema for tool parameters based on function signature and type hints.
+    *   Docstring parsing (Google, Numpy, Sphinx styles) to enrich parameter descriptions in the schema.
+    *   Automatic validation of LLM-provided arguments against tool function signature using Pydantic.
+    *   Seamless integration with agent's dependency injection system (`RunContext`).
+    *   Support for common tools (DuckDuckGo, Tavily) via optional dependencies.
+*   **Dynamic Tool Definitions (`prepare`):**
+    *   Ability to dynamically modify or enable/disable tools on a per-run or per-step basis using a `prepare` function.
+*   **System Prompts:**
+    *   Define static system prompts during Agent initialization.
+    *   Define dynamic system prompts using functions decorated with `@agent.system_prompt`.
+    *   Dynamic system prompts can access dependencies via `RunContext`.
+    *   Multiple prompts are concatenated in order of definition.
+*   **Message Handling & Chat History:**
+    *   Manages conversation history internally during a run.
+    *   Provides methods (`all_messages`, `new_messages`, `all_messages_json`, `new_messages_json`) on result objects to access message history.
+    *   Allows passing previous message history (`message_history` parameter) to subsequent runs to maintain context.
+    *   Messages are model-agnostic and serializable (e.g., to JSON).
+    *   Defines specific message part types (`UserPromptPart`, `SystemPromptPart`, `ToolCallPart`, `ToolReturnPart`, `TextPart`, etc.).
+*   **Streaming:**
+    *   Support for streaming responses from LLMs (`agent.run_stream`).
+    *   Stream text responses incrementally (`result.stream_text(delta=True)`) or as complete cumulative text (`result.stream_text()`).
+    *   Stream structured responses with partial validation (`result.stream()`, `result.stream_structured()`). Leverages Pydantic's experimental partial validation.
+    *   Provides `StreamedRunResult` context manager for handling stream lifecycle.
+*   **Dependency Injection:**
+    *   Define dependency types (often dataclasses or Pydantic models) using `deps_type` on `Agent`.
+    *   Pass dependency instances during agent runs (`deps` parameter).
+    *   Access dependencies within tools and dynamic system prompts via `RunContext.deps`.
+    *   Supports both sync and async dependencies.
+    *   Testability feature: `agent.override(deps=...)` context manager to inject mock/test dependencies.
+*   **Reflection and Self-Correction:**
+    *   Automatic retries when Pydantic validation fails for tool arguments or structured results. Validation errors are passed back to the LLM.
+    *   Tools/validators can raise `ModelRetry` exception to explicitly request the LLM to retry.
+    *   Configurable retry limits (agent-level, tool-level, validator-level).
+    *   `RunContext.retry` provides access to the current retry count.
+*   **Error Handling:**
+    *   Specific exceptions defined (e.g., `ModelError`, `ModelHTTPError`, `UsageLimitExceeded`, `UnexpectedModelBehavior`, `ModelRetry`).
+    *   `capture_run_messages` context manager to capture message history even if a run fails.
+    *   `FallbackModel` allows defining a sequence of models to try if one fails (e.g., due to API errors). Customizable fallback conditions.
+*   **Observability & Instrumentation:**
+    *   Optional, seamless integration with Pydantic Logfire (`instrument=True` or `Agent.instrument_all()`).
+    *   Based on OpenTelemetry standards.
+    *   Provides detailed traces of agent runs, including prompts, responses, tool calls/returns, validation steps, errors, and usage.
+    *   Allows instrumentation of other libraries (e.g., `httpx`, `asyncpg`) for holistic application tracing.
+    *   Configurable instrumentation settings (`InstrumentationSettings`) for event mode, custom providers.
+*   **Usage Tracking & Limits:**
+    *   Tracks token counts (request, response, total) and request counts per run (`result.usage()`).
+    *   Allows setting usage limits (`UsageLimits`) per run (request count, token counts) to prevent excessive costs or infinite loops. Raises `UsageLimitExceeded`.
+*   **Testing Utilities:**
+    *   `TestModel`: A mock model for unit testing. Simulates tool calls and generates simple structured/text responses without actual LLM calls. Configurable responses.
+    *   `FunctionModel`: A mock model controlled by a user-provided function, allowing fine-grained simulation of LLM behavior for testing specific scenarios.
+    *   `Agent.override()`: Context manager to temporarily replace an agent's model or dependencies during tests.
+    *   `capture_run_messages()`: Context manager to assert on messages exchanged during test runs.
+    *   `ALLOW_MODEL_REQUESTS`: Global flag to prevent accidental real LLM calls during tests.
+*   **Multi-Agent Patterns:**
+    *   **Agent Delegation:** Agents can call other agents via tools. Usage tracking can be combined.
+    *   **Programmatic Handoff:** Application logic orchestrates calls to different agents sequentially based on state or user input.
+*   **Pydantic Graph Integration:**
+    *   Uses `pydantic-graph` internally for agent execution flow (though often abstracted away).
+    *   Exposes low-level graph iteration via `Agent.iter()` returning an `AgentRun` async iterator/context manager for fine-grained control and inspection of execution steps (nodes).
+    *   Supports streaming events from individual graph nodes (`ModelRequestNode`, `CallToolsNode`).
+*   **Model Context Protocol (MCP) Support:**
+    *   **Client:** `Agent` can connect to MCP servers (`MCPServerHTTP`, `MCPServerStdio`) to use external tools defined by those servers.
+    *   **Server:** `Agent` can be used *within* an MCP server implementation to provide AI capabilities via tools.
+    *   Provides `mcp-run-python` server for sandboxed Python code execution via MCP.
+*   **Command Line Interface (CLI):**
+    *   Provides a `pai` CLI tool (via `pydantic-ai[cli]`) for interactive chat with various supported models directly from the terminal.
+*   **Installation Flexibility:**
+    *   `pydantic-ai` package includes all core features and model support.
+    *   `pydantic-ai-slim` package provides a minimal core, requiring optional extras (`[openai]`, `[anthropic]`, `[logfire]`, etc.) to be installed for specific features or models.
+
+### Suitability for FastAPI Integration Assessment
+
+PydanticAI is **highly suitable** for integration into FastAPI applications. It functions primarily as a **library** designed to be embedded within other applications, rather than a standalone framework.
+
+**Reasons for Suitability:**
+
+1.  **Library Design:** PydanticAI doesn't impose its own web server or request handling logic. It provides classes (`Agent`) and functions meant to be called from application code, like FastAPI endpoint handlers or background tasks.
+2.  **Async Native:** The primary interaction methods (`run`, `run_stream`, `iter`, async tools) are asynchronous (`async def`), aligning perfectly with FastAPI's async nature. This allows agent operations to be performed without blocking FastAPI's event loop (provided the tools themselves and underlying SDKs are also non-blocking). `run_sync` exists but should generally be wrapped (e.g., `run_in_threadpool`) if used directly in async FastAPI endpoints.
+3.  **Pydantic Synergy:** Both FastAPI and PydanticAI rely heavily on Pydantic. This makes data exchange seamless. Pydantic models defined for FastAPI request/response bodies can often be directly used or easily adapted for PydanticAI's `result_type` or tool arguments. Validation is consistent across both layers.
+4.  **Dependency Injection Compatibility:** FastAPI's dependency injection system can be used to manage `Agent` instances or their dependencies (`SupportDependencies` in examples). Agents or dependency objects can be created during startup and injected into endpoints.
+5.  **Lifecycle Management:** PydanticAI agents, especially their dependencies (like `httpx.AsyncClient` within providers), might require setup and teardown. FastAPI's lifespan events (`startup`, `shutdown`) provide the perfect place to manage these resources, ensuring connections are established on startup and gracefully closed on shutdown.
+6.  **Streaming Support:** PydanticAI's `run_stream` and its associated methods (`stream_text`, `stream_structured`) align well with FastAPI's `StreamingResponse`, allowing real-time responses to be sent to clients.
+7.  **Background Tasks:** For long-running agent interactions that shouldn't block HTTP responses, FastAPI's `BackgroundTasks` or external task queues (like Celery, ARQ) can be used to trigger `agent.run` or `agent.run_sync` in the background.
+8.  **Error Handling:** PydanticAI's custom exceptions can be caught within FastAPI endpoints or middleware and translated into appropriate HTTP error responses (e.g., 4xx for validation errors, 5xx for model/infra errors).
+
+**Potential Challenges/Considerations:**
+
+*   **Blocking Code:** If custom tools perform blocking I/O or CPU-intensive work synchronously, they must be run appropriately within FastAPI's async context (e.g., using `anyio.to_thread.run_sync` or `run_in_threadpool`) to avoid blocking the event loop.
+*   **Resource Management:** Careful management of dependencies (like HTTP clients used by Providers) within the FastAPI lifespan is essential to avoid resource leaks.
+*   **State Management:** While agents themselves are typically stateless between runs (relying on passed `message_history`), managing the conversation state (the message history itself) across multiple requests in a FastAPI application requires explicit handling (e.g., storing history in a database, session, or client-side).
+
+**Integration Points:** PydanticAI does not provide explicit web framework integration helpers (like a FastAPI plugin). Integration is achieved by instantiating and calling the `Agent` class directly within FastAPI code (endpoints, dependencies, background tasks, lifespan events).
+
+---
+
+## In-Depth Architecture & Core Concepts
+
+### Detailed Architectural Overview
+
+PydanticAI's architecture revolves around the `Agent` class as the central orchestrator, interacting with pluggable `Model` interfaces, utilizing `Tool` definitions, and managing conversational state through `ModelMessage` objects. Internally, it leverages `pydantic-graph` for managing the execution flow, although this is often abstracted away from the end-user for simpler use cases.
+
+**Major Components & Interactions:**
+
+1.  **`Agent` Class:**
+    *   **Role:** The primary user-facing entry point. Encapsulates the configuration and logic for an AI interaction task.
+    *   **Configuration:** Holds references to the default model, system prompts (static & dynamic functions), tool definitions, result type definition, dependency type definition, retry settings, and instrumentation settings.
+    *   **Orchestration:** Manages the run lifecycle (`run`, `run_sync`, `run_stream`, `iter`). Constructs initial prompts, calls the `Model`, handles responses (text or tool calls), invokes tools, manages retries, validates results, and tracks usage.
+    *   **Internal Graph:** Uses a `pydantic-graph.Graph` instance internally to define the state transitions (e.g., UserPrompt -> ModelRequest -> ModelResponse -> CallTools -> ModelRequest -> ... -> End).
+
+2.  **`Model` Interface (ABC & Implementations):**
+    *   **Role:** Abstract base class (`pydantic_ai.models.Model`) defining the interface for interacting with different LLM providers. Concrete implementations (`OpenAIModel`, `AnthropicModel`, `GeminiModel`, etc.) handle provider-specific API calls and data mapping.
+    *   **Responsibilities:**
+        *   Accepts a list of `ModelMessage` objects (representing the conversation history and current prompt/tool results) and model parameters (`ModelRequestParameters`).
+        *   Communicates with the underlying LLM API via its SDK or direct HTTP calls (managed by a `Provider`).
+        *   Returns a `ModelResponse` object containing the LLM's output (text, tool calls).
+        *   Handles streaming responses via the `StreamedResponse` interface.
+    *   **Interaction:** Called by the `Agent` during a run to get completions from the LLM.
+
+3.  **`Provider` Classes:**
+    *   **Role:** Handle the specifics of connecting and authenticating with a particular LLM API endpoint. Associated with a `Model` interface.
+    *   **Responsibilities:** Manage API keys, base URLs, HTTP clients (`httpx`), authentication headers, and potentially provider-specific configurations.
+    *   **Interaction:** Used internally by `Model` implementations to make the actual API calls. Allows customization of endpoints (e.g., for Azure OpenAI, OpenRouter) and connection parameters.
+
+4.  **`Tool` / Function Tools:**
+    *   **Role:** Represent external functions or capabilities the LLM can invoke.
+    *   **Definition:** Defined as standard Python functions, often decorated with `@agent.tool` or `@agent.tool_plain`, or wrapped in the `Tool` class.
+    *   **Schema Generation:** PydanticAI automatically generates a JSON schema for the tool's parameters (excluding `RunContext`) based on type hints and docstrings. This schema is passed to the `Model`.
+    *   **Execution:** When the `Model` returns a `ToolCallPart`, the `Agent` validates the arguments using Pydantic, finds the corresponding Python function, injects dependencies if needed (`RunContext`), executes the function, and formats the result to be sent back to the `Model`.
+
+5.  **`ModelMessage` & Parts:**
+    *   **Role:** Define the structure of communication between the `Agent` and the `Model`. Represents the conversation history.
+    *   **Hierarchy:** `ModelMessage` is a union of `ModelRequest` and `ModelResponse`. These contain lists of `ModelRequestPart` or `ModelResponsePart` respectively.
+    *   **Parts:** Specific types like `SystemPromptPart`, `UserPromptPart`, `ToolCallPart`, `ToolReturnPart`, `TextPart`, `ImageUrl`, `AudioUrl`, `DocumentUrl`, `BinaryContent` represent distinct elements within a request or response.
+    *   **Interaction:** Passed to the `Model` on each turn, and returned by the `Model`. Also accessible to the user via result objects.
+
+6.  **Result Handling (`result_type`, Validators):**
+    *   **Role:** Define and validate the final output of an agent run when a structured result is expected.
+    *   **Definition:** Specified by the `result_type` parameter on the `Agent`, typically a Pydantic model or `TypedDict`.
+    *   **Mechanism:** The schema of the `result_type` is registered as a special tool with the `Model`. When the model calls this "result tool," the `Agent` validates the arguments against the `result_type` schema.
+    *   **Validators:** Optional functions (`@agent.result_validator`) can perform additional validation (potentially async/IO-bound) on the structured result before the run concludes.
+
+7.  **`RunContext`:**
+    *   **Role:** Provides access to runtime information within dynamic system prompts, tools, and result validators.
+    *   **Contents:** Includes `deps` (dependency instance), `usage` (current `Usage` object), and `retry` (current retry count).
+    *   **Generics:** Parameterized by the dependency type (`DepsT`) defined on the `Agent`.
+
+8.  **`pydantic-graph` (Internal):**
+    *   **Role:** Manages the state transitions and execution flow within an `Agent` run. Defines nodes like `UserPromptNode`, `ModelRequestNode`, `CallToolsNode`, `End`.
+    *   **Interaction:** The `Agent`'s `run`/`run_stream` methods essentially drive this underlying graph. `Agent.iter` exposes direct interaction with this graph.
+
+**Flow of Control (Simplified `Agent.run`):**
+
+1.  **Input:** `Agent.run` receives user prompt, optional `message_history`, optional `deps`, model settings, usage limits.
+2.  **Prompt Assembly:** If no `message_history`, dynamic system prompts are executed (using `deps`) and combined with static prompts and the user prompt into the initial `ModelRequest`. If `message_history` exists, only the user prompt is added.
+3.  **Model Call:** The `Agent` passes the `ModelRequest` messages and relevant parameters (like tool definitions derived from registered tools and `result_type`) to the configured `Model` interface's `run` method.
+4.  **Model Response:** The `Model` (using its `Provider`) calls the LLM API and returns a `ModelResponse`.
+5.  **Response Handling:**
+    *   **If `TextPart`:** If the response is text and the `Agent` allows text results (based on `result_type`), the text is considered the final result. The run ends.
+    *   **If `ToolCallPart`:**
+        *   The `Agent` identifies the tool name and arguments.
+        *   Arguments are validated against the tool function's signature using Pydantic. If validation fails, a retry message is sent to the `Model`.
+        *   The corresponding tool function is executed (potentially async, potentially using `RunContext` to access `deps`).
+        *   The tool's return value is formatted into a `ToolReturnPart`.
+        *   A new `ModelRequest` containing the `ToolReturnPart` is created.
+        *   Go back to Step 3 (Model Call).
+    *   **If "Result Tool" Call:** (i.e., tool name matches the internal name for the `result_type`)
+        *   Arguments are validated against the `result_type` schema. If validation fails, a retry message is sent to the `Model`.
+        *   Result validator functions (if any) are executed (potentially async, potentially using `RunContext`). If a validator raises `ModelRetry`, a retry message is sent.
+        *   If validation passes, the validated Pydantic model/object is the final result. The run ends.
+6.  **Retry Logic:** If `ModelRetry` is raised or validation fails, and retry limits are not exceeded, a `RetryPromptPart` is added to the `ModelRequest`, and the flow returns to Step 3.
+7.  **End:** The run finishes, returning an `AgentRunResult` containing the final data (text or structured object), usage information, and complete message history.
+
+**(Note: Streaming (`run_stream`) follows a similar flow but yields intermediate results/deltas.)**
+
+### Fundamental Abstractions & Patterns (Comprehensive)
+
+*   **Agent (`Agent` class):** The core abstraction representing a configured AI task or capability. Encapsulates prompts, tools, models, result expectations, and dependencies. Acts as the main entry point for execution. *Pattern: Facade, Strategy (pluggable models/providers).*
+*   **Model Interface (`Model` ABC):** Defines a standardized contract for interacting with different LLM providers, abstracting away API specifics. Implementations (`OpenAIModel`, `AnthropicModel`, etc.) adapt the standard interface to specific SDKs/APIs. *Pattern: Abstract Base Class, Adapter.*
+*   **Provider (`Provider` classes):** Encapsulates the logic for connecting and authenticating to a specific API endpoint (e.g., OpenAI default vs. Azure OpenAI). Allows configuration of base URLs, API keys, and HTTP clients. *Pattern: Strategy, Configuration.*
+*   **Function Tool (`@agent.tool`, `Tool` class):** Represents external capabilities callable by the LLM. Leverages standard Python functions and uses their signature/docstring for schema generation. *Pattern: Command (implicitly), Decorator.*
+*   **Structured Results (`result_type`):** Using Pydantic models or `TypedDict` to define the expected structure of the final output. The schema is implicitly registered as a special tool for the LLM. *Pattern: Data Transfer Object (DTO), Schema Definition.*
+*   **Message Passing (`ModelMessage`, `ModelRequest`, `ModelResponse`, Parts):** Defines the immutable data structures used for communication between the Agent and the Model, representing the conversation turns and their components (text, tool calls, etc.). *Pattern: Message Passing, Value Object.*
+*   **Dependency Injection (`deps_type`, `RunContext`):** A mechanism to provide external resources (configs, connections, services) to tools and dynamic prompts in a type-safe way without hardcoding them. `RunContext` acts as the context object holding these dependencies. *Pattern: Dependency Injection.*
+*   **Unit of Work / Run Lifecycle (`run`, `run_stream`, `iter`, `AgentRunResult`, `StreamedRunResult`, `AgentRun`):** Defines the methods to execute an agent task and the objects representing the ongoing or completed run, including results, messages, and usage. `run_stream` and `iter` introduce async iteration patterns. *Pattern: Unit of Work, Iterator, Context Manager.*
+*   **Reflection / Retry Loop:** The mechanism by which validation errors or explicit `ModelRetry` exceptions trigger feedback to the LLM, prompting it to correct its tool usage or output format. *Pattern: State Machine (implicit retry state), Error Handling.*
+*   **Observability Hooks (`instrument`, `InstrumentationSettings`, Logfire Integration):** Built-in support for tracing and logging agent execution using OpenTelemetry. *Pattern: Observer (implicit via instrumentation), Telemetry.*
+*   **Configuration (`Agent` constructor, `ModelSettings`, `UsageLimits`, `Provider` args):** Multiple ways to configure agent behavior, model parameters, and resource limits, promoting flexibility. *Pattern: Configuration Object.*
+*   **Internal State Machine (`pydantic-graph`):** The underlying engine managing the flow between user input, model calls, tool execution, and result validation. Exposes nodes like `ModelRequestNode`, `CallToolsNode`. *Pattern: State Machine.*
+*   **Resource Management (`AsyncClient` in Providers, `run_stream` context manager):** Handling resources like HTTP connections, often tied to the lifespan of providers or specific run methods. *Pattern: Resource Acquisition Is Initialization (RAII) via context managers.*
+*   **Fallback (`FallbackModel`):** A strategy for handling failures by attempting a sequence of models. *Pattern: Chain of Responsibility (simplified), Circuit Breaker (conceptual similarity).*
+
+### Key Internal Modules/Packages
+
+*(Based on documentation structure, inferring key areas)*
+
+*   **`pydantic_ai.agent`:** Contains the core `Agent` class, `AgentRunResult`, `AgentRun`, `RunContext`, `InstrumentationSettings`. This is the central orchestration module.
+*   **`pydantic_ai.models`:** Defines the `Model` ABC and specific implementations (`OpenAIModel`, `AnthropicModel`, `GeminiModel`, `TestModel`, `FunctionModel`, `FallbackModel`, etc.). Handles interaction with LLM APIs.
+*   **`pydantic_ai.providers`:** Contains `Provider` classes (`OpenAIProvider`, `GoogleVertexProvider`, etc.) responsible for authentication and connection details for specific API endpoints.
+*   **`pydantic_ai.messages`:** Defines the data structures for communication (`ModelMessage`, `ModelRequest`, `ModelResponse`, and various `Part` types like `TextPart`, `ToolCallPart`). Crucial for understanding the data flow.
+*   **`pydantic_ai.tools`:** Defines the `Tool` class, decorators (`@tool`, `@tool_plain`), and related utilities for function tool definition and schema generation.
+*   **`pydantic_ai.result`:** Defines `StreamedRunResult` and handles logic related to streaming outputs.
+*   **`pydantic_ai.exceptions`:** Defines custom exception types used throughout the library. Important for error handling strategies.
+*   **`pydantic_ai.settings`:** Defines configuration objects like `ModelSettings` (for LLM parameters like temperature) and `UsageLimits`.
+*   **`pydantic_ai.usage`:** Defines the `Usage` class for tracking token counts and requests.
+*   **`pydantic_ai.common_tools`:** Provides pre-built tools like DuckDuckGo and Tavily search.
+*   **`pydantic_ai.mcp`:** Contains classes for MCP client integration (`MCPServerHTTP`, `MCPServerStdio`).
+*   **`pydantic_graph` (dependency):** Although external, its core concepts (`Graph`, `BaseNode`, `GraphRunContext`, `End`) are fundamental to the internal execution flow of `Agent`, especially when using `Agent.iter`. Key modules likely include `graph`, `nodes`, `persistence`.
+
+---
+
+## Exhaustive Integration & Lifecycle Management (FastAPI Context)
+
+### All Potential Integration Methods
+
+PydanticAI, being a library, is integrated by calling its components from within your FastAPI application code. Here are the primary ways:
+
+1.  **Direct Instantiation and Call in Endpoints:**
+    *   Instantiate an `Agent` globally or within an endpoint.
+    *   Call `agent.run()` or `agent.run_sync()` directly inside an endpoint function to handle a request.
+    *   Suitable for simple, synchronous-like request/response flows where the agent run is relatively fast.
+    *   If using `run_sync`, wrap it with `anyio.to_thread.run_sync` or similar in async endpoints.
+    *   *Example Sketch:*
+        ```python
+        from fastapi import FastAPI
+        from pydantic_ai import Agent
+        import anyio
+
+        app = FastAPI()
+        # Global agent (consider lifespan management for production)
+        my_agent = Agent('openai:gpt-4o')
+
+        @app.post("/query")
+        async def handle_query(prompt: str):
+            # For async run
+            result = await my_agent.run(prompt)
+            return {"response": result.data}
+
+        @app.post("/query_sync_in_thread")
+        async def handle_query_sync(prompt: str):
+            # For sync run in async endpoint
+            result = await anyio.to_thread.run_sync(my_agent.run_sync, prompt)
+            return {"response": result.data}
+        ```
+
+2.  **FastAPI Dependency Injection:**
+    *   Define a FastAPI dependency that provides an `Agent` instance.
+    *   Inject the `Agent` into endpoint functions.
+    *   Allows for cleaner code and easier management/testing of the agent instance.
+    *   The agent instance can be created once during application startup (see Lifespan Management).
+    *   *Example Sketch:*
+        ```python
+        from fastapi import FastAPI, Depends
+        from pydantic_ai import Agent
+
+        # Assume agent is created and managed in lifespan events
+        # and stored somewhere accessible, e.g., app.state
+        app = FastAPI()
+
+        def get_agent() -> Agent:
+            # In reality, fetch pre-initialized agent
+            return app.state.my_agent
+
+        @app.post("/query_di")
+        async def handle_query_di(prompt: str, agent: Agent = Depends(get_agent)):
+            result = await agent.run(prompt)
+            return {"response": result.data}
+        ```
+
+3.  **FastAPI Background Tasks:**
+    *   For longer-running agent interactions that shouldn't block the HTTP response.
+    *   Inject FastAPI's `BackgroundTasks` into an endpoint.
+    *   Add the `agent.run()` or `agent.run_sync()` call as a background task.
+    *   The endpoint returns immediately (e.g., with a task ID or "processing" message). Results need to be stored/retrieved separately (e.g., WebSocket, polling, webhook).
+    *   *Example Sketch:*
+        ```python
+        from fastapi import FastAPI, BackgroundTasks, Depends
+        from pydantic_ai import Agent
+
+        app = FastAPI()
+        # Assume agent managed via lifespan/DI
+        def get_agent() -> Agent: return app.state.my_agent
+
+        def run_agent_task(agent: Agent, prompt: str, task_id: str):
+            # This runs in the background
+            result = agent.run_sync(prompt) # Or use await agent.run() if task runner supports async
+            print(f"Task {task_id} finished. Result: {result.data}")
+            # Store result somewhere accessible by task_id
+
+        @app.post("/query_background")
+        async def query_background(prompt: str, background_tasks: BackgroundTasks, agent: Agent = Depends(get_agent)):
+            task_id = "some_unique_id" # Generate task ID
+            background_tasks.add_task(run_agent_task, agent, prompt, task_id)
+            return {"message": "Processing started", "task_id": task_id}
+        ```
+
+4.  **External Task Queues (Celery, ARQ, etc.):**
+    *   Similar to Background Tasks but more robust for distributed systems, retries, etc.
+    *   Define a task (e.g., a Celery task) that takes necessary inputs (prompt, maybe serialized history/deps) and runs the agent.
+    *   The FastAPI endpoint enqueues the task.
+    *   Requires setting up the task queue framework and workers. The agent needs to be initializable within the task worker environment.
+
+5.  **Streaming Responses (`StreamingResponse`):**
+    *   Use `agent.run_stream()` within an endpoint.
+    *   Use `result.stream_text()` or `result.stream_structured()` to get an async generator.
+    *   Return FastAPI's `StreamingResponse` passing the async generator.
+    *   Ideal for real-time chat applications.
+    *   *Example Sketch (Text Streaming):*
+        ```python
+        from fastapi import FastAPI, Depends
+        from fastapi.responses import StreamingResponse
+        from pydantic_ai import Agent
+
+        app = FastAPI()
+        # Assume agent managed via lifespan/DI
+        def get_agent() -> Agent: return app.state.my_agent
+
+        async def stream_agent_response(agent: Agent, prompt: str):
+            async with agent.run_stream(prompt) as result:
+                async for chunk in result.stream_text(delta=True):
+                    yield chunk # Or format as SSE, etc.
+
+        @app.post("/query_stream")
+        async def query_stream(prompt: str, agent: Agent = Depends(get_agent)):
+            return StreamingResponse(stream_agent_response(agent, prompt), media_type="text/plain")
+        ```
+
+6.  **Using `Agent.iter` for Fine-Grained Control:**
+    *   For complex scenarios requiring inspection or intervention at each step of the agent's internal graph.
+    *   Use `async with agent.iter(...) as run:` within an endpoint or background task.
+    *   Iterate `async for node in run:` or manually drive with `await run.next(node)`.
+    *   More complex, suitable for advanced use cases like custom state management or integrating external logic between agent steps.
+
+### Instantiation & Initialization Deep Dive
+
+Instantiating `pydantic_ai.Agent` requires specifying at least the model interface. Other parameters configure its behavior.
+
+**Core Parameters:**
+
+*   `model`: (Required) Either:
+    *   A string identifier like `"openai:gpt-4o"`, `"anthropic:claude-3-5-sonnet-latest"`, `"google-gla:gemini-1.5-flash"`. PydanticAI parses this and uses the corresponding `Model` implementation and default `Provider`. Requires appropriate environment variables (e.g., `OPENAI_API_KEY`) for the default provider.
+    *   An instantiated `Model` object (e.g., `OpenAIModel("gpt-4o")`, `GeminiModel("gemini-1.5-pro", provider=GoogleVertexProvider(...))`). This allows for custom provider configuration.
+*   `system_prompt`: (Optional) A string or list of strings defining static system prompts.
+*   `tools`: (Optional) A list of functions or `Tool` instances to be used as function tools.
+*   `result_type`: (Optional) The Pydantic model, `TypedDict`, or basic type (`str`, `list[str]`, `Union[...]`, etc.) defining the expected structured output. If `str` or includes `str` in a Union, text responses are allowed. Defaults implicitly to `str` if not provided.
+*   `deps_type`: (Optional) The type hint for dependencies expected by tools/dynamic prompts (e.g., `MyDepsDataclass`). Used for static type checking.
+*   `retries`: (Optional[int]) Default number of retries for validation errors or `ModelRetry` exceptions (default is 1).
+*   `instrument`: (Optional[Union[bool, InstrumentationSettings]]) Enable/configure OpenTelemetry instrumentation (default is `False`).
+*   `model_settings`: (Optional[ModelSettings | dict]) Default model parameters (e.g., temperature, max_tokens) to use for runs. See [Complete Configuration Guide](#complete-configuration-guide-for-integration-scenario).
+*   `end_strategy`: (Optional[EndStrategy]) How to determine when a run should end (default `EndStrategy.GENERATION_OR_TOOL_CALL`).
+
+**Instantiation Examples within FastAPI:**
+
+*   **Simple Global Agent (requires env vars):**
+    ```python
+    # main.py
+    from fastapi import FastAPI
+    from pydantic_ai import Agent
+
+    app = FastAPI()
+    # Instantiated at module level. Dependencies like HTTP clients within
+    # default providers are created lazily on first use.
+    # Assumes OPENAI_API_KEY is set.
+    simple_agent = Agent('openai:gpt-4o', system_prompt="Be helpful.")
+
+    @app.post("/simple")
+    async def simple_endpoint(prompt: str):
+        result = await simple_agent.run(prompt)
+        return {"response": result.data}
+    ```
+    *   *Pros:* Simple for basic cases.
+    *   *Cons:* Less flexible configuration, relies on env vars, harder to manage resources/testing. Global state.
+
+*   **Agent in App State (Initialized during Lifespan):**
+    ```python
+    # main.py
+    from contextlib import asynccontextmanager
+    from fastapi import FastAPI, Depends
+    from pydantic_ai import Agent
+    from pydantic_ai.models import OpenAIModel
+    from pydantic_ai.providers import OpenAIProvider
+    import httpx
+    import os
+
+    # Define dependency structure if needed
+    # from pydantic import BaseModel
+    # class MyAgentDeps(BaseModel): ...
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        # Startup: Initialize resources and agent
+        print("Lifespan startup: Initializing Agent...")
+        # Example: Explicit provider with custom client
+        # Manage httpx client lifecycle
+        app.state.http_client = httpx.AsyncClient(timeout=30.0)
+        provider = OpenAIProvider(
+            api_key=os.getenv("OPENAI_API_KEY"), # Or read from config
+            openai_client=None # Let provider create one using app.state.http_client implicitly or explicitly pass it
+            # Or pass a fully custom openai.AsyncOpenAI client instance
+        )
+        app.state.my_agent = Agent(
+            model=OpenAIModel("gpt-4o", provider=provider),
+            system_prompt="Assist the user.",
+            # result_type=MyResultModel, # If needed
+            # deps_type=MyAgentDeps,     # If needed
+            instrument=True # Enable Logfire/OTel if configured
+        )
+        print("Lifespan startup: Agent initialized.")
+        yield
+        # Shutdown: Cleanup resources
+        print("Lifespan shutdown: Cleaning up...")
+        await app.state.http_client.aclose()
+        # Agent itself might not need explicit cleanup unless
+        # it holds other resources directly (uncommon).
+        print("Lifespan shutdown: Cleanup complete.")
+
+    app = FastAPI(lifespan=lifespan)
+
+    def get_agent() -> Agent:
+        return app.state.my_agent
+
+    @app.post("/query_lifespan")
+    async def query_lifespan(prompt: str, agent: Agent = Depends(get_agent)):
+        # Create dependencies instance if agent requires them
+        # agent_deps = MyAgentDeps(...) # Fetch/create deps
+        # result = await agent.run(prompt, deps=agent_deps)
+        result = await agent.run(prompt) # Assuming no deps for simplicity
+        return {"response": result.data}
+    ```
+    *   *Pros:* Centralized initialization, proper resource management (like `httpx.AsyncClient`), testable via dependency injection overrides, configuration can be loaded properly during startup. Recommended for production.
+    *   *Cons:* More boilerplate than global instantiation.
+
+*   **Agent with Dependencies:** If the agent uses dependencies (`deps_type`), you need to create an instance of that type and pass it to `agent.run(..., deps=...)`. These dependencies might themselves be managed by FastAPI's DI system.
+    ```python
+    # Assume MyAgentDeps and agent configured in lifespan as above
+    from fastapi import Depends
+    # ... other imports
+
+    # FastAPI dependency to provide agent dependencies
+    async def get_agent_dependencies() -> MyAgentDeps:
+        # Fetch user info, database connections, etc. based on request context
+        # Example: Fetch from DB based on authenticated user
+        db_conn = await get_db_connection() # Another FastAPI dependency
+        user_id = await get_current_user_id() # Another FastAPI dependency
+        return MyAgentDeps(user_id=user_id, db=db_conn, other_service=...)
+
+    @app.post("/query_with_deps")
+    async def query_with_deps(
+        prompt: str,
+        agent: Agent = Depends(get_agent),
+        agent_deps: MyAgentDeps = Depends(get_agent_dependencies)
+    ):
+        result = await agent.run(prompt, deps=agent_deps)
+        return {"response": result.data}
+    ```
+
+### Comprehensive FastAPI Lifespan Management (startup/shutdown)
+
+Proper resource management is crucial when integrating PydanticAI (or any library managing external connections/resources) into a long-running application like FastAPI. FastAPI's `lifespan` context manager is the ideal place for this.
+
+**Resources Managed by PydanticAI (Potentially):**
+
+1.  **HTTP Clients (`httpx.AsyncClient`):** These are typically managed within `Provider` classes (e.g., `OpenAIProvider`, `GoogleVertexProvider`, `AnthropicProvider`). If a custom client isn't passed, the provider often creates one internally. These clients manage connection pools and should be properly closed on application shutdown.
+2.  **External Connections (within Dependencies):** If your agent's `deps_type` includes objects managing database connections (like `asyncpg.Pool`), other API clients, or file handles, these need to be initialized on startup and closed on shutdown.
+3.  **MCP Servers (Stdio):** If using `MCPServerStdio`, the `agent.run_mcp_servers()` context manager handles starting/stopping the subprocess. This context should ideally be managed within the application's lifespan if the MCP connection needs to persist across requests, or within request scope if needed only for a single request. For persistent connections across requests, managing the `ClientSession` from the `mcp` library within the FastAPI lifespan might be necessary.
+4.  **Background Threads/Processes (Potentially):** While PydanticAI itself doesn't typically start long-lived background threads, custom tools or dependencies might. These should be managed appropriately.
+
+**Robust Lifespan Example:**
+
+```python
+# main.py
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Depends
+from pydantic_ai import Agent
+from pydantic_ai.models import GeminiModel
+from pydantic_ai.providers import GoogleVertexProvider # Example provider
+import httpx
+import os
+import asyncpg # Example DB dependency
+from pydantic import BaseModel, Field # Example config/deps model
+
+# --- Configuration ---
+class AppSettings(BaseModel):
+    openai_api_key: str = Field(..., env='OPENAI_API_KEY')
+    gcp_project_id: str = Field(..., env='GCP_PROJECT_ID')
+    db_dsn: str = Field(..., env='DATABASE_URL')
+    # Add other settings
+
+settings = AppSettings() # Load from env vars/files using Pydantic BaseSettings pattern
+
+# --- Agent Dependencies ---
+class AgentDeps:
+    def __init__(self, db_pool: asyncpg.Pool, user_id: int | None = None):
+         self.db_pool = db_pool
+         self.user_id = user_id # Example: user context needed by tools
+
+    async def get_user_setting(self, setting_name: str) -> str | None:
+        if not self.user_id: return None
+        async with self.db_pool.acquire() as conn:
+            # Example DB interaction
+            value = await conn.fetchval(
+                "SELECT value FROM user_settings WHERE user_id = $1 AND name = $2",
+                self.user_id, setting_name
+            )
+            return value
+
+# --- Lifespan Management ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # === Startup ===
+    print("Lifespan startup...")
+    # 1. Initialize shared HTTP client for Providers
+    app.state.http_client = httpx.AsyncClient(timeout=60.0)
+
+    # 2. Initialize Database Pool (Example Dependency)
+    try:
+        app.state.db_pool = await asyncpg.create_pool(
+            dsn=settings.db_dsn, min_size=1, max_size=10
+        )
+        print("Database pool created.")
+    except Exception as e:
+        print(f"FATAL: Could not connect to database: {e}")
+        # Decide how to handle failure - maybe exit or run without DB?
+        app.state.db_pool = None # Indicate DB is unavailable
+
+    # 3. Initialize Agent(s)
+    # Example: Gemini using Vertex AI Provider
+    vertex_provider = GoogleVertexProvider(
+        project_id=settings.gcp_project_id,
+        http_client=app.state.http_client # Reuse shared client
+        # Assumes ADC or service account configured elsewhere
+    )
+    app.state.main_agent = Agent(
+        model=GeminiModel("gemini-1.5-pro", provider=vertex_provider),
+        deps_type=AgentDeps, # Agent expects our dependency class
+        instrument=True # Enable instrumentation
+    )
+    print("Agent initialized.")
+
+    # Potentially start MCP Client Sessions here if needed globally
+
+    yield # Application runs here
+
+    # === Shutdown ===
+    print("Lifespan shutdown...")
+    # 1. Close Agent Resources (if any directly held - usually none)
+    # No explicit agent cleanup needed typically
+
+    # Potentially close MCP Client Sessions here
+
+    # 2. Close Database Pool
+    if app.state.db_pool:
+        print("Closing database pool...")
+        await app.state.db_pool.close()
+        print("Database pool closed.")
+
+    # 3. Close shared HTTP Client
+    if app.state.http_client:
+        print("Closing HTTP client...")
+        await app.state.http_client.aclose()
+        print("HTTP client closed.")
+
+    print("Lifespan shutdown complete.")
+
+app = FastAPI(lifespan=lifespan)
+
+# --- FastAPI Dependencies ---
+def get_agent() -> Agent:
+    # Assumes agent initialization succeeded in lifespan
+    return app.state.main_agent
+
+async def get_agent_dependencies(
+    # Example: Inject user ID if authentication is used
+    # current_user: User = Depends(get_current_user)
+) -> AgentDeps:
+    if not app.state.db_pool:
+        # Handle case where DB is unavailable if necessary
+        raise HTTPException(status_code=503, detail="Database not available")
+    # user_id = current_user.id if current_user else None
+    user_id = 123 # Dummy user ID for example
+    return AgentDeps(db_pool=app.state.db_pool, user_id=user_id)
+
+# --- Endpoint ---
+@app.post("/process")
+async def process_data(
+    prompt: str,
+    agent: Agent = Depends(get_agent),
+    agent_deps: AgentDeps = Depends(get_agent_dependencies)
+):
+    try:
+        result = await agent.run(prompt, deps=agent_deps)
+        # Process result.data
+        return {"result": result.data}
+    except Exception as e:
+        # Log the error properly
+        print(f"Agent run failed: {e}")
+        # Consider mapping specific PydanticAI exceptions to HTTP errors
+        raise HTTPException(status_code=500, detail="Agent processing failed")
+
+```
+
+**Potential Issues if Not Managed Correctly:**
+
+*   **Resource Leaks:** Failure to close HTTP clients, database connections, or file handles can lead to resource exhaustion over time.
+*   **Stale Connections:** Network interruptions can cause connections (DB, HTTP) to become stale. Connection pools managed correctly (like `asyncpg.create_pool`) often handle reconnection, but poorly managed single connections might not.
+*   **Slow Startup/Shutdown:** Initializing many resources synchronously during startup can delay application readiness. Using async initialization within the lifespan is preferred. Long shutdown procedures can delay restarts or deployments.
+*   **Configuration Errors:** If dependencies (like API keys or DB DSNs) are misconfigured, errors might occur only when the agent is first used, rather than failing fast during startup. Loading and validating config early in the lifespan helps.
+*   **Testing Complexity:** Tightly coupling resource initialization within endpoints makes unit testing harder. Using lifespan and dependency injection simplifies mocking and testing.
+
+---
+
+## Detailed Asynchronous Compatibility Analysis
+
+PydanticAI is fundamentally designed with asynchronous operations in mind, making it a natural fit for async frameworks like FastAPI.
+
+**Overall Assessment:** PydanticAI is **highly async compatible**.
+
+*   **Core Execution:** The primary methods for running agents (`Agent.run`, `Agent.run_stream`, `Agent.iter`) are `async def` functions.
+*   **Tool Execution:** Tools decorated with `@agent.tool` or `@agent.tool_plain` can be `async def` functions. If a sync function is provided, PydanticAI will typically run it in a separate thread using `anyio.to_thread.run_sync` (or similar mechanism inherited from `pydantic-graph`) to avoid blocking the main event loop during tool execution.
+*   **Model Interactions:** Interactions with underlying LLM SDKs (like `openai`, `anthropic`) or direct HTTP calls (like `GeminiModel`) are generally performed asynchronously by the respective `Model` implementations and `Provider` classes, leveraging `httpx.AsyncClient`.
+*   **Dependency Injection:** `RunContext` is available in both async and sync tool/prompt functions. Async dependencies (like `httpx.AsyncClient`, `asyncpg.Pool`) can be used directly within async functions. Sync dependencies can be used in sync functions (run in a thread) or carefully in async functions if their methods are non-blocking.
+
+**Key Async Functions/Methods:**
+
+*   `Agent.run(...)`
+*   `Agent.run_stream(...)` (returns an async context manager)
+*   `Agent.iter(...)` (returns an async context manager yielding an async iterator)
+*   `AgentRun.next(...)` (within `Agent.iter`)
+*   `StreamedRunResult.stream()`
+*   `StreamedRunResult.stream_text(...)`
+*   `StreamedRunResult.stream_structured(...)`
+*   `StreamedRunResult.get_data()`
+*   Tool functions defined as `async def`.
+*   Dynamic system prompt functions defined as `async def`.
+*   Result validator functions defined as `async def`.
+*   `Model.run(...)` and `Model.run_stream(...)` (internal methods called by `Agent`).
+*   `Provider` methods interacting with `httpx.AsyncClient` (internal).
+
+**Key Potentially Blocking Functions/Methods:**
+
+*   `Agent.run_sync(...)`: This is explicitly synchronous. It blocks until the entire agent run is complete. **It should NOT be called directly within an async FastAPI endpoint's main execution path.** Use `await anyio.to_thread.run_sync(agent.run_sync, ...)` or run it in a background task/thread.
+*   **Synchronous Tool Functions:** Functions decorated with `@agent.tool` or `@agent.tool_plain` that are defined using `def` instead of `async def`. PydanticAI runs these in a thread pool, so they don't block the main event loop *during their execution*, but the `await` call that invokes the tool *will* pause the calling coroutine until the thread completes.
+*   **Synchronous Dependency Methods:** If dependencies injected via `RunContext.deps` have synchronous, blocking methods (e.g., using `requests.get` instead of `httpx.AsyncClient.get`), calling these methods directly from an `async def` tool/prompt function *will* block the event loop. Such calls should be wrapped (e.g., `await anyio.to_thread.run_sync(deps.sync_method, ...)`). If called from a *synchronous* tool function, they will run within that tool's thread pool, which is generally safe.
+*   **Underlying SDKs (Potentially):** While PydanticAI aims for async interaction, it's theoretically possible (though unlikely for major supported models) that an underlying SDK used by a `Model` implementation might contain some blocking calls internally. This is generally abstracted away but could be a source of blocking if using less common models or custom implementations.
+*   **File I/O in Sync Tools/Prompts:** Reading/writing large files synchronously within a tool/prompt run via the thread pool can still block that thread, potentially impacting overall throughput if the thread pool is small.
+
+**Strategies for Handling Blocking Operations in FastAPI:**
+
+1.  **Avoid `agent.run_sync` in Endpoints:** Never call `agent.run_sync(...)` directly in an `async def` endpoint.
+2.  **Wrap `agent.run_sync`:** If you *must* use `run_sync` (e.g., in contexts where `await` is not possible but you can bridge to async), wrap it when calling from async code:
+    ```python
+    import anyio
+    # Inside an async def endpoint:
+    result = await anyio.to_thread.run_sync(agent.run_sync, prompt, deps=...)
+    ```
+3.  **Prefer Async Tools:** Define tools and dynamic prompts as `async def` functions whenever they perform I/O.
+4.  **Wrap Blocking Calls in Async Tools:** If an async tool needs to call a synchronous blocking function/method (e.g., from a sync library or a sync dependency):
+    ```python
+    import anyio
+
+    @agent.tool
+    async def my_async_tool(ctx: RunContext[...], ...) -> ...:
+        # ... async setup ...
+        blocking_result = await anyio.to_thread.run_sync(sync_blocking_function, arg1, arg2)
+        # ... use blocking_result ...
+        return ...
+    ```
+5.  **Use Sync Tools for Sync Logic:** If a tool contains purely synchronous logic (CPU-bound or calls sync libraries), defining it as `def` (sync) is acceptable. PydanticAI will run it in a thread, preventing it from blocking the main event loop.
+    ```python
+    @agent.tool # or @agent.tool_plain
+    def my_sync_tool(arg1: str) -> int:
+        # This runs in a thread pool managed by PydanticAI/anyio
+        result = some_sync_library.compute(arg1)
+        return result
+    ```
+6.  **Background Tasks / Task Queues:** For potentially long-running agent operations (sync or async), offload the entire `agent.run` or `agent.run_sync` call to FastAPI's `BackgroundTasks` or an external queue like Celery/ARQ. This prevents the HTTP request from being blocked.
+
+**Interaction with Asyncio and FastAPI Event Loop:**
+
+*   PydanticAI runs within the same Asyncio event loop as the FastAPI application when its async methods (`run`, `run_stream`, `iter`, async tools) are called.
+*   It uses `anyio` internally (likely via `pydantic-graph`) for its concurrency primitives, which is compatible with Asyncio.
+*   When synchronous tools are executed, `anyio.to_thread.run_sync` (or equivalent) is used to delegate the execution to a separate thread pool, preventing the main event loop from being blocked. The main coroutine `await`s the completion of the thread.
+*   There is no separate PydanticAI-specific event loop. It integrates directly into the host application's loop (FastAPI's Asyncio loop in this case).
+*   **Potential Issue:** If the thread pool used for sync tasks becomes saturated (e.g., many concurrent requests trigger long-running sync tools), it could become a bottleneck, even though the main event loop isn't blocked directly.
+
+**Performance Implications:**
+
+*   Using `agent.run_sync` via `run_in_threadpool` introduces overhead compared to calling `agent.run` directly.
+*   Running synchronous tools involves thread context switching overhead.
+*   Heavy reliance on blocking operations, even when offloaded to threads, can limit the overall concurrency and throughput compared to a fully non-blocking async implementation. Optimize I/O within tools to be async wherever possible.
+
+---
+
+## Comprehensive API Reference & Usage within FastAPI
+
+This section catalogs the most relevant public APIs for a developer integrating PydanticAI into FastAPI.
+
+### Core `Agent` Class (`pydantic_ai.agent.Agent`)
+
+The central class for defining and interacting with LLM agents.
+
+*   **Purpose:** Encapsulates configuration (model, prompts, tools, results, deps) and provides methods to run interactions.
+*   **Instantiation:** See [Instantiation & Initialization Deep Dive](#instantiation--initialization-deep-dive). Typically done once and managed via FastAPI lifespan/DI.
+
+**Key Methods:**
+
+1.  **`Agent.run(prompt, message_history=None, deps=None, model=None, model_settings=None, usage=None, usage_limits=None) -> AgentRunResult`**
+    *   **Purpose:** Executes a complete agent run asynchronously.
+    *   **Signature:**
+        *   `prompt: Any`: The user's input/prompt. Can be a string or other data (like list containing text and `ImageUrl`).
+        *   `message_history: Optional[list[ModelMessage]]`: Previous messages to provide context.
+        *   `deps: Optional[DepsT]`: Instance of the dependency type defined by `deps_type`.
+        *   `model: Optional[Union[str, Model]]`: Override the agent's default model for this run.
+        *   `model_settings: Optional[Union[ModelSettings, dict]]`: Override agent/model default settings (e.g., temperature).
+        *   `usage: Optional[Usage]`: Pass an existing `Usage` object to accumulate usage across runs (used internally for delegation).
+        *   `usage_limits: Optional[UsageLimits]`: Apply usage limits for this run.
+        *   *Returns:* `AgentRunResult[ResultDataT]` containing the final data, usage, and messages.
+    *   **FastAPI Usage Example (Endpoint):**
+        ```python
+        from fastapi import FastAPI, Depends, HTTPException
+        from pydantic_ai import Agent, AgentRunResult
+        from pydantic_ai.exceptions import UsageLimitExceeded, ModelError
+
+        app = FastAPI() # Assume agent 'my_agent' and 'get_agent_dependencies' setup via lifespan/DI
+
+        def get_agent() -> Agent: return app.state.my_agent
+        async def get_deps() -> AgentDeps: ... # Your dependency logic
+
+        @app.post("/run")
+        async def run_agent_endpoint(
+            prompt: str,
+            agent: Agent = Depends(get_agent),
+            agent_deps: AgentDeps = Depends(get_deps) # If agent uses deps
+        ):
+            try:
+                result: AgentRunResult = await agent.run(prompt, deps=agent_deps)
+                # 'result.data' holds the validated Pydantic model or string
+                return {"response": result.data, "usage": result.usage()}
+            except UsageLimitExceeded as e:
+                raise HTTPException(status_code=429, detail=f"Usage limit exceeded: {e}")
+            except ModelError as e: # Catch other PydanticAI errors
+                print(f"Agent error: {e}") # Log error
+                raise HTTPException(status_code=500, detail="Agent processing failed")
+            except Exception as e:
+                print(f"Unexpected error: {e}") # Log error
+                raise HTTPException(status_code=500, detail="Internal server error")
+
+        ```
+
+2.  **`Agent.run_sync(...) -> AgentRunResult`**
+    *   **Purpose:** Executes a complete agent run synchronously. **Blocks** until completion.
+    *   **Signature:** Same parameters as `run`.
+    *   **FastAPI Usage Example (Background Task / Threadpool):**
+        ```python
+        import anyio
+        from fastapi import BackgroundTasks
+
+        # Inside an async endpoint
+        def sync_agent_task(agent, prompt, deps):
+            # This runs in background/thread
+            result = agent.run_sync(prompt, deps=deps)
+            # Store result associated with a task ID, etc.
+            print(f"Sync task finished: {result.data}")
+
+        @app.post("/run_sync_background")
+        async def run_sync_bg(
+            prompt: str,
+            background_tasks: BackgroundTasks,
+            agent: Agent = Depends(get_agent),
+            agent_deps: AgentDeps = Depends(get_deps)
+        ):
+            background_tasks.add_task(sync_agent_task, agent, prompt, agent_deps)
+            return {"message": "Sync agent task started."}
+
+        # Or directly in endpoint using threadpool (blocks response until done)
+        @app.post("/run_sync_threaded")
+        async def run_sync_threaded(
+            prompt: str,
+            agent: Agent = Depends(get_agent),
+            agent_deps: AgentDeps = Depends(get_deps)
+        ):
+            result = await anyio.to_thread.run_sync(agent.run_sync, prompt, deps=agent_deps)
+            return {"response": result.data, "usage": result.usage()}
+        ```
+
+3.  **`Agent.run_stream(...) -> AsyncContextManager[StreamedRunResult]`**
+    *   **Purpose:** Executes an agent run asynchronously, providing access to results as they stream in.
+    *   **Signature:** Same parameters as `run`.
+    *   **Returns:** An async context manager yielding a `StreamedRunResult`.
+    *   **FastAPI Usage Example (Streaming Endpoint):**
+        ```python
+        from fastapi.responses import StreamingResponse
+        from pydantic import TypeAdapter # For structured streaming example
+        # Assume agent and deps setup
+
+        # Text Streaming
+        async def stream_text_generator(agent: Agent, prompt: str, deps: AgentDeps):
+            async with agent.run_stream(prompt, deps=deps) as result:
+                async for chunk in result.stream_text(delta=True):
+                     # Format for Server-Sent Events (SSE) or just yield raw text
+                    yield f"data: {chunk}\n\n"
+                # Optionally yield usage info at the end
+                yield f"event: usage\ndata: {result.usage().model_dump_json()}\n\n"
+
+        @app.get("/stream_text")
+        async def stream_text_endpoint(
+            prompt: str,
+            agent: Agent = Depends(get_agent),
+            agent_deps: AgentDeps = Depends(get_deps)
+        ):
+            return StreamingResponse(stream_text_generator(agent, prompt, agent_deps), media_type="text/event-stream")
+
+        # Structured Streaming (Example: streaming UserProfile TypedDict)
+        UserProfileTA = TypeAdapter(UserProfile) # Assume UserProfile is defined
+        async def stream_structured_generator(agent: Agent, prompt: str, deps: AgentDeps):
+             async with agent.run_stream(prompt, deps=deps) as result:
+                # stream() yields partially validated objects
+                async for partial_profile in result.stream():
+                    # Send partial updates via SSE or WebSocket
+                    yield f"event: partial_update\ndata: {UserProfileTA.dump_json(partial_profile).decode()}\n\n"
+                # Final validated result available after stream completes
+                final_profile = result.data # Access the fully validated result
+                yield f"event: final_result\ndata: {UserProfileTA.dump_json(final_profile).decode()}\n\n"
+                yield f"event: usage\ndata: {result.usage().model_dump_json()}\n\n"
+
+        @app.get("/stream_structured")
+        async def stream_struct_endpoint(
+             prompt: str,
+             agent: Agent = Depends(get_agent),
+             agent_deps: AgentDeps = Depends(get_deps)
+         ):
+            # Ensure agent's result_type is UserProfile for this example
+            return StreamingResponse(stream_structured_generator(agent, prompt, agent_deps), media_type="text/event-stream")
+        ```
+
+4.  **`Agent.iter(...) -> AsyncContextManager[AgentRun]`**
+    *   **Purpose:** Provides low-level async iteration over the agent's internal execution graph nodes. For advanced control.
+    *   **Signature:** Same parameters as `run`.
+    *   **Returns:** An async context manager yielding an `AgentRun` object.
+    *   **FastAPI Usage Example (Advanced Logging/Intervention):**
+        ```python
+        # Less common in typical endpoints, might be used in specialized background tasks
+        # or debugging tools built with FastAPI.
+        from pydantic_ai.agent import AgentRun
+        from pydantic_graph import End
+
+        async def process_with_iter(agent: Agent, prompt: str, deps: AgentDeps):
+            log = []
+            final_data = None
+            async with agent.iter(prompt, deps=deps) as run:
+                log.append(f"Starting run {run.run_id}")
+                async for node in run: # Iterate through graph execution steps
+                    log.append(f"Executing node: {type(node).__name__} - {node}")
+                    if agent.is_call_tools_node(node):
+                        # Example: Log tool calls before they happen
+                        log.append(f"Model Response leading to tool call: {node.model_response}")
+                    # Could potentially inject custom logic or modify state here
+                    if isinstance(node, End):
+                        log.append(f"Run finished.")
+                        final_data = node.data # Or run.result.data after loop
+                        break # Exit loop once End is reached
+            return {"log": log, "final_data": final_data, "usage": run.usage()}
+
+        @app.post("/run_iter")
+        async def run_iter_endpoint(
+            prompt: str,
+            agent: Agent = Depends(get_agent),
+            agent_deps: AgentDeps = Depends(get_deps)
+        ):
+            # This still runs the full agent logic, just with more verbose logging
+            # Could potentially take a long time, consider background task
+            result = await process_with_iter(agent, prompt, agent_deps)
+            return result
+        ```
+
+5.  **`Agent.tool(...)` / `Agent.tool_plain(...)` Decorators:**
+    *   **Purpose:** Register Python functions as tools callable by the LLM.
+    *   **Signature:** `@agent.tool(name=None, description=None, retries=None, prepare=None)` / `@agent.tool_plain(...)`
+    *   **FastAPI Usage:** Define tool functions alongside the Agent definition (e.g., in the same module or imported). These are part of the agent's configuration, typically done at definition time, not within endpoints.
+    *   *Example Sketch (Tool Definition File):*
+        ```python
+        # tools.py
+        from pydantic_ai import RunContext
+        # Assume 'agent' is defined elsewhere and imported, or defined here
+        # from my_app.agents import main_agent as agent
+
+        @agent.tool
+        async def get_user_data(ctx: RunContext[AgentDeps], user_id: int) -> dict:
+             """Fetches user data from the database."""
+             async with ctx.deps.db_pool.acquire() as conn:
+                 row = await conn.fetchrow("SELECT name, email FROM users WHERE id = $1", user_id)
+                 return dict(row) if row else {}
+
+        @agent.tool_plain # No context needed
+        def simple_calculator(expression: str) -> float:
+             """Evaluates a simple mathematical expression."""
+             try:
+                 # WARNING: eval is dangerous, use a safer parser in production!
+                 return eval(expression, {"__builtins__": {}}, {})
+             except:
+                 return float('nan')
+        ```
+
+6.  **`Agent.system_prompt(...)` Decorator:**
+    *   **Purpose:** Register dynamic system prompt functions.
+    *   **Signature:** `@agent.system_prompt`
+    *   **FastAPI Usage:** Define these functions alongside the agent definition. They are called automatically at the start of an agent run (if no `message_history` is provided).
+    *   *Example Sketch (Agent Definition File):*
+        ```python
+        # agents.py
+        from pydantic_ai import Agent, RunContext
+        from datetime import datetime
+        # Assume AgentDeps defined
+
+        agent = Agent(...) # Configure agent
+
+        @agent.system_prompt
+        async def add_current_time(ctx: RunContext[AgentDeps]) -> str:
+             # Example: Inject current time and maybe user-specific info
+             user_pref = await ctx.deps.get_user_setting("preferred_timezone") or "UTC"
+             now = datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S %Z')
+             return f"Current time is {now}. User preferred timezone: {user_pref}."
+
+        ```
+
+7.  **`Agent.result_validator(...)` Decorator:**
+    *   **Purpose:** Register functions to perform additional validation on structured results.
+    *   **Signature:** `@agent.result_validator`
+    *   **FastAPI Usage:** Define these alongside the agent. They run automatically after the LLM returns a structured result matching `result_type` and initial Pydantic validation passes.
+    *   *Example Sketch (Agent Definition File):*
+        ```python
+        # agents.py
+        from pydantic_ai import Agent, RunContext, ModelRetry
+        # Assume AgentDeps, MyResultModel defined
+
+        agent = Agent(..., result_type=MyResultModel, deps_type=AgentDeps)
+
+        @agent.result_validator
+        async def check_result_against_db(ctx: RunContext[AgentDeps], result: MyResultModel) -> MyResultModel:
+            # Example: Check if generated ID exists in DB
+            async with ctx.deps.db_pool.acquire() as conn:
+                exists = await conn.fetchval("SELECT EXISTS(SELECT 1 FROM items WHERE id = $1)", result.item_id)
+            if not exists:
+                raise ModelRetry(f"Validation failed: Item ID {result.item_id} does not exist.")
+            return result # Must return the validated result
+        ```
+
+8.  **`Agent.override(...)` Context Manager:**
+    *   **Purpose:** Temporarily replace the agent's model or dependencies, primarily for testing.
+    *   **Signature:** `Agent.override(model=None, deps=None)`
+    *   **FastAPI Usage:** Primarily used in `pytest` tests for FastAPI endpoints that use the agent. Not typically used in production endpoint code.
+    *   *Example Sketch (Pytest):*
+        ```python
+        # test_api.py
+        from fastapi.testclient import TestClient
+        from pydantic_ai.models.test import TestModel
+        from my_app.main import app, get_agent # Import app and dependency getter
+        from my_app.agents import main_agent # Import the actual agent instance
+
+        client = TestClient(app)
+
+        def test_query_endpoint_mocked():
+            test_model = TestModel(custom_result_text="Mocked response")
+            # Override the dependency getter for FastAPI's DI
+            app.dependency_overrides[get_agent] = lambda: main_agent
+
+            with main_agent.override(model=test_model): # Override the agent's model
+                response = client.post("/query_lifespan", params={"prompt": "test"})
+
+            assert response.status_code == 200
+            assert response.json()["response"] == "Mocked response"
+
+            # Clear overrides after test
+            app.dependency_overrides = {}
+        ```
+
+### Supporting Classes and Functions
+
+*   **`Model` Implementations (e.g., `OpenAIModel`, `GeminiModel`):** Used during Agent instantiation to specify the model interface. Allow configuration via `Provider` instances.
+*   **`Provider` Implementations (e.g., `OpenAIProvider`, `GoogleVertexProvider`):** Used to configure API keys, base URLs, custom HTTP clients, and other connection details when instantiating a `Model`.
+*   **`Tool` Class:** Alternative way to define tools, useful for reuse or more complex definitions (e.g., setting `prepare` function).
+*   **Message Classes (`ModelMessage`, `ModelRequest`, `ModelResponse`, `TextPart`, `ToolCallPart`, etc.):** Used when interacting with `message_history` or `capture_run_messages`. Needed for type hints and understanding conversation structure.
+*   **Configuration Classes (`ModelSettings`, `UsageLimits`, `InstrumentationSettings`):** Passed to `Agent` constructor or run methods to control behavior.
+*   **Exception Classes (`ModelError`, `UsageLimitExceeded`, `ModelRetry`, etc.):** Used in `try...except` blocks for robust error handling in FastAPI endpoints.
+*   **`RunContext`:** Type hint used in tool/prompt/validator function signatures to access dependencies, usage, and retry count.
+*   **`AgentRunResult` / `StreamedRunResult`:** Return types of `run`/`run_sync` and `run_stream`. Provide access to `data`, `usage()`, `all_messages()`, `new_messages()`.
+*   **`AgentRun`:** Return type of `agent.iter()`, provides low-level graph iteration capabilities.
+*   **`capture_run_messages`:** Context manager, useful mainly for debugging or testing to inspect messages from a run, especially failed runs.
+
+---
+
+## Data Exchange & Modeling In-Depth
+
+PydanticAI leverages Pydantic extensively for defining and validating data structures used in interactions with LLMs. This aligns well with FastAPI's use of Pydantic for request/response modeling and validation.
+
+### Detailed Input/Output Data Structures
+
+PydanticAI handles various data types for input and output:
+
+**1. Agent Input (`prompt` argument in `run`/`run_stream`/`iter`):**
+
+*   **`str`:** The most common input type, representing the user's text prompt.
+*   **`list[Union[str, ImageUrl, AudioUrl, DocumentUrl, BinaryContent]]`:** For multimodal inputs, a list containing text parts and/or references/data for images, audio, or documents.
+    *   `ImageUrl(url: str, detail: Optional[Literal['low', 'high', 'auto']] = 'auto')`: Represents an image via URL. `detail` is relevant for models like GPT-4 Vision.
+    *   `AudioUrl(url: str)`: Represents audio via URL.
+    *   `DocumentUrl(url: str)`: Represents a document via URL.
+    *   `BinaryContent(data: bytes, media_type: str)`: Represents image, audio, or document content directly as bytes, requiring a specific `media_type` (e.g., `image/png`, `audio/mpeg`, `application/pdf`).
+
+**2. Tool Arguments (Input to Tool Functions):**
+
+*   Defined by the parameters of the Python function registered as a tool (excluding `RunContext`).
+*   PydanticAI generates a JSON schema from the function signature (type hints, defaults).
+*   The LLM provides arguments matching this schema.
+*   Pydantic validates the arguments received from the LLM before calling the tool function.
+*   Types can be standard Python types (int, str, bool, float, list, dict), Pydantic models, `TypedDict`, `Enum`, `Literal`, `Union`, etc.
+
+**3. Tool Return Values (Output from Tool Functions):**
+
+*   The return value of the tool function.
+*   Can be any Python object serializable to JSON (primitives, lists, dicts, Pydantic models).
+*   PydanticAI formats this return value (often as a JSON string if it's not primitive, though model support varies) to be included in the `ToolReturnPart` sent back to the LLM.
+
+**4. Agent Final Output (`result.data`):**
+
+*   Determined by the `result_type` specified on the `Agent`.
+*   **If `result_type` is `str` (or union including `str`)**: Can be a plain `str` directly from the LLM's text response.
+*   **If `result_type` is a Pydantic model, `TypedDict`, `list`, `dict`, etc. (or a Union of these):** The LLM is expected to call the corresponding "result tool" with arguments matching the schema derived from `result_type`. PydanticAI validates these arguments, and `result.data` will be an instance of the specified `result_type`.
+    *   Example: If `result_type=User(BaseModel)`, `result.data` will be a `User` instance.
+    *   Example: If `result_type=list[str]`, `result.data` will be a `list` of strings.
+    *   Example: If `result_type=Union[Order(BaseModel), Error(BaseModel)]`, `result.data` will be either an `Order` instance or an `Error` instance.
+
+**5. Message History (`message_history` parameter, `result.all_messages()`):**
+
+*   A `list[ModelMessage]`, where `ModelMessage` is a `Union[ModelRequest, ModelResponse]`.
+*   These contain `parts` which are unions of types like `UserPromptPart`, `SystemPromptPart`, `TextPart`, `ToolCallPart`, `ToolReturnPart`, etc., holding the actual content exchanged. See `pydantic_ai.messages` for detailed structures.
+
+### Pydantic Integration/Compatibility
+
+PydanticAI's integration with Pydantic is fundamental and seamless, especially beneficial in a FastAPI context.
+
+*   **Direct Use of Models:** Pydantic models defined for FastAPI request/response bodies can often be directly used as `result_type` for PydanticAI Agents or as schemas for tool arguments, promoting code reuse and consistency.
+*   **Validation:** Both FastAPI (for HTTP requests/responses) and PydanticAI (for tool args/results) use the same Pydantic validation engine, ensuring consistent data validation rules and error handling styles.
+*   **Schema Generation:** PydanticAI relies on Pydantic's schema generation capabilities to create the JSON schemas passed to LLMs for tools and structured results.
+*   **Serialization:** Pydantic models returned by `agent.run(...).data` can be directly returned from FastAPI endpoints, and FastAPI will automatically serialize them to JSON using Pydantic's serialization logic.
+
+**Data Mapping/Conversion Examples:**
+
+*   **FastAPI Request -> Agent Run (Structured Input - Less Common):** While agent prompts are often text, if you need structured input to construct the prompt or for dependencies:
+    ```python
+    from fastapi import FastAPI, Depends
+    from pydantic import BaseModel
+    from pydantic_ai import Agent
+    from pydantic_ai.format_as_xml import format_as_xml # Helper
+
+    class UserQuery(BaseModel):
+        user_id: int
+        question: str
+        preferences: dict[str, str]
+
+    app = FastAPI()
+    # Assume agent configured
+
+    @app.post("/structured_query")
+    async def structured_query(query: UserQuery, agent: Agent = Depends(get_agent)):
+        # Format structured input into a string prompt for the agent
+        # Using XML formatting helper as one option
+        prompt = f"User query:\n{format_as_xml(query)}"
+        result = await agent.run(prompt) # Pass the formatted string
+        return {"response": result.data}
+    ```
+
+*   **Agent Result -> FastAPI Response:** This is usually direct, as PydanticAI's structured results are already Pydantic models.
+    ```python
+    from fastapi import FastAPI, Depends
+    from pydantic import BaseModel
+    from pydantic_ai import Agent
+
+    class AgentResponseModel(BaseModel): # Example result type
+        summary: str
+        action_items: list[str]
+
+    app = FastAPI()
+    # Assume agent configured with result_type=AgentResponseModel
+    def get_agent() -> Agent: return app.state.my_agent
+
+    @app.post("/get_summary")
+    async def get_summary(prompt: str, agent: Agent = Depends(get_agent)):
+        result = await agent.run(prompt)
+        # result.data is already an AgentResponseModel instance
+        # FastAPI automatically serializes Pydantic models to JSON
+        return result.data
+    ```
+
+*   **Mapping Agent Result to Different FastAPI Response:** If the FastAPI response model differs from the agent's `result_type`.
+    ```python
+    from fastapi import FastAPI, Depends
+    from pydantic import BaseModel
+    from pydantic_ai import Agent
+
+    class AgentInternalResult(BaseModel):
+        raw_summary: str
+        internal_codes: list[int]
+
+    class FastAPIResponse(BaseModel):
+        processed_summary: str
+        status: str
+
+    app = FastAPI()
+    # Assume agent configured with result_type=AgentInternalResult
+    def get_agent() -> Agent: return app.state.my_agent
+
+    @app.post("/process_and_map")
+    async def process_and_map(prompt: str, agent: Agent = Depends(get_agent)):
+        agent_result: AgentInternalResult = (await agent.run(prompt)).data
+
+        # Map agent result to FastAPI response model
+        processed_summary = agent_result.raw_summary.upper() # Example processing
+        status = "Codes found" if agent_result.internal_codes else "No codes"
+        response_data = FastAPIResponse(processed_summary=processed_summary, status=status)
+
+        return response_data
+    ```
+
+### Serialization/Deserialization Mechanisms
+
+*   **Internal:** PydanticAI uses Pydantic's built-in serialization (`model_dump`, `model_dump_json`) and validation (`model_validate`, `TypeAdapter`) extensively for:
+    *   Generating JSON schemas for tools and result types.
+    *   Validating LLM arguments for tool calls against the function signature.
+    *   Validating LLM responses for structured results against the `result_type`.
+    *   Serializing tool return values (if complex) to strings/JSON before sending back to the LLM.
+    *   Serializing/deserializing message history (e.g., via `all_messages_json`).
+*   **XML Formatting:** Provides `pydantic_ai.format_as_xml` helper function to serialize Pydantic models or dataclasses into an XML-like string format, which can sometimes be easier for LLMs to understand within prompts compared to JSON, especially for complex nested structures. This is a formatting choice for the prompt string, not an internal serialization mechanism.
+*   **FastAPI Integration:** FastAPI handles the final serialization of endpoint return values (which might be PydanticAI results) to JSON for the HTTP response, and deserialization/validation of HTTP request bodies into Pydantic models used as input. PydanticAI itself doesn't directly handle the HTTP-level serialization.
+
+**Awareness for FastAPI Layer:**
+
+*   The FastAPI layer generally doesn't need to worry about PydanticAI's *internal* serialization, as Pydantic handles it consistently.
+*   Ensure Pydantic versions used by FastAPI and PydanticAI are compatible (PydanticAI likely requires Pydantic v2+).
+*   When receiving data from PydanticAI (`result.data`), it will already be a validated Python object (string, Pydantic model instance, list, etc.). FastAPI can typically serialize this directly.
+*   When preparing prompts that include structured data, consider using helpers like `format_as_xml` or simple `model_dump_json` if that structure needs to be part of the prompt text itself.
+
+---
+
+## Complete Configuration Guide (for Integration Scenario)
+
+This section details how to configure `pydantic_ai.Agent` and its components when used within a FastAPI application.
+
+### All Configuration Methods
+
+Configuration can happen at different levels:
+
+1.  **`Agent` Instantiation:**
+    *   Passing arguments directly to the `Agent(...)` constructor (e.g., `model`, `system_prompt`, `tools`, `result_type`, `retries`, `model_settings`, `instrument`). This is the primary method for setting agent-specific behavior.
+2.  **`Model` Instantiation:**
+    *   If passing a `Model` instance to the `Agent` instead of a string identifier, you configure the model interface itself (e.g., `OpenAIModel(model_name, provider=...)`).
+3.  **`Provider` Instantiation:**
+    *   Configuring API keys, base URLs, custom HTTP clients, region (for VertexAI), etc., by instantiating a specific `Provider` class (e.g., `OpenAIProvider`, `GoogleVertexProvider`) and passing it to the `Model` constructor.
+4.  **Environment Variables:**
+    *   Default `Provider` implementations often read API keys from standard environment variables (e.g., `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY`). GCP credentials for VertexAI can also be sourced from the environment via Application Default Credentials.
+5.  **Run-time Overrides:**
+    *   Passing arguments like `model`, `model_settings`, `usage_limits` to `agent.run()`, `agent.run_sync()`, or `agent.run_stream()` overrides the defaults set on the `Agent` instance for that specific run.
+6.  **Decorator Arguments:**
+    *   Passing arguments to `@agent.tool()` (e.g., `retries`, `prepare`) or `@agent.tool_plain()` to configure specific tools.
+
+### Exhaustive List of Configuration Parameters
+
+*(Focusing on parameters relevant during integration/runtime)*
+
+**On `Agent` Constructor:**
+
+*   `model: Union[str, Model]`: (Required) Specifies the LLM interface. String uses default provider (needs env vars), instance allows custom provider.
+*   `system_prompt: Optional[Union[str, list[str]]]`: Static system instructions.
+*   `tools: Optional[list[Union[Callable, Tool]]]`: List of callable functions or `Tool` instances.
+*   `result_type: Optional[Type]`: Expected Pydantic model/type for structured output.
+*   `deps_type: Optional[Type]`: Type hint for dependencies used by tools/dynamic prompts.
+*   `retries: int`: Default number of retries on validation/`ModelRetry` errors (default: 1).
+*   `instrument: Union[bool, InstrumentationSettings]`: Enable/configure OTel instrumentation.
+*   `model_settings: Optional[Union[ModelSettings, dict]]`: Default model parameters (e.g., temperature).
+*   `end_strategy: EndStrategy`: How the agent determines the end of a run.
+*   `mcp_servers: Optional[list[MCPServer]]`: List of MCP servers to connect to for external tools.
+
+**On `Model` Implementations (e.g., `OpenAIModel`, `GeminiModel`):**
+
+*   `model_name: str`: The specific model identifier (e.g., "gpt-4o", "gemini-1.5-pro").
+*   `provider: Optional[Provider]`: An instance of a corresponding `Provider` class to customize connection/auth. If `None`, the default provider is used (often requiring env vars).
+
+**On `Provider` Implementations (Examples):**
+
+*   `OpenAIProvider`:
+    *   `api_key: Optional[str]`: OpenAI API key (reads `OPENAI_API_KEY` env var if None).
+    *   `base_url: Optional[str]`: API endpoint URL (defaults to OpenAI). Used for OpenAI-compatible APIs.
+    *   `openai_client: Optional[openai.AsyncOpenAI]`: Pass a pre-configured OpenAI SDK client.
+    *   `http_client: Optional[httpx.AsyncClient]`: Pass a custom httpx client.
+*   `AnthropicProvider`:
+    *   `api_key: Optional[str]`: Anthropic API key (reads `ANTHROPIC_API_KEY` env var if None).
+    *   `base_url: Optional[str]`: API endpoint URL.
+    *   `http_client: Optional[httpx.AsyncClient]`: Pass a custom httpx client.
+*   `GoogleGLAProvider`: (For Gemini Generative Language API)
+    *   `api_key: Optional[str]`: Gemini API key (reads `GEMINI_API_KEY` env var if None).
+    *   `http_client: Optional[httpx.AsyncClient]`: Pass a custom httpx client.
+*   `GoogleVertexProvider`: (For Gemini via Vertex AI)
+    *   `project_id: Optional[str]`: GCP Project ID (can often be inferred from credentials).
+    *   `region: str`: GCP region (e.g., "us-central1").
+    *   `service_account_file: Optional[str]`: Path to service account JSON key file.
+    *   `service_account_info: Optional[dict]`: Service account info as a dictionary.
+    *   `http_client: Optional[httpx.AsyncClient]`: Pass a custom httpx client.
+    *   *(Note: Uses `google-auth` library for authentication, leveraging ADC or service account info).*
+*   `GroqProvider`, `MistralProvider`, `CohereProvider`, `BedrockProvider`, `AzureProvider`, `DeepSeekProvider`: Similar patterns, typically taking `api_key`, `base_url` (if applicable), and potentially custom SDK/HTTP clients. Check specific provider docs (`pydantic_ai.providers`).
+
+**On Run Methods (`run`, `run_sync`, `run_stream`, `iter`):**
+
+*   `model: Optional[Union[str, Model]]`: Override agent's model for this run.
+*   `model_settings: Optional[Union[ModelSettings, dict]]`: Override agent's model settings for this run. Merged with agent defaults.
+*   `usage_limits: Optional[UsageLimits]`: Apply specific usage limits for this run.
+
+**`ModelSettings` (and subclasses like `GeminiModelSettings`):**
+
+*   Common: `temperature`, `max_tokens`, `top_p`, `top_k`, `stop_sequences`, `timeout`.
+*   Specific models might have extra settings (e.g., `gemini_safety_settings` on `GeminiModelSettings`). Pass these as a dictionary or specific `ModelSettings` subclass instance.
+
+**`UsageLimits`:**
+
+*   `request_limit: Optional[int]`
+*   `total_tokens_limit: Optional[int]`
+*   `request_tokens_limit: Optional[int]`
+*   `response_tokens_limit: Optional[int]`
+
+### Robust FastAPI Configuration Patterns
+
+Leverage FastAPI's standard configuration practices, typically using Pydantic's `BaseSettings`, environment variables, and `.env` files.
+
+**Pattern 1: Using `BaseSettings` and Lifespan**
+
+```python
+# config.py
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file='.env', extra='ignore')
+
+    # LLM Provider Keys (read from .env or environment)
+    openai_api_key: str | None = None
+    anthropic_api_key: str | None = None
+    gemini_api_key: str | None = None
+    gcp_project_id: str | None = None # For Vertex
+
+    # Agent Configuration
+    default_agent_model: str = "openai:gpt-4o"
+    agent_system_prompt: str = "You are a helpful assistant."
+    agent_temperature: float = 0.7
+    agent_max_tokens: int = 1000
+
+    # Database (Example Dependency)
+    database_url: str = "postgresql+asyncpg://user:pass@host:port/db"
+
+settings = Settings()
+
+# main.py
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Depends
+from pydantic_ai import Agent, ModelSettings
+from pydantic_ai.models import OpenAIModel, GeminiModel # etc.
+from pydantic_ai.providers import OpenAIProvider, GoogleVertexProvider # etc.
+import httpx
+
+from .config import settings # Import the loaded settings
+# Assume AgentDeps defined if needed
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("Lifespan startup: Initializing resources...")
+    app.state.http_client = httpx.AsyncClient()
+
+    # --- Configure Provider based on settings ---
+    # Example: Use OpenAI if key exists, else try Vertex, etc.
+    provider = None
+    model_identifier = settings.default_agent_model
+    model_type = None
+
+    if model_identifier.startswith("openai:") and settings.openai_api_key:
+        provider = OpenAIProvider(
+            api_key=settings.openai_api_key,
+            http_client=app.state.http_client
+        )
+        model_type = OpenAIModel
+        model_name = model_identifier.split(":", 1)[1]
+        print(f"Using OpenAI model: {model_name}")
+    elif model_identifier.startswith("google-vertex:") and settings.gcp_project_id:
+        provider = GoogleVertexProvider(
+            project_id=settings.gcp_project_id,
+            http_client=app.state.http_client
+            # region can also be configured via settings
+        )
+        model_type = GeminiModel
+        model_name = model_identifier.split(":", 1)[1]
+        print(f"Using Google Vertex model: {model_name}")
+    # Add configurations for Anthropic, Gemini GLA, Groq etc. based on settings
+
+    if not provider or not model_type:
+        raise RuntimeError("Could not configure a valid LLM provider based on settings.")
+
+    # --- Configure Agent ---
+    agent_model_settings = ModelSettings(
+        temperature=settings.agent_temperature,
+        max_tokens=settings.agent_max_tokens
+    )
+
+    app.state.my_agent = Agent(
+        model=model_type(model_name=model_name, provider=provider),
+        system_prompt=settings.agent_system_prompt,
+        model_settings=agent_model_settings,
+        # result_type=... # Configure from settings if needed
+        # deps_type=AgentDeps # If using dependencies
+        instrument=True
+    )
+    print("Agent initialized.")
+
+    # Initialize DB Pool, etc. using settings.database_url
+    app.state.db_pool = await asyncpg.create_pool(settings.database_url)
+    print("DB Pool initialized.")
+
+    yield
+
+    print("Lifespan shutdown...")
+    await app.state.db_pool.close()
+    await app.state.http_client.aclose()
+    print("Lifespan shutdown complete.")
+
+
+app = FastAPI(lifespan=lifespan)
+
+# Dependency to get agent
+def get_agent() -> Agent:
+    return app.state.my_agent
+
+# Endpoint using the configured agent
+@app.post("/configured_query")
+async def configured_query(prompt: str, agent: Agent = Depends(get_agent)):
+    # Create deps if needed
+    # deps = AgentDeps(db_pool=app.state.db_pool, ...)
+    # result = await agent.run(prompt, deps=deps)
+    result = await agent.run(prompt)
+    return {"response": result.data, "usage": result.usage()}
+```
+
+**Pattern 2: Injecting Configuration via Dependency Injection**
+
+```python
+# config.py (as above)
+from .config import settings, Settings
+
+# dependencies.py
+from fastapi import Depends
+import httpx
+from pydantic_ai import Agent, ModelSettings # ... other imports
+from .config import Settings # Import Settings class
+
+# Dependency to provide settings
+def get_settings() -> Settings:
+    return settings # Return the loaded settings instance
+
+# Dependency to provide shared HTTP client (managed by lifespan)
+async def get_http_client(app_state = Depends(lambda app: app.state)) -> httpx.AsyncClient:
+     # Assume client is attached to app.state in lifespan
+     # Add error handling if client doesn't exist
+     return app_state.http_client
+
+# Dependency to create Agent instance on-demand (or retrieve from state)
+# This example creates it on demand using injected settings and client
+# Prefer lifespan initialization for singletons
+def get_configured_agent(
+    settings: Settings = Depends(get_settings),
+    http_client: httpx.AsyncClient = Depends(get_http_client)
+) -> Agent:
+    # Logic to select provider/model based on settings (similar to lifespan example)
+    if settings.default_agent_model.startswith("openai:"):
+         provider = OpenAIProvider(api_key=settings.openai_api_key, http_client=http_client)
+         model_type = OpenAIModel
+         model_name = settings.default_agent_model.split(":", 1)[1]
+         # ... handle other providers
+    else:
+        raise ValueError("Unsupported agent model in config")
+
+    agent_model_settings = ModelSettings(temperature=settings.agent_temperature)
+
+    agent = Agent(
+        model=model_type(model_name=model_name, provider=provider),
+        system_prompt=settings.agent_system_prompt,
+        model_settings=agent_model_settings,
+        instrument=True
+    )
+    return agent
+
+
+# main.py
+from fastapi import FastAPI, Depends
+from .dependencies import get_configured_agent # Import the dependency function
+from pydantic_ai import Agent
+
+app = FastAPI() # Add lifespan if managing http_client centrally
+
+@app.post("/di_configured_query")
+async def di_configured_query(prompt: str, agent: Agent = Depends(get_configured_agent)):
+     result = await agent.run(prompt)
+     return {"response": result.data}
+
+```
+
+**Key Considerations for FastAPI Configuration:**
+
+*   **Centralize Configuration:** Use `BaseSettings` or a similar pattern to load configuration from environment variables or files (`.env`).
+*   **Lifespan for Initialization:** Initialize expensive resources like HTTP clients, database pools, and potentially the `Agent` instance itself within the FastAPI `lifespan` context manager. Store shared resources in `app.state`.
+*   **Dependency Injection:** Use FastAPI's `Depends` to inject the initialized `Agent` instance and any necessary `AgentDeps` into your endpoint functions. This promotes testability and separation of concerns.
+*   **API Keys:** Handle API keys securely. Avoid hardcoding them. Use environment variables or a secrets management system, loaded via your configuration class.
+*   **Model Selection:** Make the choice of LLM model configurable (e.g., via settings) rather than hardcoding model strings.
+
+---
+
+## Extensibility, Customization, and Hooks
+
+PydanticAI offers several ways to extend and customize its behavior:
+
+### Detailed Mechanisms
+
+1.  **Custom Tools (Functions):**
+    *   **Mechanism:** Defining standard Python functions and registering them with the `Agent` using decorators (`@agent.tool`, `@agent.tool_plain`) or the `tools` list in the constructor.
+    *   **Customization:** Allows integration with any external API, database, library, or custom logic. The LLM decides when to call these tools based on their description (docstring) and parameters (derived from signature).
+    *   **Hooks:** Tool functions themselves act as hooks executed during the agent's reasoning process when called by the LLM.
+    *   **Context Access:** `@agent.tool` allows access to `RunContext` (dependencies, usage, retry count).
+
+2.  **Custom `result_type` (Pydantic Models/TypedDicts):**
+    *   **Mechanism:** Defining a specific Pydantic model or `TypedDict` and setting it as the `Agent`'s `result_type`.
+    *   **Customization:** Forces the LLM to structure its final output according to your defined schema. Enables reliable extraction of specific data fields.
+    *   **Hooks:** The validation performed by Pydantic on the result acts as a hook ensuring data integrity.
+
+3.  **Custom Result Validators (`@agent.result_validator`):**
+    *   **Mechanism:** Decorating functions that take `RunContext` (optional) and the validated structured result as input.
+    *   **Customization:** Allows performing additional, potentially asynchronous or IO-bound validation logic on the structured result *after* initial Pydantic validation passes. Can raise `ModelRetry` to force the LLM to generate a new result.
+    *   **Hooks:** These functions are hooks executed just before the agent run successfully concludes with a structured result.
+
+4.  **Dynamic System Prompts (`@agent.system_prompt`):**
+    *   **Mechanism:** Decorating functions that return strings. These functions can optionally take `RunContext`.
+    *   **Customization:** Allows system prompts to be dynamically generated based on runtime context (e.g., user information, current date, data fetched from dependencies). Multiple dynamic prompts can be combined with static prompts.
+    *   **Hooks:** These functions are hooks executed at the beginning of an agent run (if no prior message history is provided) to assemble the system prompt.
+
+5.  **Custom Tool Preparation (`prepare` function):**
+    *   **Mechanism:** Providing a `prepare` function (type `ToolPrepareFunc`) when registering a tool (via decorator or `Tool` class). This function receives `RunContext` and the default `ToolDefinition`.
+    *   **Customization:** Allows dynamically modifying a tool's definition (name, description, schema) or completely disabling the tool for a specific LLM call based on runtime context (e.g., user permissions, agent state).
+    *   **Hooks:** The `prepare` function is a hook executed before each LLM call to determine the exact set and definition of tools available to the model for that turn.
+
+6.  **Custom Dependencies (`deps_type`, `RunContext`):**
+    *   **Mechanism:** Defining a custom class (often a dataclass or Pydantic model) as `deps_type` and passing instances via the `deps` parameter during runs. Accessed via `RunContext`.
+    *   **Customization:** Provides a structured and type-safe way to inject any required external resources, configuration, or services into tools, dynamic prompts, and validators. Enables extensive customization of tool behavior by modifying the dependencies.
+
+7.  **Custom `Model` Implementation:**
+    *   **Mechanism:** Subclassing `pydantic_ai.models.Model` and `pydantic_ai.models.StreamedResponse`.
+    *   **Customization:** Allows integrating PydanticAI with entirely new LLM providers or custom model APIs not natively supported. Requires implementing the logic for API calls, message formatting, tool handling, and streaming.
+    *   **Hooks:** The `run` and `run_stream` methods of the custom model act as the core hooks for interacting with the LLM.
+
+8.  **Custom `Provider` Implementation:**
+    *   **Mechanism:** Subclassing `pydantic_ai.providers.Provider`.
+    *   **Customization:** Allows implementing custom authentication methods, connection logic, or interacting with specific API gateways for existing `Model` interfaces.
+    *   **Hooks:** Methods like `_get_client`, `_prepare_request` (conceptual) act as hooks for customizing connection and request details.
+
+9.  **Run-time Overrides (`model`, `model_settings` in `run` methods):**
+    *   **Mechanism:** Passing `model` or `model_settings` arguments to `agent.run`/`run_stream`.
+    *   **Customization:** Allows changing the LLM or its parameters (e.g., temperature) for specific requests without altering the base agent configuration.
+
+10. **Testing Overrides (`Agent.override`):**
+    *   **Mechanism:** Context manager to temporarily replace `model` or `deps` on an `Agent` instance.
+    *   **Customization:** Crucial for unit testing, allowing injection of mock models (`TestModel`, `FunctionModel`) or test dependencies.
+
+11. **Low-level Graph Iteration (`Agent.iter`):**
+    *   **Mechanism:** Iterating over the internal `pydantic-graph` execution nodes.
+    *   **Customization:** Provides the ultimate level of control, allowing inspection of every internal step, modification of intermediate states (if using mutable state), or injecting completely custom logic between predefined agent steps. For advanced users building complex stateful applications.
+
+### Usage Examples (FastAPI Context)
+
+*   **Custom Tool using FastAPI Dependencies:**
+    ```python
+    # Assume agent and AgentDeps (with db_pool) configured in lifespan/DI
+    from fastapi import Depends
+    from pydantic_ai import Agent, RunContext
+
+    def get_agent() -> Agent: return app.state.my_agent
+    async def get_deps() -> AgentDeps: ...
+
+    @agent.tool # Tool defined alongside agent
+    async def check_order_status(ctx: RunContext[AgentDeps], order_id: int) -> str:
+        """Checks the status of a given order ID."""
+        async with ctx.deps.db_pool.acquire() as conn:
+            status = await conn.fetchval("SELECT status FROM orders WHERE id = $1 AND user_id = $2", order_id, ctx.deps.user_id) # Uses user_id from deps
+            return status or "Order not found or access denied."
+
+    @app.post("/order_status")
+    async def order_status(
+        order_id: int, # Could also come from request body
+        agent: Agent = Depends(get_agent),
+        agent_deps: AgentDeps = Depends(get_agent_dependencies) # Injects deps with user_id
+    ):
+        # Prompt might just ask about the order, LLM uses tool
+        prompt = f"What is the status of my order {order_id}?"
+        result = await agent.run(prompt, deps=agent_deps)
+        return {"response": result.data}
+    ```
+
+*   **Dynamic System Prompt based on Request:**
+    ```python
+    # Assume agent configured with deps_type=AgentDeps in lifespan/DI
+    # AgentDeps includes user_id and potentially request-specific info
+
+    @agent.system_prompt # Defined with agent
+    async def personalize_prompt(ctx: RunContext[AgentDeps]) -> str:
+        base_prompt = "You are OrderBot. "
+        if ctx.deps.user_id:
+             # Fetch user name using deps.db_pool and deps.user_id
+             user_name = await fetch_user_name(ctx.deps.db_pool, ctx.deps.user_id)
+             base_prompt += f"You are assisting user {user_name} (ID: {ctx.deps.user_id}). "
+        # Add other dynamic info from deps
+        return base_prompt
+
+    # FastAPI endpoint injects AgentDeps created per-request
+    @app.post("/personalized_query")
+    async def personalized_query(
+        prompt: str,
+        agent: Agent = Depends(get_agent),
+        agent_deps: AgentDeps = Depends(get_agent_dependencies) # Creates deps with request context
+    ):
+        result = await agent.run(prompt, deps=agent_deps)
+        return {"response": result.data}
+
+    ```
+
+*   **Result Validator using External API:**
+    ```python
+    # Assume agent configured with result_type=GeneratedAddress(BaseModel)
+    # and deps_type=AgentDeps (containing httpx_client)
+
+    @agent.result_validator # Defined with agent
+    async def validate_address_api(ctx: RunContext[AgentDeps], address: GeneratedAddress) -> GeneratedAddress:
+         """Uses an external API to validate the generated address."""
+         api_endpoint = "https://api.addressvalidation.com/validate"
+         try:
+             response = await ctx.deps.httpx_client.post(api_endpoint, json=address.model_dump())
+             response.raise_for_status()
+             validation_result = response.json()
+             if not validation_result.get("isValid"):
+                 raise ModelRetry(f"Address validation failed: {validation_result.get('reason', 'Unknown')}")
+         except httpx.HTTPStatusError as e:
+             print(f"Address validation API error: {e}")
+             # Decide whether to retry or let it pass
+             raise ModelRetry("Could not validate address via external API.")
+         except Exception as e:
+             print(f"Unexpected validation error: {e}")
+             raise ModelRetry("Internal error during address validation.")
+         return address
+
+     # Endpoint uses agent, validator runs automatically
+     @app.post("/generate_address")
+     async def generate_address_endpoint(...):
+         # ... run agent ...
+         # Validator is invoked automatically before run completes
+         return {"address": result.data}
+    ```
+
+---
+
+## Conventions, Best Practices, and Idioms
+
+### Comprehensive List
+
+*   **Agent as Singleton/Managed Instance:** Instantiate `Agent` once (per distinct configuration) and reuse it. Manage its lifecycle and dependencies using FastAPI's lifespan and dependency injection. Avoid creating new `Agent` instances per request unless configuration differs significantly.
+*   **Clear Naming:** Use descriptive names for agents, tools, Pydantic models (`result_type`), and dependency classes to improve readability.
+*   **Docstrings for Tools:** Write clear, concise docstrings for tool functions. They are used as descriptions for the LLM. Include parameter descriptions using a supported format (Google, Numpy, Sphinx) for better schema generation. Set `require_parameter_descriptions=True` for stricter checking.
+*   **Specific `result_type`:** Define a specific Pydantic model or `TypedDict` for `result_type` whenever structured output is needed, rather than relying solely on text responses and parsing them later. Use `Union` types for alternative structured outputs or to allow text fallback (`Union[MyModel, str]`).
+*   **Use `RunContext` for Dependencies:** Access dependencies (`deps`), usage (`usage`), and retry count (`retry`) within tools/prompts/validators via the `RunContext` parameter. Type hint `RunContext` correctly (e.g., `RunContext[MyDeps]`).
+*   **Prefer Async:** Define tools, dynamic prompts, and validators as `async def` functions when they perform I/O operations to avoid blocking.
+*   **Handle Blocking Code:** If using synchronous blocking code within tools/prompts, ensure it's handled correctly (run in threadpool via `anyio.to_thread.run_sync` if called from async code, or define the tool/prompt itself as sync `def`).
+*   **Error Handling:**
+    *   Catch specific PydanticAI exceptions (`ModelError`, `UsageLimitExceeded`, `ModelRetry`, `ValidationError` from Pydantic) in FastAPI endpoints or middleware for appropriate HTTP responses.
+    *   Use `ModelRetry` within tools/validators to guide the LLM towards a correct response rather than failing the run immediately.
+    *   Use `FallbackModel` for resilience against specific model provider outages/errors.
+*   **Configuration Management:** Use FastAPI/Pydantic best practices (e.g., `BaseSettings`, `.env` files) to manage API keys and agent configuration. Avoid hardcoding sensitive information.
+*   **Streaming for Interactivity:** Use `agent.run_stream()` and FastAPI's `StreamingResponse` for chat-like interfaces or when immediate feedback is needed.
+*   **Background Tasks for Long Runs:** Offload long `agent.run` or `agent.run_sync` calls to background tasks or external task queues to keep FastAPI endpoints responsive.
+*   **Testing:**
+    *   Use `TestModel` or `FunctionModel` for unit tests to avoid real LLM calls.
+    *   Use `Agent.override()` to inject mocks.
+    *   Set `ALLOW_MODEL_REQUESTS=False` globally during tests.
+    *   Use `capture_run_messages` to assert on agent-model interactions.
+*   **Instrumentation:** Enable instrumentation (`instrument=True`) and integrate with Logfire or another OpenTelemetry backend for debugging and monitoring, especially during development and production.
+*   **Dependency Management (`pydantic-ai-slim`):** Use `pydantic-ai-slim` with specific extras (e.g., `pip install "pydantic-ai-slim[openai,logfire]"`) in production to keep dependencies minimal. `pydantic-ai` is convenient for exploration as it includes all supported models.
+
+### Idiomatic Usage
+
+*   **Defining an Agent with Tools and Structured Results:**
+    ```python
+    # Idiomatic: Clear definition using decorators and result_type
+    from pydantic import BaseModel
+    from pydantic_ai import Agent, RunContext
+
+    class WeatherReport(BaseModel):
+        location: str
+        temperature: float
+        conditions: str
+
+    weather_agent = Agent(
+        'openai:gpt-4o',
+        result_type=WeatherReport,
+        system_prompt="Provide weather reports.",
+        deps_type=WeatherService # Assume WeatherService dependency defined
+    )
+
+    @weather_agent.tool
+    async def get_current_weather(ctx: RunContext[WeatherService], location: str) -> dict:
+        """Fetches the current weather for a location."""
+        return await ctx.deps.fetch_weather(location)
+
+    # Contrast (Less Idiomatic): Relying only on text parsing
+    # text_agent = Agent('openai:gpt-4o', system_prompt="Describe the weather.")
+    # # Manual parsing of result.data string would be needed here... less reliable.
+    ```
+
+*   **Handling Agent Runs in FastAPI:**
+    ```python
+    # Idiomatic: Use lifespan, DI, and async run
+    from fastapi import FastAPI, Depends, HTTPException
+    # ... lifespan setup ...
+
+    def get_agent() -> Agent: return app.state.weather_agent
+    async def get_deps() -> WeatherService: ...
+
+    @app.get("/weather")
+    async def get_weather_endpoint(
+        location: str,
+        agent: Agent = Depends(get_agent),
+        deps: WeatherService = Depends(get_deps)
+    ):
+        try:
+            result = await agent.run(f"What's the weather in {location}?", deps=deps)
+            if not isinstance(result.data, WeatherReport):
+                 # Handle unexpected result type if Union was used, etc.
+                 raise HTTPException(status_code=500, detail="Could not get weather report.")
+            return result.data # FastAPI serializes the Pydantic model
+        except ModelError as e:
+            # Log e
+            raise HTTPException(status_code=503, detail="Weather service unavailable.")
+
+    # Contrast (Less Idiomatic): Blocking call in endpoint
+    # @app.get("/weather_bad")
+    # async def get_weather_bad(location: str):
+    #     # Agent might be global or created here (bad practice)
+    #     result = global_weather_agent.run_sync(f"Weather in {location}?") # Blocks event loop!
+    #     return {"report": result.data}
+    ```
+
+---
+
+## Dependency Ecosystem & Potential Conflicts
+
+### Full Dependency List
+
+PydanticAI itself has a core set of dependencies, with many more being optional based on the features or models used. The use of `pydantic-ai-slim` highlights this modularity.
+
+**Core Dependencies (Likely required by `pydantic-ai-slim`):**
+
+*   `pydantic`: Version >= 2.0 (Fundamental dependency)
+*   `httpx`: For making asynchronous HTTP requests (used by many providers).
+*   `anyio`: For async utilities, especially running sync code in threads.
+*   `pydantic-graph`: Used internally for agent execution flow.
+*   `typing_extensions`: For newer typing features on older Python versions.
+*   `griffe`: For parsing docstrings to generate tool schemas.
+*   `jinja2`: Likely used for templating internally (e.g., maybe for formatting messages/prompts, common in similar libs).
+
+**Optional Dependencies (Installed via extras like `[openai]`, `[logfire]`, `[mcp]`, `[examples]` etc.):**
+
+*   `openai`: For `OpenAIModel`.
+*   `anthropic`: For `AnthropicModel`.
+*   `google-auth`, `requests`: For `GoogleVertexProvider` (Gemini via Vertex). *(Note: `requests` might be only for auth flow, actual API calls likely use `httpx`).*
+*   `groq`: For `GroqModel`.
+*   `mistralai`: For `MistralModel`.
+*   `cohere`: For `CohereModel`.
+*   `boto3`, `botocore`: For `BedrockProvider`.
+*   `logfire`: For Logfire integration (`[logfire]` extra).
+*   `mcp`: For Model Context Protocol client/server features (`[mcp]` extra). Requires Python >= 3.10.
+*   `duckduckgo-search`: For `duckduckgo_search_tool` (`[duckduckgo]` extra).
+*   `tavily-python`: For `tavily_search_tool` (`[tavily]` extra).
+*   `rich`: Used in examples for terminal output formatting, potentially CLI (`[examples]`, `[cli]`).
+*   `fastapi`, `uvicorn`: Used in examples (`[examples]`).
+*   `nest-asyncio`: Suggested for Jupyter usage.
+*   `exceptiongroup`: Backport for `except*` on Python < 3.11 (used by `FallbackModel` error handling).
+*   `jsonschema`: Used internally by Pydantic.
+*   `dirty-equals`, `pytest`, `pytest-asyncio`, `pytest-snapshot`: Dev/test dependencies used in examples/tests.
+
+*(This list is inferred from documentation (`install.md`, model pages, examples). A `pyproject.toml` or `requirements.txt` would provide the definitive list and version ranges.)*
+
+### Conflict Analysis
+
+**Potential Conflicts with typical FastAPI stack (FastAPI, Starlette, Pydantic, Uvicorn, Jinja2):**
+
+1.  **Pydantic:** This is the most critical dependency.
+    *   PydanticAI requires Pydantic V2+.
+    *   FastAPI versions >= 0.100.0 also rely on Pydantic V2.
+    *   **Conflict Risk:** Low, *if* using modern FastAPI (>= 0.100.0). If using an older FastAPI version that requires Pydantic V1, there will be a **major conflict**, and integration is likely impossible without upgrading FastAPI. Ensure both libraries target compatible Pydantic V2 minor versions if possible, although Pydantic V2 aims for good backward compatibility within V2.x.
+2.  **Starlette:** FastAPI is built on Starlette. PydanticAI does not seem to have a direct dependency on Starlette. Conflicts are unlikely unless a transitive dependency clashes.
+3.  **Uvicorn:** Uvicorn is an ASGI server, PydanticAI runs within the ASGI application (FastAPI) and doesn't directly interact with or depend on Uvicorn. Conflicts are highly unlikely.
+4.  **HTTPX:** Both PydanticAI (via Providers) and potentially FastAPI application code might use `httpx`.
+    *   **Conflict Risk:** Low. Generally, multiple parts of an application can use `httpx` without issue. Ensure version compatibility if specific features are relied upon by both. Managing the lifecycle of shared `httpx.AsyncClient` instances via FastAPI's lifespan is recommended.
+5.  **Anyio:** PydanticAI uses `anyio`. FastAPI/Starlette also use `anyio` for their async operations.
+    *   **Conflict Risk:** Low. They should coordinate on the same backend (usually `asyncio`). Version mismatches could theoretically cause subtle issues, but `anyio` aims for stability.
+6.  **Typing Extensions:** Both FastAPI and PydanticAI rely heavily on `typing_extensions`.
+    *   **Conflict Risk:** Very Low. Usually only the latest required version is needed.
+7.  **Jinja2:** FastAPI uses Jinja2 for optional HTML templating. PydanticAI might use it internally.
+    *   **Conflict Risk:** Very Low. Version conflicts are rare and usually easily resolved.
+
+**Known Issues/Workarounds:**
+
+*   The documentation mentions needing `nest-asyncio` for Jupyter notebooks due to event loop conflicts. This is not relevant for standard FastAPI deployment but indicates potential async edge cases.
+*   Requires Python 3.9+ (MCP requires 3.10+). Ensure FastAPI deployment environment meets this.
+
+### Installation Options
+
+*   **Standard Install (All Models):**
+    ```bash
+    pip install pydantic-ai
+    # or using uv
+    uv pip install pydantic-ai
+    ```
+    *Installs core + dependencies for all built-in model providers.*
+
+*   **Slim Install (Core Only):**
+    ```bash
+    pip install pydantic-ai-slim
+    # or using uv
+    uv pip install pydantic-ai-slim
+    ```
+    *Installs only the core PydanticAI library without model-specific SDKs.*
+
+*   **Slim Install with Specific Models/Features for FastAPI:**
+    *   **Scenario:** FastAPI app using OpenAI and Logfire.
+        ```bash
+        pip install "pydantic-ai-slim[openai, logfire]"
+        # or using uv
+        uv pip install "pydantic-ai-slim[openai, logfire]"
+        ```
+    *   **Scenario:** FastAPI app using Gemini (Vertex) and DuckDuckGo tool.
+        ```bash
+        pip install "pydantic-ai-slim[vertexai, duckduckgo]"
+        # or using uv
+        uv pip install "pydantic-ai-slim[vertexai, duckduckgo]"
+        ```
+    *   **Scenario:** FastAPI app using MCP client features.
+        ```bash
+        pip install "pydantic-ai-slim[mcp]" # Requires Python >= 3.10
+        # or using uv
+        uv pip install "pydantic-ai-slim[mcp]"
+        ```
+
+**Recommended for FastAPI Production:** Use `pydantic-ai-slim` and specify only the necessary extras (`[openai]`, `[anthropic]`, `[logfire]`, etc.) to minimize the dependency footprint.
+
+---
+
+## Detailed Integration Patterns & Advanced Recipes (FastAPI Context)
+
+This section provides detailed examples and explanations for common integration patterns.
+
+**Assumptions:**
+
+*   FastAPI app (`app = FastAPI(lifespan=...)`) is set up.
+*   An `Agent` instance (`agent`) is initialized during lifespan and available via `app.state.my_agent`.
+*   A FastAPI dependency `get_agent()` exists: `def get_agent() -> Agent: return app.state.my_agent`.
+*   Dependencies (`AgentDeps`) are managed via `get_agent_dependencies()` if needed.
+
+**1. Simple Request -> Agent -> Response:**
+
+*   **Scenario:** An endpoint receives a text query, runs the agent, and returns the agent's (potentially structured) result directly. Suitable for quick, stateless interactions.
+*   **Code:**
+    ```python
+    from fastapi import FastAPI, Depends, HTTPException
+    from pydantic import BaseModel
+    from pydantic_ai import Agent
+    from pydantic_ai.exceptions import ModelError
+
+    # Assume app, get_agent defined with lifespan
+    # Assume agent is configured with result_type=SummaryResult
+
+    class SummaryResult(BaseModel):
+        summary: str
+        keywords: list[str]
+
+    @app.post("/summarize", response_model=SummaryResult) # Use agent's result type as response model
+    async def summarize_text(
+        text_to_summarize: str, # From request body or query param
+        agent: Agent = Depends(get_agent)
+    ):
+        prompt = f"Summarize the following text and extract keywords:\n\n{text_to_summarize}"
+        try:
+            # Run the agent asynchronously
+            result = await agent.run(prompt)
+
+            # Check if the result is of the expected type
+            if isinstance(result.data, SummaryResult):
+                # FastAPI will serialize the Pydantic model automatically
+                return result.data
+            else:
+                # Log unexpected result type
+                print(f"Unexpected result type: {type(result.data)}")
+                raise HTTPException(status_code=500, detail="Agent returned unexpected data format.")
+
+        except ModelError as e:
+            print(f"Agent run failed: {e}") # Log the error
+            raise HTTPException(status_code=503, detail=f"Agent error: {e}")
+        except Exception as e:
+            print(f"Unexpected error: {e}") # Log the error
+            raise HTTPException(status_code=500, detail="Internal server error")
+    ```
+*   **Explanation:**
+    *   The endpoint takes text input.
+    *   It injects the pre-configured `Agent`.
+    *   `agent.run()` is called asynchronously with the prompt.
+    *   Error handling catches PydanticAI-specific errors and general exceptions, returning appropriate HTTP status codes.
+    *   The validated `result.data` (which is a `SummaryResult` instance) is returned directly. FastAPI handles JSON serialization.
+
+**2. Using Agent Components via FastAPI Dependency Injection:**
+
+*   **Scenario:** Injecting the agent itself (as shown above) or its dependencies into endpoints.
+*   **Code (Injecting Agent):** (See example 1, using `agent: Agent = Depends(get_agent)`)
+*   **Code (Injecting Agent Dependencies):**
+    ```python
+    from fastapi import FastAPI, Depends, HTTPException
+    from pydantic_ai import Agent
+    # Assume app, lifespan, get_agent, AgentDeps, get_agent_dependencies are defined
+
+    @app.post("/process_with_deps")
+    async def process_with_deps(
+        prompt: str,
+        agent: Agent = Depends(get_agent),
+        agent_deps: AgentDeps = Depends(get_agent_dependencies) # Inject dependencies
+    ):
+        # Agent's tools/prompts can now use agent_deps via RunContext
+        try:
+            result = await agent.run(prompt, deps=agent_deps) # Pass deps to the run
+            return {"response": result.data}
+        except Exception as e:
+            # Handle errors
+            raise HTTPException(status_code=500, detail=str(e))
+    ```
+*   **Explanation:**
+    *   `get_agent` provides the shared `Agent` instance.
+    *   `get_agent_dependencies` creates/retrieves the necessary dependencies (like DB connections, user context) potentially based on the incoming request (e.g., auth headers).
+    *   The endpoint receives both the agent and its dependencies.
+    *   The dependencies instance is passed explicitly to `agent.run()`.
+
+**3. Triggering Long-Running Agent Tasks (BackgroundTasks):**
+
+*   **Scenario:** An endpoint needs to trigger an agent run that might take significant time, without making the client wait for the HTTP response.
+*   **Code:**
+    ```python
+    import uuid
+    from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException
+    from pydantic_ai import Agent
+    # Assume app, lifespan, get_agent, AgentDeps, get_agent_dependencies defined
+
+    # Simple in-memory store for task results (Replace with DB/Redis in production)
+    task_results = {}
+
+    def run_long_agent_task(agent: Agent, deps: AgentDeps, prompt: str, task_id: str):
+        print(f"Background task {task_id} started for prompt: {prompt[:50]}...")
+        try:
+            # Using run_sync here as BackgroundTasks often run in a threadpool anyway
+            # If run_sync uses async deps internally, ensure thread safety or use agent.run
+            result = agent.run_sync(prompt, deps=deps)
+            task_results[task_id] = {"status": "completed", "data": result.data, "usage": result.usage()}
+            print(f"Background task {task_id} completed.")
+        except Exception as e:
+            print(f"Background task {task_id} failed: {e}")
+            task_results[task_id] = {"status": "failed", "error": str(e)}
+
+    @app.post("/long_task", status_code=202) # Accepted
+    async def start_long_task(
+        prompt: str,
+        background_tasks: BackgroundTasks,
+        agent: Agent = Depends(get_agent),
+        agent_deps: AgentDeps = Depends(get_agent_dependencies)
+    ):
+        task_id = str(uuid.uuid4())
+        task_results[task_id] = {"status": "processing"}
+        background_tasks.add_task(run_long_agent_task, agent, agent_deps, prompt, task_id)
+        return {"message": "Task accepted for processing.", "task_id": task_id}
+
+    @app.get("/task_status/{task_id}")
+    async def get_task_status(task_id: str):
+        result = task_results.get(task_id)
+        if not result:
+            raise HTTPException(status_code=404, detail="Task not found")
+        return result
+    ```
+*   **Explanation:**
+    *   The `/long_task` endpoint generates a unique `task_id`.
+    *   It adds `run_long_agent_task` to FastAPI's `BackgroundTasks`. This function executes *after* the response is sent.
+    *   The endpoint immediately returns `202 Accepted` with the `task_id`.
+    *   The background task runs the agent (using `run_sync` here for simplicity, assuming it runs in a thread) and stores the result (or error) in a simple dictionary keyed by `task_id`.
+    *   A separate `/task_status/{task_id}` endpoint allows the client to poll for the result.
+    *   **Note:** For production, replace the in-memory `task_results` with a persistent store (DB, Redis) and consider using Celery/ARQ for more robust background task management.
+
+**4. Handling Agent Events (using `Agent.iter`):**
+
+*   **Scenario:** Need to react to specific internal events during an agent run, e.g., log every tool call attempt or modify state between steps. Often used with WebSockets for real-time updates.
+*   **Code (Illustrative - Logging focus):**
+    ```python
+    from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect
+    from pydantic_ai import Agent, AgentRun
+    from pydantic_graph import End
+
+    # Assume app, agent, deps setup
+
+    @app.websocket("/ws/agent_iter/{client_id}")
+    async def websocket_agent_iter(
+        websocket: WebSocket,
+        client_id: str, # Example context
+        agent: Agent = Depends(get_agent),
+        agent_deps: AgentDeps = Depends(get_agent_dependencies) # Create deps for this connection
+    ):
+        await websocket.accept()
+        try:
+            while True:
+                prompt = await websocket.receive_text()
+                await websocket.send_text(f"Received prompt: {prompt}. Starting agent...")
+
+                async with agent.iter(prompt, deps=agent_deps) as run:
+                    run_id = run.run_id
+                    await websocket.send_text(f"Starting run ID: {run_id}")
+                    try:
+                        async for node in run:
+                            node_type = type(node).__name__
+                            await websocket.send_text(f"Node Executed: {node_type}")
+                            # Send detailed info based on node type
+                            if agent.is_model_request_node(node):
+                                 # Potentially redact sensitive info before sending
+                                 await websocket.send_json({"event": "model_request", "parts": [p.model_dump(mode='json') for p in node.request.parts]})
+                            elif agent.is_call_tools_node(node):
+                                 await websocket.send_json({"event": "model_response", "parts": [p.model_dump(mode='json') for p in node.model_response.parts]})
+                                 # Could stream tool execution events here too if needed
+                            elif agent.is_end_node(node):
+                                await websocket.send_json({"event": "final_result", "data": run.result.data, "usage": run.usage()})
+                                break # Exit inner loop on End
+
+                    except Exception as e:
+                         await websocket.send_text(f"Error during run {run_id}: {e}")
+                         # Log the full error
+                         print(f"WS Error for {client_id}, run {run_id}: {e}")
+        except WebSocketDisconnect:
+            print(f"Client {client_id} disconnected")
+        except Exception as e:
+            print(f"WS Error for {client_id}: {e}")
+            # Attempt to close gracefully if possible
+            await websocket.close(code=1011) # Internal error
+    ```
+*   **Explanation:**
+    *   A WebSocket endpoint is established.
+    *   On receiving a prompt, `agent.iter()` is used.
+    *   The code iterates through the execution graph using `async for node in run:`.
+    *   For each `node`, information about the step is sent over the WebSocket.
+    *   This allows a frontend client to display the agent's progress in real-time.
+    *   Proper error handling for both the agent run and WebSocket communication is included.
+
+**5. Two-way Communication (Agent asks User via Tool):**
+
+*   **Scenario:** The agent needs clarification from the user during its run. This requires pausing the agent run, getting user input (e.g., via WebSocket or a separate API call), and resuming the run. This is complex and best handled using `Agent.iter` and state persistence.
+*   **Conceptual Outline (Requires `pydantic-graph` state persistence):**
+    1.  Define a tool like `ask_user_for_clarification(question: str) -> str`.
+    2.  Inside the FastAPI endpoint handling the agent run (likely using `Agent.iter` and state persistence):
+        *   Run `await run.next()`.
+        *   Check if the returned node is a `ToolCallPart` for `ask_user_for_clarification`.
+        *   If yes:
+            *   Save the current state of the `run` (using the persistence layer).
+            *   Send the `question` from the tool call arguments back to the user (e.g., via WebSocket or storing it for a polling endpoint).
+            *   The endpoint *pauses* or finishes, waiting for user input.
+        *   If no, continue running `await run.next()` until `ask_user_for_clarification` is called or the run ends.
+    3.  A separate mechanism (WebSocket message, another endpoint) receives the user's answer.
+    4.  Load the saved `run` state using the persistence layer.
+    5.  Manually create a `ToolReturnPart` containing the user's answer for the `ask_user_for_clarification` tool call.
+    6.  Resume the run by calling `await run.next(the_tool_return_node)`.
+    7.  Continue the loop from step 2.
+*   **Note:** This pattern requires careful state management and handling of potentially long pauses. `pydantic-graph`'s persistence features are designed for this but require implementing a persistence backend (e.g., database).
+
+---
+
+## Troubleshooting, Debugging, and Error Handling
+
+### Common Pitfalls & Errors
+
+*   **Blocking Calls:** Calling `agent.run_sync` directly in an `async` endpoint, or using blocking I/O in `async` tools/prompts/validators without `anyio.to_thread.run_sync`. Leads to poor performance and potential deadlocks.
+*   **Configuration Errors:** Forgetting API keys (or setting incorrect env vars), misconfiguring providers (`base_url`), leading to `ModelError` or `AuthenticationError` on the first agent run.
+*   **Dependency Issues:** Not providing required dependencies (`deps`) to `agent.run`, or providing the wrong type. Accessing `ctx.deps` when the agent wasn't configured with `deps_type`.
+*   **Tool Schema/Validation Errors:** Defining tool functions with complex or ambiguous types that Pydantic cannot easily generate a schema for, or that LLMs struggle to populate correctly. LLM providing invalid arguments leading to `ValidationError` (which might trigger retries or `UnexpectedModelBehavior` if retries are exhausted).
+*   **Result Type Validation Errors:** LLM failing to return data matching the `result_type` schema after retries are exhausted, leading to `UnexpectedModelBehavior`.
+*   **Usage Limit Exceeded:** Hitting configured `UsageLimits` (token counts, request counts), raising `UsageLimitExceeded`. Often happens with complex prompts or runaway tool usage.
+*   **Resource Leaks:** Not properly closing resources managed in dependencies (e.g., HTTP clients, DB connections) by using FastAPI's `lifespan`.
+*   **State Management:** Forgetting to pass `message_history` for follow-up requests in conversational agents, leading to loss of context. Incorrectly managing application state related to agent runs (e.g., in background tasks).
+*   **Streaming Errors:** Not fully consuming a stream from `agent.run_stream` before trying to access `result.data` or `result.all_messages()`. Accessing `result.data` when using `stream_text(delta=True)`. Handling `ValidationError` during structured streaming (`result.stream()`).
+
+### Specific Exception Types (`pydantic_ai.exceptions`)
+
+*   `PydanticAIError`: Base exception class.
+*   `ModelError`: General error related to model interaction.
+    *   `ModelHTTPError(ModelError)`: Error related to HTTP communication with the model API (e.g., 4xx, 5xx status codes). Includes `status_code` and potentially response body.
+    *   `ModelTimeoutError(ModelHTTPError)`: Specific timeout error during model API call.
+    *   `AuthenticationError(ModelHTTPError)`: Authentication failure (e.g., invalid API key). Often a 401 or 403.
+    *   `RateLimitError(ModelHTTPError)`: Rate limit exceeded (e.g., 429 status code).
+*   `ToolError(PydanticAIError)`: Error occurring during tool execution (not validation). Wraps the original exception.
+*   `UnexpectedModelBehavior(ModelError)`: Raised when the model behaves unexpectedly, e.g., exceeds max retries for tool/result validation, or returns malformed responses not caught by other exceptions.
+*   `UsageLimitExceeded(PydanticAIError)`: Raised when a configured `UsageLimits` threshold is breached.
+*   `UserError(PydanticAIError)`: Configuration error by the user (e.g., invalid setup).
+*   `ModelRetry(Exception)`: Special exception *intended to be raised by users* within tools or result validators to signal that the model should attempt to correct its previous output and retry. *Not typically caught*, as the agent handles it internally.
+*   `FallbackExceptionGroup(ExceptionGroup)`: Raised by `FallbackModel` if all underlying models fail. Contains the individual exceptions from each model attempt. Requires Python >= 3.11 or the `exceptiongroup` backport.
+
+*(Also be aware of `pydantic.ValidationError` which can occur during tool argument or result validation, but is often handled internally by the retry mechanism unless retries are exhausted).*
+
+### Error Handling Strategies in FastAPI
+
+1.  **Global Exception Handler (for common errors):**
+    ```python
+    from fastapi import FastAPI, Request, HTTPException
+    from fastapi.responses import JSONResponse
+    from pydantic_ai.exceptions import ModelError, UsageLimitExceeded, ToolError, AuthenticationError, RateLimitError
+
+    app = FastAPI()
+
+    @app.exception_handler(ModelError)
+    async def model_error_handler(request: Request, exc: ModelError):
+        # Log the full exception details
+        print(f"ModelError occurred: {exc}")
+        detail = "LLM interaction failed."
+        status_code = 503 # Service Unavailable
+
+        if isinstance(exc, AuthenticationError):
+            detail = "LLM authentication failed."
+            status_code = 500 # Or 401 if client could fix? Unlikely here.
+        elif isinstance(exc, RateLimitError):
+            detail = "LLM rate limit exceeded. Please try again later."
+            status_code = 429
+        elif isinstance(exc, ModelHTTPError):
+             detail = f"LLM API error: Status {exc.status_code}"
+             # Keep status_code 503 or map based on exc.status_code if needed
+
+        return JSONResponse(status_code=status_code, content={"detail": detail})
+
+    @app.exception_handler(UsageLimitExceeded)
+    async def usage_limit_handler(request: Request, exc: UsageLimitExceeded):
+        print(f"UsageLimitExceeded: {exc}")
+        return JSONResponse(status_code=429, content={"detail": f"Usage limit exceeded: {exc}"})
+
+    @app.exception_handler(ToolError)
+    async def tool_error_handler(request: Request, exc: ToolError):
+        print(f"ToolError occurred: {exc.__cause__}") # Log the original cause
+        return JSONResponse(status_code=500, content={"detail": "Error executing internal tool."})
+
+    # Add handlers for other specific PydanticAI or Pydantic exceptions if needed
+
+    # Endpoint code can focus on core logic
+    @app.post("/process")
+    async def process_endpoint(prompt: str, agent: Agent = Depends(get_agent)):
+        # No try/except needed here for handled exceptions
+        result = await agent.run(prompt)
+        return {"response": result.data}
+    ```
+
+2.  **Endpoint-Specific Handling (for fine-grained control):**
+    ```python
+    from pydantic_ai.exceptions import UnexpectedModelBehavior, ValidationError # Pydantic's error
+
+    @app.post("/process_specific")
+    async def process_specific(prompt: str, agent: Agent = Depends(get_agent)):
+        try:
+            result = await agent.run(prompt)
+            return {"response": result.data}
+        except ValidationError as e: # If validation fails after retries
+             print(f"Final Validation Error: {e}")
+             raise HTTPException(status_code=400, detail=f"Invalid format after retries: {e}")
+        except UnexpectedModelBehavior as e:
+             print(f"Model behaved unexpectedly: {e}")
+             raise HTTPException(status_code=500, detail="Model failed to follow instructions.")
+        # Can still rely on global handlers for other errors like ModelHTTPError
+    ```
+
+3.  **Logging:** Always log the full exception details (including tracebacks and causes like `exc.__cause__`) server-side, regardless of the HTTP response sent to the client. Use FastAPI middleware or structured logging libraries. Pydantic Logfire integration automatically captures exceptions within agent runs.
+
+### Debugging Tips
+
+*   **Enable Instrumentation:** The easiest way to debug is `Agent(..., instrument=True)` with Logfire configured. It provides a visual trace of prompts, responses, tool calls/returns, timings, and errors.
+*   **`capture_run_messages`:** Use this context manager in tests or debugging sessions to inspect the exact sequence of `ModelMessage` objects exchanged between the agent and the model, especially useful when a run fails unexpectedly.
+*   **Inspect Tool Schemas:** Use `TestModel` or `FunctionModel` to print the generated `parameters_json_schema` for your tools (as shown in the tools documentation) to ensure they match your expectations and are clear for the LLM.
+*   **Test Tools Independently:** Write unit tests for your tool functions separately to ensure their internal logic is correct before integrating them with the agent. Mock their dependencies (`RunContext.deps`).
+*   **Simplify Prompts:** If getting unexpected behavior, simplify the system and user prompts to isolate the issue. Does it work with a minimal prompt?
+*   **Test Different Models:** Sometimes behavior is model-specific. Try running the same prompt/tools with a different model (e.g., switch between OpenAI and Anthropic or Gemini) to see if the issue persists.
+*   **Check `result.usage()`:** Monitor token counts. Very high counts might indicate inefficient prompting or runaway tool usage.
+*   **Examine Underlying SDK/HTTP Errors:** If `ModelHTTPError` occurs, check the `status_code` and response body (if available in the exception details or Logfire trace) for clues from the provider's API.
+*   **Validate Dependencies:** Ensure dependencies passed via `deps` are correctly initialized and functional. Add logging within dependency methods called by tools.
+
+---
+
+## Performance & Scaling Considerations
+
+### Performance Bottlenecks
+
+*   **LLM Latency:** The primary bottleneck is usually the time taken by the LLM provider to generate a response. This varies significantly between models and providers. Streaming can improve *perceived* latency for text responses.
+*   **Network Latency:** Time taken for API calls to/from the LLM provider. Can be mitigated by choosing providers/regions geographically close to your FastAPI server.
+*   **Tool Execution Time:** Tools performing slow I/O (database queries, external API calls) or heavy computation can become bottlenecks, especially if called frequently by the LLM.
+*   **Sequential Tool Calls:** If the LLM needs to call multiple tools sequentially (call tool A, get result, call tool B based on A's result), the total latency adds up.
+*   **Blocking Code:** Synchronous, blocking code in tools, dependencies, or misuse of `run_sync` can block the FastAPI event loop, severely limiting concurrency.
+*   **Pydantic Validation:** For very complex `result_type` models or tool arguments, Pydantic validation *might* add a small overhead, but this is typically negligible compared to LLM/network latency. Partial validation during streaming also has some overhead.
+*   **Instrumentation Overhead:** Enabling detailed tracing (Logfire/OpenTelemetry) adds some overhead, though usually minimal unless generating extremely high volumes of spans/logs.
+*   **Resource Limits:** Hitting API rate limits (`RateLimitError`) imposed by the LLM provider will throttle performance. Insufficient CPU/memory/network on the FastAPI host can also be a bottleneck under load.
+*   **Inefficient Prompts/Tool Design:** Prompts that require excessive reasoning or tool designs that necessitate many back-and-forth calls with the LLM increase overall latency and cost.
+
+### Optimization Techniques
+
+*   **Choose Faster Models:** Use faster, cheaper models (e.g., Gemini Flash, GPT-4o-mini, Claude 3 Haiku) where appropriate for the task complexity. Use more powerful models only when necessary.
+*   **Use Streaming:** Employ `agent.run_stream()` for text or structured responses to deliver partial results to the user faster, improving perceived performance.
+*   **Optimize Prompts:** Craft clear, concise prompts that minimize ambiguity and the need for excessive reasoning or tool calls. Provide examples (few-shot prompting) if helpful.
+*   **Optimize Tools:**
+    *   Make tools perform necessary I/O asynchronously (`async def`).
+    *   Optimize database queries, cache external API calls where possible within tools.
+    *   Design tools to return all necessary information in one call if feasible, avoiding multiple sequential calls by the LLM for related data.
+    *   Use `prepare` functions to conditionally disable tools if they aren't relevant for a specific step.
+*   **Batching (Application Level):** If multiple independent agent runs are needed concurrently, use `asyncio.gather` to run them in parallel (respecting provider rate limits).
+    ```python
+    # Example: Running multiple prompts concurrently
+    prompts = ["Query 1", "Query 2", "Query 3"]
+    tasks = [agent.run(p, deps=...) for p in prompts]
+    results = await asyncio.gather(*tasks)
+    ```
+*   **Caching:** Cache results of expensive agent runs or tool calls if the inputs are likely to repeat and the results don't need to be real-time. Use libraries like `cachetools` or Redis. Implement caching within tool functions or at the application layer wrapping agent calls.
+*   **Connection Pooling:** Ensure dependencies like database connections use pooling (`asyncpg.create_pool`). `httpx.AsyncClient` manages connection pooling internally. Ensure these are managed correctly in the FastAPI lifespan.
+*   **Use `pydantic-ai-slim`:** Minimize installed dependencies.
+*   **Monitor and Profile:** Use Logfire or other profiling tools to identify specific bottlenecks in agent runs or tool executions.
+
+### Scaling Implications
+
+*   **Statelessness:** PydanticAI agents are largely stateless between runs (state is passed via `message_history` and `deps`). This makes scaling FastAPI horizontally (running multiple instances) relatively straightforward. State management (message history, task results) needs to be handled externally (e.g., DB, Redis).
+*   **Resource Dependencies:** Ensure shared resources like databases or external APIs called by tools can handle the load from multiple FastAPI instances running agent tasks concurrently.
+*   **LLM Provider Limits:** The primary scaling bottleneck will often be the rate limits and concurrency limits imposed by the chosen LLM provider. Scaling FastAPI instances won't help if the downstream LLM API is the bottleneck. Consider:
+    *   Using providers with higher limits or provisioned throughput (like Vertex AI).
+    *   Implementing application-level rate limiting or queuing before calling the agent.
+    *   Using `FallbackModel` to distribute load or handle rate limit errors gracefully.
+*   **Cost:** Scaling increases the number of LLM API calls, directly impacting cost. Monitor usage closely (`result.usage()`, Logfire).
+*   **Dependency Management:** Ensure dependencies (`AgentDeps`) can be efficiently created or retrieved for each request, especially under high load. Caching dependency data might be necessary.
+*   **Background Task Workers:** If using external task queues (Celery/ARQ), scale the number of worker processes appropriately to handle the agent task load. Ensure workers have necessary configuration and dependencies.
+
+---
+
+## Security Considerations in Integration
+
+Integrating LLMs introduces unique security considerations.
+
+### Framework-Specific Vulnerabilities
+
+*   **Prompt Injection:** The most significant risk. Malicious user input could trick the LLM into ignoring its original instructions or executing unintended actions, especially through tools.
+    *   **Mitigation:** Sanitize user input before including it in prompts. Use clear delimiters between instructions and user input. Instruct the LLM in the system prompt to be wary of conflicting instructions from the user. Carefully design tool capabilities to limit potential damage (least privilege). Validate tool outputs. **PydanticAI itself doesn't prevent prompt injection; it's an application-level concern.**
+*   **Insecure Tool Design:** Tools that execute arbitrary code (`eval`, shell commands), perform dangerous OS operations, or make sensitive API calls without proper authorization checks are high-risk.
+    *   **Mitigation:** Design tools with the principle of least privilege. Avoid tools that execute arbitrary code directly based on LLM output. Use dedicated, sandboxed environments if code execution is necessary (like `mcp-run-python`). Validate tool *inputs* rigorously (Pydantic helps here) and *outputs* before using them. Implement proper authentication/authorization within tools that access protected resources.
+*   **Data Leakage via Prompts/Tools:** Sensitive data included in prompts or processed by tools could be inadvertently logged by the LLM provider or exposed through tool errors/outputs.
+    *   **Mitigation:** Avoid including unnecessary sensitive data in prompts. Configure LLM providers (if possible) to disable logging/training on API data. Redact sensitive information before sending it to the LLM or tools where feasible. Ensure tools don't log sensitive arguments or return excessive sensitive information.
+*   **Dependency Security:** Vulnerabilities in PydanticAI's dependencies (core or optional SDKs like `openai`, `anthropic`) could be exploited.
+    *   **Mitigation:** Keep dependencies updated. Use security scanning tools (e.g., `pip-audit`, `safety`). Use `pydantic-ai-slim` to minimize attack surface.
+*   **Denial of Service (DoS):** Malicious input could cause excessive tool usage, hit token limits rapidly, or trigger computationally expensive operations, leading to high costs or service unavailability.
+    *   **Mitigation:** Implement strict `UsageLimits`. Add application-level input validation and rate limiting before calling the agent. Design tools to be efficient and handle edge cases gracefully.
+
+### Secure Integration Patterns
+
+*   **Input Validation/Sanitization:** Before passing user input to `agent.run()`, validate and sanitize it using Pydantic (at the FastAPI level) and potentially other libraries (like `bleach` for HTML) to remove malicious payloads or prompt injection attempts.
+*   **Least Privilege for Tools:** Design tools to perform only the specific actions necessary. If a tool interacts with a database, use a specific, restricted DB user/role. If it calls an API, use an API key with minimal required permissions.
+*   **Authentication/Authorization in Tools:** If tools access user-specific data or perform actions on behalf of a user, ensure the tool verifies the user's identity and permissions. Pass necessary user context via `AgentDeps` (obtained securely via FastAPI's authentication mechanisms) and check permissions within the tool function using `RunContext.deps`.
+*   **Never Trust LLM Output for Security Decisions:** Do not rely on the LLM to make authorization decisions or generate security-sensitive code/commands directly. Always validate and authorize actions in your application code *after* receiving output from the LLM or tools.
+*   **Parameterize Securely:** Avoid constructing tool arguments or SQL queries within tools by simple string formatting of LLM output. Use parameterized queries for databases, and pass structured data to APIs. Pydantic validation helps ensure arguments have the correct *type*, but not necessarily safe *values*.
+*   **Secrets Management:** Store API keys (for LLM providers or tools) securely using environment variables, `.env` files (loaded via `BaseSettings`), or dedicated secrets management systems. Do not hardcode secrets.
+*   **Contextual Awareness in Prompts:** Include instructions in the system prompt warning the LLM about potential misuse or conflicting instructions from user input.
+*   **Rate Limiting & Usage Monitoring:** Implement rate limiting at the FastAPI level (per user/IP). Monitor `result.usage()` and Logfire traces to detect abnormal activity or cost spikes. Use `UsageLimits` in PydanticAI.
+*   **Sandboxing:** If tools *must* execute code generated by the LLM, use a secure sandboxing environment (like Docker containers, WebAssembly via Pyodide as used in `mcp-run-python`).
+
+---
+
+## Testing the Integration
+
+Testing FastAPI applications using PydanticAI involves testing both the FastAPI layer (endpoints, dependencies) and the interaction with the PydanticAI agent.
+
+### Strategies
+
+1.  **Unit Testing FastAPI Endpoints (Mocking Agent):**
+    *   Focus: Test the endpoint logic, request/response handling, dependency injection, and basic flow *without* involving real LLM calls or complex agent behavior.
+    *   Method: Use `Agent.override()` with `TestModel` or `FunctionModel` to mock the agent's behavior. Inject the overridden agent via FastAPI's `app.dependency_overrides`.
+    *   Assertions: Check HTTP status codes, response bodies (often containing mocked agent data), and potentially if specific background tasks were added.
+2.  **Unit Testing Agent Logic (Mocking Dependencies/Tools):**
+    *   Focus: Test the agent's configuration, prompt assembly, tool usage logic, and result handling *without* real LLM calls and *without* real external dependencies (like databases or APIs called by tools).
+    *   Method: Use `Agent.override()` with `TestModel` or `FunctionModel`. Also override agent dependencies using `Agent.override(deps=...)` with mock dependency objects (e.g., using `unittest.mock.MagicMock` or custom test classes).
+    *   Assertions: Use `capture_run_messages` to assert the sequence of interactions (prompts, tool calls, tool returns, final response) matches expectations based on the mocked model and dependencies. Check the final `result.data`.
+3.  **Integration Testing (Agent with Mocked Tools/Deps):**
+    *   Focus: Test the interaction between FastAPI and the agent, including dependency injection and response handling, using a mocked agent model but potentially real (or test-instance) dependencies if needed.
+    *   Method: Similar to Unit Testing Endpoints, but potentially using `FunctionModel` for more realistic agent interaction simulation, while still mocking external services called by *tools*.
+4.  **Integration Testing (Agent with Real Tools/Deps - Staging/Test Env):**
+    *   Focus: Test the agent's interaction with *real* (but non-production) external services (test database, staging APIs) via its tools and dependencies. Still uses a mocked LLM (`TestModel` or `FunctionModel`) to avoid costs/variability.
+    *   Method: Configure the test environment to point dependencies to staging/test instances. Use `Agent.override(model=...)` but *not* `Agent.override(deps=...)`.
+    *   Assertions: Check responses, and verify side effects in the staging/test external systems (e.g., check if a record was created in the test DB).
+5.  **End-to-End Testing (Minimal, Controlled):**
+    *   Focus: Test the entire flow, including FastAPI, PydanticAI, and potentially *real* LLM calls and external services (use with extreme caution, preferably against non-production LLM endpoints if available, or with strict usage limits/mocking).
+    *   Method: Use a test client (`httpx`) to make requests to the running FastAPI application (potentially in a dedicated test environment).
+    *   Assertions: Check final HTTP responses and side effects. High cost, high variability, slow. Best reserved for critical path smoke tests. Set `ALLOW_MODEL_REQUESTS=True` explicitly for these tests if the global flag was set to `False`.
+
+### Mocking/Faking
+
+*   **Mocking the Agent (`TestModel`, `FunctionModel`):**
+    *   **`TestModel`:** Easiest way. Simulates tool calls and returns predictable (but often generic) data based on tool return types or a `custom_result_text`.
+        ```python
+        import pytest
+        from fastapi.testclient import TestClient
+        from pydantic_ai.models.test import TestModel
+        from my_app.main import app, get_agent # Import FastAPI app and dependency getter
+        from my_app.agents import main_agent # Import the actual agent instance
+
+        @pytest.fixture
+        def client():
+            return TestClient(app)
+
+        def test_endpoint_with_testmodel(client):
+            # Configure TestModel response
+            mock_model = TestModel(custom_result_data={"summary": "Mock summary", "keywords": ["mock", "test"]})
+
+            # Override FastAPI dependency to provide the *real* agent instance initially
+            app.dependency_overrides[get_agent] = lambda: main_agent
+
+            # Use Agent.override to replace the model *within* the real agent instance
+            with main_agent.override(model=mock_model):
+                response = client.post("/summarize", params={"text_to_summarize": "test"})
+
+            assert response.status_code == 200
+            assert response.json() == {"summary": "Mock summary", "keywords": ["mock", "test"]}
+
+            # Clean up overrides
+            app.dependency_overrides = {}
+        ```
+    *   **`FunctionModel`:** For fine-grained control over the mock LLM's responses, especially simulating specific tool call sequences or conditional logic based on input messages.
+        ```python
+        import pytest
+        from fastapi.testclient import TestClient
+        from pydantic_ai import models, Agent
+        from pydantic_ai.models.function import FunctionModel, AgentInfo
+        from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart, TextPart
+        from my_app.main import app, get_agent
+        from my_app.agents import main_agent
+
+        models.ALLOW_MODEL_REQUESTS = False # Ensure no real calls
+
+        # Custom function to simulate LLM logic for a specific test
+        def mock_llm_logic(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            last_prompt = messages[-1].parts[0].content
+            if "weather" in last_prompt.lower():
+                # Simulate calling the weather tool
+                return ModelResponse(parts=[ToolCallPart(tool_name="get_current_weather", args={"location": "TestCity"})])
+            elif messages[-1].parts[0].part_kind == 'tool-return':
+                # Simulate final response after tool return
+                 tool_return_content = messages[-1].parts[0].content
+                 return ModelResponse(parts=[TextPart(f"Final answer based on tool: {tool_return_content}")])
+            else:
+                return ModelResponse(parts=[TextPart("Default mock response")])
+
+        @pytest.fixture
+        def client():
+            return TestClient(app)
+
+        def test_endpoint_with_functionmodel(client):
+            mock_model = FunctionModel(mock_llm_logic)
+            app.dependency_overrides[get_agent] = lambda: main_agent
+
+            with main_agent.override(model=mock_model):
+                 # This prompt should trigger the weather tool simulation
+                response = client.post("/weather_endpoint", params={"location": "TestCity"}) # Assuming endpoint calls agent
+
+            assert response.status_code == 200
+            # Assuming the (mocked) tool returns "Sunny"
+            assert response.json()["response"] == "Final answer based on tool: Sunny"
+
+            app.dependency_overrides = {}
+        ```
+
+*   **Mocking Agent Dependencies:** Use `unittest.mock.MagicMock`, custom test classes, or libraries like `pytest-mock`. Inject these mocks using `Agent.override(deps=...)`.
+    ```python
+    import pytest
+    from unittest.mock import MagicMock
+    from pydantic_ai import capture_run_messages
+    from pydantic_ai.models.test import TestModel
+    from my_app.agents import agent, AgentDeps # Import agent and its dep class
+
+    @pytest.mark.anyio
+    async def test_agent_with_mock_deps():
+        # Create mock dependency
+        mock_db = MagicMock()
+        mock_db.fetch_weather.return_value = {"temp": 25, "desc": "Very Mocking"}
+        mock_deps = AgentDeps(db_conn=mock_db, user_id=999) # Assuming AgentDeps structure
+
+        test_model = TestModel() # Mock the LLM too
+
+        # Override both model and dependencies
+        with agent.override(model=test_model, deps=mock_deps):
+             with capture_run_messages() as messages:
+                 result = await agent.run("Weather please")
+
+        # Assert on result or messages
+        assert result.data == '{"get_current_weather":{"temp": 25, "desc": "Very Mocking"}}' # TestModel default output includes tool results
+        mock_db.fetch_weather.assert_called_once() # Verify mock dependency was called
+        # Can also assert on 'messages' list for detailed interaction
+    ```
+
+### End-to-End Testing Considerations
+
+*   **Cost and Rate Limits:** E2E tests involving real LLM calls are expensive and can quickly hit rate limits. Use sparingly.
+*   **Non-Determinism:** LLM responses can vary, making assertions difficult. Focus E2E tests on whether the overall flow completes successfully and essential side effects occur, rather than asserting exact LLM text output. Use models with low temperature if possible for more predictability.
+*   **Test Environment:** Run E2E tests against a dedicated staging environment with separate API keys and isolated external services (test DB, etc.).
+*   **Flakiness:** E2E tests involving external network calls (LLM API, tool APIs) are prone to network-related flakiness. Implement retries or expect occasional failures.
+*   **Secrets Management:** Securely provide necessary API keys (for LLM and potentially tools) to the E2E test environment.
+*   **Cleanup:** Ensure E2E tests clean up any state they create in external systems (e.g., delete test records from a database).
+
+---
+
+## Key Learning Resources & Source Code Pointers
+
+### Comprehensive List
+
+*   **Core Documentation:**
+    *   `docs/index.md`: Introduction, overview, key features.
+    *   `docs/agents.md`: **Crucial.** Detailed explanation of the `Agent` class, running agents (`run`, `run_sync`, `run_stream`, `iter`), system prompts, reflection/retries.
+    *   `docs/tools.md`: **Crucial.** Explains function tools, decorators, schema generation from docstrings, `RunContext`.
+    *   `docs/results.md`: **Crucial.** Covers structured results (`result_type`), validation, and streaming (`stream_text`, `stream_structured`).
+    *   `docs/dependencies.md`: **Crucial.** Details the dependency injection system (`deps_type`, `RunContext`, overriding).
+    *   `docs/message-history.md`: Explains accessing and reusing conversation messages.
+    *   `docs/models.md`: **Crucial.** Lists supported models, configuration instructions (API keys, providers), and how to use OpenAI-compatible models.
+    *   `docs/logfire.md`: Explains integration with Pydantic Logfire for debugging/monitoring.
+    *   `docs/testing.md`: **Crucial.** Covers unit testing strategies using `TestModel`, `FunctionModel`, and `Agent.override`.
+    *   `docs/multi-agent-applications.md`: Discusses agent delegation and hand-off patterns.
+    *   `docs/graph.md`: Detailed guide on the underlying `pydantic-graph` library for complex state machine workflows.
+    *   `docs/input.md`: Covers multimodal input (Image, Audio, Document).
+    *   `docs/mcp/index.md`, `client.md`, `server.md`, `run-python.md`: Information on Model Context Protocol integration.
+    *   `docs/install.md`: Installation instructions, including `pydantic-ai-slim` and extras.
+    *   `docs/cli.md`: Usage of the command-line interface.
+    *   `docs/troubleshooting.md`: Common issues and solutions.
+    *   `docs/contributing.md`: Contribution guidelines, setup for development.
+*   **API Reference:**
+    *   `docs/api/agent.md`: API docs for `Agent`, `AgentRunResult`, `AgentRun`.
+    *   `docs/api/tools.md`: API docs for `Tool`, `RunContext`.
+    *   `docs/api/messages.md`: API docs for `ModelMessage` and parts.
+    *   `docs/api/models/base.md`: API docs for `Model` ABC.
+    *   `docs/api/models/openai.md`, `anthropic.md`, `gemini.md`, etc.: Specific API details for each model implementation.
+    *   `docs/api/models/test.md`, `function.md`: API docs for test models.
+    *   `docs/api/providers.md`: API docs for Provider classes.
+    *   `docs/api/exceptions.md`: Lists defined exceptions.
+    *   `docs/api/settings.md`: API docs for `ModelSettings`, `UsageLimits`.
+    *   `docs/api/usage.md`: API docs for `Usage`.
+    *   `docs/api/pydantic_graph/graph.md`, `nodes.md`, `persistence.md`: API docs for the graph library.
+*   **Example Directories:**
+    *   `docs/examples/index.md`: Overview and instructions for running examples.
+    *   `docs/examples/pydantic-model.md`: Basic structured output.
+    *   `docs/examples/weather-agent.md`: **Relevant.** Demonstrates tools, dependencies, streaming, Gradio UI.
+    *   `docs/examples/chat-app.md`: **Relevant.** Demonstrates message history, streaming, FastAPI integration.
+    *   `docs/examples/sql-gen.md`: **Relevant.** Demonstrates dynamic prompts, structured results, result validators, dependencies.
+    *   `docs/examples/bank-support.md`: **Relevant.** Demonstrates dynamic prompts, structured results, tools, dependencies.
+    *   `docs/examples/rag.md`: Demonstrates RAG pattern using tools and dependencies.
+    *   `docs/examples/stream-markdown.md`, `stream-whales.md`: Focus specifically on streaming different types of content.
+    *   `docs/examples/flight-booking.md`: Demonstrates multi-agent patterns (delegation, hand-off).
+    *   `docs/examples/question-graph.md`: Demonstrates `pydantic-graph`.
+
+### Crucial Source Files (Inferred Pointers)
+
+*(Since actual source code isn't provided, these are highly likely locations based on documentation and conventions)*
+
+*   **`pydantic_ai/agent.py`:** Likely contains the `Agent` class implementation, run methods (`run`, `run_sync`, `run_stream`, `iter`), and core orchestration logic. **Key for understanding execution flow.**
+*   **`pydantic_ai/models/base.py`:** Likely contains the `Model` Abstract Base Class definition.
+*   **`pydantic_ai/models/openai.py`, `anthropic.py`, `gemini.py`, etc.:** Implementations for specific model providers, showing how they interact with SDKs/APIs and map data to/from `ModelMessage` structures. **Key for understanding provider specifics.**
+*   **`pydantic_ai/providers/*.py`:** Implementations of `Provider` classes, handling authentication, client creation, and base URL logic. **Key for configuration.**
+*   **`pydantic_ai/tools.py`:** Likely contains the `Tool` class, tool decorators, schema generation logic (`_build_tool_schema`), and `RunContext`. **Key for understanding tool definition and usage.**
+*   **`pydantic_ai/messages.py`:** Definitions of all `ModelMessage`, `ModelRequest`, `ModelResponse`, and various `Part` dataclasses/typeddicts. **Key for understanding data structures.**
+*   **`pydantic_ai/result.py`:** Implementation of `StreamedRunResult` and associated streaming logic. **Key for understanding streaming.**
+*   **`pydantic_ai/exceptions.py`:** Definitions of custom exceptions.
+*   **`pydantic_ai/settings.py`:** Definitions of `ModelSettings`, `UsageLimits`.
+*   **`pydantic_ai/internal/graph_runner.py` (or similar):** Likely contains the code that interacts directly with `pydantic-graph` to execute the agent's internal state machine. Understanding this would clarify the low-level flow abstracted by `Agent.run`.
+*   **`pydantic_graph/graph.py`, `nodes.py` (in `pydantic-graph` library):** Core definitions for the graph execution engine used internally by `Agent`.
+
+```markdown

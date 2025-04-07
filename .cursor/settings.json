@@ -1,0 +1,139 @@
+{
+  "formatOnSave": true,
+  "tabSize": 4,
+  "trimTrailingWhitespace": true,
+  "insertFinalNewline": true,
+  "rulers": [88],
+  "wordWrap": "on",
+  "python.linting.enabled": true,
+  "python.linting.flake8Enabled": true,
+  "python.linting.mypyEnabled": true,
+  "python.linting.flake8Args": [
+    "--max-line-length=88",
+    "--extend-ignore=E203",
+    "--docstring-convention=google",
+    "--extend-select=B,B9",
+    "--per-file-ignores=tests/*:D"
+  ],
+  "python.linting.mypyArgs": [
+    "--strict",
+    "--ignore-missing-imports",
+    "--disallow-untyped-defs",
+    "--disallow-incomplete-defs",
+    "--check-untyped-defs",
+    "--disallow-untyped-decorators",
+    "--no-implicit-optional",
+    "--warn-redundant-casts",
+    "--warn-unused-ignores",
+    "--warn-return-any",
+    "--no-implicit-reexport"
+  ],
+  "python.formatting.provider": "black",
+  "python.formatting.blackArgs": [
+    "--line-length=88"
+  ],
+  "python.sortImports.args": ["--profile", "black"],
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.nosetestsEnabled": false,
+  "python.testing.pytestArgs": [
+    "tests",
+    "--cov=app",
+    "--cov-report=xml",
+    "--cov-report=term",
+    "--cov-fail-under=90",
+    "--doctest-modules",
+    "--strict-markers"
+  ],
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": true
+  },
+  "python.analysis.typeCheckingMode": "strict",
+  "editor.defaultFormatter": "ms-python.black-formatter",
+  "python.defaultInterpreterPath": "python3.12",
+  "python.dependencyVersions": {
+    "fastapi": ">=0.109.0,<0.110.0",
+    "pydantic": ">=2.6.0,<3.0.0",
+    "sqlalchemy": ">=2.0.0,<3.0.0",
+    "uvicorn": ">=0.28.0,<0.29.0",
+    "alembic": ">=1.15.0,<1.16.0",
+    "black": ">=25.1.0,<26.0.0",
+    "isort": ">=5.13.2,<6.0.0",
+    "flake8": ">=7.0.0,<8.0.0",
+    "flake8-bugbear": ">=24.2.6,<25.0.0",
+    "flake8-docstrings": ">=1.7.0,<2.0.0",
+    "mypy": ">=1.8.0,<2.0.0",
+    "pytest": ">=8.0.0,<9.0.0",
+    "pytest-cov": ">=4.1.0,<5.0.0",
+    "pytest-asyncio": ">=0.23.0,<0.24.0"
+  },
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/node_modules": true,
+    "**/.env": true,
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.coverage": true,
+    "**/coverage.xml": true,
+    "**/*.pyc": true,
+    "**/.mypy_cache": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/.git": true,
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.mypy_cache": true
+  },
+  "files.associations": {
+    "*.py": "python",
+    "requirements*.txt": "pip-requirements",
+    "requirements*.in": "pip-requirements",
+    "Dockerfile": "dockerfile",
+    ".env*": "dotenv",
+    "Procfile": "shellscript",
+    "*.yaml.j2": "yaml",
+    ".flake8": "ini"
+  },
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": true
+    }
+  },
+  "python.analysis.diagnosticMode": "workspace",
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.fixAll": ["source.unusedImports", "source.convertImportFormat"],
+  "python.analysis.inlayHints.functionReturnTypes": true,
+  "python.analysis.inlayHints.variableTypes": true,
+  "python.analysis.packageIndexDepths": [
+    { "name": "fastapi", "depth": 3 },
+    { "name": "sqlalchemy", "depth": 2 },
+    { "name": "pydantic", "depth": 2 }
+  ],
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/.hg/store/**": true,
+    "**/.venv/**": true,
+    "**/__pycache__/**": true
+  },
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": true,
+  "editor.suggest.preview": true,
+  "editor.suggest.showStatusBar": true,
+  "editor.stickyScroll.enabled": true,
+  "editor.linkedEditing": true,
+  "editor.suggest.insertMode": "replace",
+  "editor.acceptSuggestionOnEnter": "smart",
+  "terminal.integrated.env.osx": {
+    "PYTHONPATH": "${workspaceFolder}"
+  },
+  "debug.inlineValues": true,
+  "debug.showInStatusBar": "always",
+  "debug.toolBarLocation": "docked"
+}

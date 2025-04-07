@@ -1,0 +1,387 @@
+---
+description: start or create a new project
+globs: 
+alwaysApply: false
+---
+---
+description: Guidelines for setup guidelines and feature development with a strong emphasis on TDD, incremental progress, and environment-aware testing.
+globs:
+  - "**/*.py"
+  - "/app/**"
+---
+
+## Summary:
+Enforce a strict test-driven development workflow with **iterative code quality checks integrated into the development cycle**. Each feature goes through a complete TDD lifecycle with automated testing across all environments, deployed to Heroku Eco dynos with LTS dependencies. Continuous integration and deployment ensure a production-ready FastAPI project.
+## Goals:
+- **Prioritize TDD**: Write tests before implementation
+- **Automate Everything**: Tests, linting, formatting, deployment
+- **Continuous Verification**: Test in every environment automatically
+- **Incremental Progress**: Small, tested, working features deployed frequently
+- **Sustainable Infrastructure**: Use Eco dynos on Heroku
+- **Stability**: Use LTS/stable versions of Python and dependencies
+---
+## 🧪 Test-Driven Development (TDD) Workflow
+### The TDD Cycle (Red-Green-Refactor):
+1. **RED**: Write a failing test first
+   - Create test file in `app/tests/`
+   - Define expected behavior clearly
+   - Run test to confirm it fails (for the right reason)
+
+2. **GREEN**: Write minimal code to pass
+   - Implement just enough to make the test pass
+   - Focus on functionality, not perfection
+   - Run test to confirm it passes
+
+3. **REFACTOR**: Improve the implementation
+   - Clean up the code while keeping tests green
+   - Apply code quality tools
+   - Ensure tests still pass after refactoring
+
+### TDD Requirements:
+- **No code without tests**: Every function must have corresponding tests
+- **Test coverage targets**: Aim for >90% code coverage
+- **Test isolation**: Tests should not depend on each other
+- **Fast test suite**: Optimize for quick feedback cycles
+---
+## 🔄 CI/CD Pipeline Integration
+### Feature Development Flow:
+```
+Local Development → GitHub CI → Review App → Production (Eco Dyno)
+     (TDD Cycle)     (Tests)    (Testing)   (Verification)
+```
+
+### CI/CD Core Requirements:
+- **Fail Fast**: Any test or lint failure blocks deployment
+- **Automated**: Migrations, tests, deployment all automatic
+- **Consistent**: Tests must pass in all environments
+- **Verifiable**: Run health checks after deployment
+- **Eco-friendly**: Deploy to Heroku Eco dynos
+---
+## 🐍 Python Version & Dependencies
+- Use **LTS Python version** (currently Python 3.10 LTS)
+- Pin all dependency versions for stability
+- Prefer packages with long-term support
+- Update dependencies on a scheduled basis, not ad-hoc
+- Specify Python version in `.python-version`:
+  ```
+  3.10
+  ```
+- Use dependency version constraints that specify minimum compatible versions
+---
+## 🔧 Python Best Practices
+- Follow **PEP 8** and use **type hints** throughout.
+- Favor **Pythonic idioms** and meaningful naming.
+- Keep functions focused and modular.
+- Raise helpful exceptions and log where useful.
+---
+## 🧹 Code Quality Tools
+### Formatting
+- Use **Black** for automatic code formatting with default settings
+- Use **isort** to organize imports with Black-compatible settings
+- Add pre-commit hooks to format code automatically before commits
+
+### Linting
+- Use **Flake8** with appropriate plugins:
+  - `flake8-bugbear` for additional bug detection
+  - `flake8-docstrings` for docstring style checking
+  - `flake8-comprehensions` for better list/dict comprehensions
+- Configure with reasonable line length (88 to match Black)
+- Run linting in CI pipeline to block non-compliant code
+
+### Type Checking
+- Use **Mypy** for static type analysis
+- Enable strict mode for maximum type safety
+- Run type checking in the CI pipeline
+- Add inline type ignores only when absolutely necessary
+
+Iterative Application During Development:**
+**Crucially, apply Black, isort, Flake8, and Mypy frequently during development. After completing a function, method, or significant block of code, run these tools and fix any reported issues immediately before moving on to the next piece of functionality. Do not accumulate quality debt.**
+
+---
+## 🚀 FastAPI & Project Structure
+- Use **Pydantic** for data validation and response models.
+- Leverage **FastAPI dependency injection** where helpful.
+- Organize with **APIRouter**, one per domain.
+- Structure the project like this:
+```
+├── app/
+│   ├── main.py             # FastAPI app instantiation, lifespan, top-level middleware
+│   │
+│   ├── api/                # FastAPI routers/endpoints
+│   │   ├── __init__.py
+│   │   ├── endpoints/      # Endpoint definitions (e.g., webhooks, status checks)
+│   │   │   ├── __init__.py
+│   │   │   ├── email_webhooks.py # Handler for Mailgun/Mailchimp webhooks
+│   │   │   └── other_endpoints.py
+│   │   └── deps.py           # Common API-level dependencies (auth, etc.) - distinct from Agent deps
+│   │
+│   ├── agents/             # ★ NEW: Dedicated directory for PydanticAI Agents
+│   │   ├── __init__.py
+│   │   ├── parsing/        # Agents focused on parsing/understanding input
+│   │   │   ├── __init__.py
+│   │   │   └── email_parser_agent.py
+│   │   ├── analysis/       # Agents for analysis (sentiment, intent)
+│   │   │   ├── __init__.py
+│   │   │   └── sentiment_agent.py
+│   │   ├── actions/        # Agents performing actions (DB transactions, sending email)
+│   │   │   ├── __init__.py
+│   │   │   ├── transaction_agent.py
+│   │   │   └── email_sender_agent.py
+│   │   ├── coordination/   # Agents responsible for routing/workflow decisions
+│   │   │   ├── __init__.py
+│   │   │   └── workflow_coordinator_agent.py
+│   │   └── base.py         # (Optional) Base agent configurations or shared settings
+│   │
+│   ├── tools/              # ★ NEW: Dedicated directory for Agent Tools
+│   │   ├── __init__.py
+│   │   ├── database_tools.py   # Tools interacting with your DB
+│   │   ├── external_api_tools.py # Tools for other external APIs
+│   │   ├── azure_ocr_tool.py   # Tool specifically for Azure Document Intelligence
+│   │   └── workflow_tools.py   # Tools used by coordination agents
+│   │
+│   ├── dependencies/       # ★ NEW: PydanticAI Agent Dependencies definitions
+│   │   ├── __init__.py
+│   │   └── agent_deps.py     # Define Pydantic models/dataclasses for Agent `deps_type`
+│   │
+│   ├── integrations/       # ★ NEW: Clients/SDKs for external services
+│   │   ├── __init__.py
+│   │   ├── email/          # Email service specifics (Mailgun/Mailchimp client logic)
+│   │   │   ├── __init__.py
+│   │   │   └── client.py
+│   │   ├── azure/          # Azure service specifics
+│   │   │   ├── __init__.py
+│   │   │   └── document_intelligence.py # Logic wrapping Azure SDK calls for OCR
+│   │   └── other_apis/     # Clients for other APIs agents might use via tools
+│   │       └── client.py
+│   │
+│   ├── models/             # ORM models (e.g., SQLAlchemy) - Remains the same
+│   │   ├── __init__.py
+│   │   └── email_data.py   # Example model for storing email/workflow state
+│   │
+│   ├── schemas/            # Pydantic schemas (for API request/response validation)
+│   │   ├── __init__.py
+│   │   ├── webhook_schemas.py # Schemas for incoming webhooks
+│   │   ├── agent_results.py # ★ Can also hold Pydantic models used as Agent `result_type`
+│   │   └── common.py
+│   │
+│   ├── services/           # Business logic / Orchestration Layer - Remains important
+│   │   ├── __init__.py
+│   │   └── email_processing_service.py # Core logic orchestrating parsing, analysis, actions
+│   │
+│   ├── db/                 # DB config and session management - Remains the same
+│   │   ├── __init__.py
+│   │   └── session.py
+│   │
+│   ├── core/               # Settings, base config, shared utilities - Remains the same
+│   │   ├── __init__.py
+│   │   ├── config.py         # Pydantic BaseSettings for configuration
+│   │   └── security.py       # Security-related utilities (API keys, etc.)
+│   │
+│   └── tests/              # Tests - Structure remains similar, add agent tests
+│       ├── __init__.py
+│       ├── conftest.py
+│       ├── test_unit/
+│       │   ├── test_agents/    # ★ NEW: Unit tests specifically for agents (using mocks)
+│       │   ├── test_tools/     # ★ NEW: Unit tests for tools
+│       │   ├── test_services/
+│       │   └── test_schemas.py
+│       └── test_integration/
+│           ├── test_api/       # Tests for API endpoints
+│           └── test_workflows/ # Tests for full email processing flows (staging deps)
+│
+├── .env                # Local environment variables (API keys, DB DSNs, etc.)
+├── .env.example
+├── requirements/       # ★ NEW: Directory for requirements files
+│   ├── base.txt          # Core dependencies (FastAPI, Pydantic)
+│   ├── agents.txt        # PydanticAI, specific model SDKs, pydantic-graph
+│   ├── integrations.txt  # SDKs for Mailgun, Azure, etc.
+│   └── dev.txt           # Test dependencies (pytest, httpx, etc.)
+├── pyproject.toml      # Project metadata, build config, tool config (ruff, mypy)
+├── .python-version
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+└── README.md           # Updated project description
+```
+---
+## 📄 OpenAPI Specification
+- Maintain an up-to-date OpenAPI specification
+- Export the spec using FastAPI's built-in tools
+- Update the spec after each feature addition
+- Use the spec for documentation and client generation
+---
+## 📊 Test Coverage and Reporting
+- Use `pytest-cov` to measure test coverage
+- Set minimum coverage thresholds in CI pipeline
+- Generate coverage reports after test runs
+- Example: `pytest --cov=app --cov-report=xml --cov-report=term`
+---
+## 🔄 Feature Development Workflow
+For each feature:
+1. **Create a feature branch** from main
+2. **Write tests first** (RED phase)
+3. **Implement the feature** (GREEN phase)
+4. **Clean and optimize** (REFACTOR phase)
+5. **Submit pull request** - CI runs all checks
+6. **Automatic deployment** to review app
+7. **Verify production** after merge to main
+---
+## 🧪 Environment-Aware Testing
+All tests must work in both local (SQLite) and production (PostgreSQL) environments:
+- Use a `Settings` class with environment detection.
+- Use a `DATABASE_URL` env variable override pattern.
+- For local testing, default to `sqlite:///./dev.db`.
+- In CI or Heroku, use the `DATABASE_URL` Heroku provides.
+- When running and testing local use venv and python3 (I always run on a mac)
+---
+## 🚀 GitHub & Heroku CI/CD Pipeline
+### GitHub Actions Workflow:
+```yaml
+name: TDD CI/CD Pipeline
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'  # LTS version
+      - name: Run quality checks
+        run: |
+          # Install and run black, isort, flake8, mypy
+
+  test:
+    name: Run Test Suite
+    needs: quality
+    runs-on: ubuntu-latest
+    # Set up Postgres service for testing
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'  # LTS version
+      - name: Run tests with coverage
+        run: pytest --cov=app
+
+  deploy:
+    name: Deploy
+    needs: test
+    if: success() && (github.ref == 'refs/heads/main' || github.event_name == 'pull_request')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Deploy to appropriate environment
+        # Deploy to review app or production based on context
+        uses: akhileshns/heroku-deploy@v3.12.12
+        with:
+          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+          heroku_app_name: ${{ secrets.HEROKU_APP_NAME }}
+          heroku_email: ${{ secrets.HEROKU_EMAIL }}
+          dyno_type: eco
+      - name: Verify deployment
+        # Run health check against deployed app
+```
+
+### Heroku Configuration:
+- **Procfile**:
+  ```
+  release: alembic upgrade head
+  web: uvicorn app.main:app --host=0.0.0.0 --port=$PORT
+  ```
+- **.python-version**:
+  ```
+  3.10
+  ```
+- **app.json**:
+  ```json
+  {
+    "name": "FastAPI TDD App",
+    "description": "A FastAPI application built with TDD",
+    "formation": {
+      "web": {
+        "quantity": 1,
+        "size": "eco"
+      }
+    },
+    "addons": [
+      "heroku-postgresql:mini"
+    ]
+  }
+  ```
+- **Post-deploy**: Run health checks and basic API tests
+---
+## 📦 Dependencies Management
+- Use `pip-tools` with `requirements.in` for direct dependencies
+- Generate `requirements.txt` with pinned versions using `pip-compile`
+- Separate `requirements-dev.in` for development dependencies
+- Pin to stable LTS versions where available
+- Example requirements.in:
+  ```
+- **Python:** 3.12
+- **FastAPI:** 0.109.x
+- **Pydantic:** 2.6.x (V2)
+- **SQLAlchemy:** 2.0.x
+- **Uvicorn:** 0.28.x
+- **Alembic:** 1.15.1
+
+**Code Quality Tools:**
+- Black 25.1.0
+- isort 5.13.2
+- flake8 7.0.0
+- flake8-bugbear 24.2.6
+- flake8-docstrings 1.7.0
+- mypy 1.8.0
+  ```
+---
+## 🗃️ Database Migrations
+- Use Alembic for all schema changes
+- Create migration scripts for every model change
+- Test migrations in both directions (up/down)
+---
+## 🔒 Security Practices
+- Never hardcode secrets; use environment variables
+- Implement proper authentication with JWT or OAuth2
+- Use HTTPS in production
+- Apply input validation on all endpoints
+---
+## ⚙️ Environment-Based Settings
+- Store configuration in a `Settings` class using `pydantic.BaseSettings`
+- Read from `.env` locally and from Heroku env vars in production
+- Detect and switch database URIs automatically
+---
+## ⚠️ Error Handling
+- Use custom exception classes for domain-specific errors
+- Implement global exception handlers
+- Return consistent error responses with appropriate status codes
+---
+## 📚 API Documentation
+- Document all endpoints with clear descriptions
+- Provide examples for request/response bodies
+- Use FastAPI's automatic docs with enhanced descriptions
+---
+## ⚡ Performance Considerations
+- Use async where appropriate (I/O operations)
+- Implement caching for expensive operations
+- Paginate list endpoints
+- Use database indices for frequently queried fields
+- Optimize for eco dyno constraints:
+  - Efficient memory usage
+  - Resource-conscious background tasks
+  - Appropriate connection pooling
+---
+## 🧠 Apply this rule when:
+- Writing or editing any function, route, schema, or service
+- Adding a new domain to the API
+- Creating tests for new or existing functionality
+- Setting up CI/CD pipelines
+- Starting a new feature branch
+- Submitting or reviewing pull requests

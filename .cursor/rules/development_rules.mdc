@@ -1,0 +1,183 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+description: Development guidelines for a FastAPI project emphasizing TDD, iterative code quality, CI/CD, and environment-aware testing, including specific tool configurations.
+globs:
+  - "**/*.py"
+  - "/app/**"
+---
+## Summary:
+This document outlines the mandatory development workflow for this FastAPI project. It enforces a strict **Test-Driven Development (TDD)** process combined with **frequent, iterative code quality checks** adhering to specific project standards. The core philosophy is to build reliable software through small, verifiable steps, automated checks, and continuous integration/deployment. Adherence to these guidelines is required for all code contributions.
+
+## Core Goals:
+- **TDD First**: Implement **all** code changes using the Red-Green-Refactor cycle. No production code without a preceding failing test.
+- **Automate Rigorously**: Rely on automated tests, formatting, linting, type checking, and deployment pipelines configured according to project standards.
+- **Continuous Verification**: Ensure code passes all checks and tests locally **and** in CI (simulating production) before merging.
+- **Iterative Quality**: Apply code quality tools (Black, isort, Flake8, Mypy) **frequently** during development, not just before committing. Fix issues immediately according to defined standards.
+- **Incremental Development**: Build features and fix bugs in small, testable, working increments.
+- **Maintain Stability**: Manage dependencies carefully using pinned versions and controlled updates.
+
+## 🧪 Test-Driven Development (TDD) Workflow
+
+### The TDD Cycle (Red-Green-Refactor):
+1.  **RED**: Write a **failing test** first.
+    -   Create/update test file(s) in `app/tests/` (unit or integration).
+    -   Clearly define expected behavior via assertions.
+    -   Run tests; **confirm failure** for the *expected* reason.
+2.  **GREEN**: Write the **minimum** application code to make the test(s) pass.
+    -   Focus *only* on satisfying the test requirements.
+    -   Run tests frequently until they pass.
+3.  **REFACTOR**: Improve application and test code while **keeping tests green**.
+    -   Enhance clarity, structure, and performance. Remove duplication.
+    -   **Crucially: Run code quality tools (Black, isort, Flake8, Mypy) and fix all reported issues according to project standards (see below).**
+    -   Confirm all tests still pass after refactoring.
+
+### TDD Requirements:
+-   **Strict Enforcement**: No application code is written before a failing test.
+-   **Test Coverage**: Aim for **>90% code coverage**. Monitor via `pytest-cov` and analyze reports to cover gaps.
+-   **Test Isolation**: Design tests to run independently and in any order.
+-   **Test Speed**: Optimize tests for fast feedback cycles.
+
+## 🔧 Python Best Practices
+-   Adhere strictly to **PEP 8** style guidelines (enforced by tools below).
+-   Use **type hints** for all function signatures and complex variables (enforced by MyPy).
+-   Write idiomatic, **Pythonic code** (e.g., comprehensions, context managers).
+-   Follow the **Single Responsibility Principle**: Keep functions/methods small and focused.
+-   Use clear, meaningful names for all identifiers.
+-   Raise specific, informative exceptions.
+-   Implement appropriate **logging** for debugging and monitoring. **Do not use `print()` statements.**
+
+## 🧹 Iterative Code Quality Checks
+**Apply quality tools frequently during the Refactor step and throughout development.** Do **not** wait until the end of a task or before committing. Address quality issues **immediately** to prevent technical debt accumulation.
+
+1.  **Format**: `black .`
+2.  **Sort Imports**: `isort .`
+3.  **Lint**: `flake8 .` (Fix **all** issues).
+4.  **Type Check**: `mypy app` (Fix **all** errors).
+
+Code **must** pass all checks locally and in CI before merging.
+
+## ✨ Code Quality Standards (Tool Configuration)
+When generating or modifying Python code, you MUST strictly follow the configurations defined in the project's `pyproject.toml` and `setup.cfg` files, specifically the settings for **Black**, **Flake8**, and **MyPy**. Key standards include:
+
+1.  **Formatting (Black):**
+    *   Adhere to Black's opinionated formatting style.
+    *   **Maximum line length is 88 characters.** Format code accordingly.
+2.  **Linting (Flake8):**
+    *   Follow rules enforced by Flake8, including selected plugins (like Bugbear, Comprehensions).
+    *   Pay attention to complexity limits (**max complexity: 12**).
+    *   Avoid ignored warnings (E203, W503) where applicable due to Black compatibility.
+    *   **Do not use `print()` statements** for debugging; use logging instead.
+3.  **Type Hinting (MyPy):**
+    *   Provide **full type hints** for all function definitions (arguments and return types) as per `disallow_untyped_defs = true` and `disallow_incomplete_defs = true`.
+    *   Ensure functions being called are typed where possible (`disallow_untyped_calls = true`).
+    *   Avoid using `Any` where a more specific type is possible (`warn_return_any = true`). Use standard types from the `typing` module (e.g., `List`, `Dict`, `Optional`, `Union`, `Tuple`, `Callable`).
+    *   Assume `ignore_missing_imports = true` unless specifically told otherwise; do not invent types for unimported modules.
+
+4.  **Common mypy Issues to Avoid:**
+    *   **Missing Return Type Annotations**: Always include a return type for every function and method, including `-> None` for functions that don't return a value.
+    *   **Incompatible Method Signatures**: When overriding methods from parent classes (especially Pydantic's BaseModel methods like `dict()` or `model_dump()`), ensure your signature exactly matches the parent class's signature including all parameters and return types.
+    *   **Parameter Type Compatibility**: Ensure function parameter types are compatible with arguments passed to them. Pay special attention to:
+        * Factory functions/callables for default values (e.g., `Field(default_factory=dict)` should be `Field(default_factory=lambda: {})`)
+        * Collection types with proper type parameters (e.g., `list[EmailAttachment]` instead of just `list`)
+    *   **Invalid Return Types**: Ensure return values match the declared return type. Avoid returning `None` from functions declared to return non-optional types or returning dictionaries when a specific model type is expected.
+    *   **Proper Subclass Method Overrides**: When overriding methods from parent classes, use `@override` decorator to ensure signature compatibility, and match the parent method's signature exactly including optional parameters.
+    *   **Import Errors in Test Files**: Ensure all imports are properly handled, especially in test files. Use `pytest-mock` for test fixtures and mocks, and ensure it's properly installed.
+    *   **Union Types**: When using union types (e.g., `dict | Model`), check for attribute existence before access, or use proper type narrowing to avoid `union-attr` errors.
+
+**Your Responsibilities (As an AI Assistant):**
+*   **Adherence:** All Python code you generate MUST pass Black formatting, Flake8 linting (with the specified config), and MyPy static type checking (with the specified config).
+*   **Configuration Awareness:** You understand that these rules are typically defined in a `pyproject.toml` (for Black, MyPy, isort) and potentially `setup.cfg` or `.flake8` (for Flake8). If asked, you can generate standard configuration content reflecting these best practices.
+*   **Clarity:** If a requirement conflicts with these standards (e.g., requires a line longer than 88 characters that cannot be reasonably broken), explicitly mention the conflict.
+*   **Proactivity:** Apply these standards proactively without needing to be reminded for every code snippet.
+
+Generate code that is not just functional but also clean, readable, maintainable, and type-safe according to these industry-standard tools and configurations.
+
+## 🚀 FastAPI & Pydantic Usage
+-   Use **Pydantic V2** for robust request/response models (`app/schemas/`) and data validation.
+-   Leverage **FastAPI Dependency Injection** for resources (e.g., DB sessions, services).
+-   Organize endpoints with **APIRouter** (`app/api/`), typically one per domain/resource.
+-   Place business logic in **Service Layers** (`app/services/`).
+-   Define database models using **SQLAlchemy** (`app/models/`).
+
+## 📄 OpenAPI Specification Maintenance
+-   Keep the OpenAPI spec (`openapi.json`) accurate as the API evolves.
+-   Enhance auto-generated docs (`/docs`, `/redoc`) with clear **docstrings**, descriptions, summaries, and examples in code and Pydantic models.
+-   Regenerate and commit `openapi.json` if manual adjustments are needed (though typically auto-generated).
+
+## 📊 Test Coverage Reporting
+-   Measure coverage using `pytest-cov`.
+-   CI Command: `pytest --cov=app --cov-report=term-missing --cov-report=xml`
+-   Analyze reports (`term-missing`, `xml`) to identify and address gaps in testing. Maintain or increase coverage with each PR.
+
+## 🔄 Development Workflow (Feature/Bugfix)
+1.  **Branch**: Create a feature/bugfix branch from `develop` (or `main` as appropriate).
+2.  **TDD Cycle**: Repeatedly apply **Red-Green-Refactor**. Run quality tools iteratively during Refactor, ensuring adherence to **Code Quality Standards**.
+3.  **Commit**: Make small, logical commits frequently.
+4.  **Local Checks**: **Before pushing**, ensure all tests (`pytest`) and quality checks (Black, isort, Flake8, MyPy) pass locally according to defined standards.
+5.  **Push**: Push the branch to the remote repository (e.g., GitHub).
+6.  **Pull Request**: Create a PR targeting the appropriate base branch (`develop` or `main`).
+7.  **CI Pipeline**: Runs automatically. **Fix any failures** reported by CI (tests, quality checks).
+8.  **Code Review**: Address feedback (if applicable).
+9.  **Merge**: Merge the PR once CI passes and reviews are complete.
+10. **Deploy**: CI/CD automatically deploys to the relevant environment based on merge context (e.g., Heroku).
+
+## 🧪 Environment-Aware Testing
+-   Write tests compatible with different configurations (e.g., SQLite locally, PostgreSQL in CI/prod).
+-   Use the `Settings` class (`app/core/config.py`) and environment variables (`.env` locally, config vars in CI/prod) to manage settings like `DATABASE_URL`.
+-   Ensure test fixtures correctly set up/tear down resources per environment.
+-   CI pipeline must configure the test environment to mimic production (e.g., use PostgreSQL service).
+
+## 📦 Dependency Management (`pip-compile`)
+-   Add **direct** dependencies to `requirements.in` (production) or `requirements-dev.in` (development).
+-   **NEVER** manually edit `requirements.txt` or `requirements-dev.txt`.
+-   **Regenerate** `.txt` files after editing `.in` files:
+    -   `pip-compile requirements.in`
+    -   `pip-compile requirements-dev.in`
+-   **Commit** both the updated `.in` and regenerated `.txt` files together.
+-   Prefer stable/LTS versions. Schedule periodic dependency review/updates.
+
+## 🗃️ Database Migrations (Alembic)
+1.  **Generate**: After changing SQLAlchemy models (`app/models/`):
+    `alembic revision --autogenerate -m "Concise description of model changes"`
+2.  **Review**: **Carefully inspect** the generated migration script for correctness and potential data issues. `autogenerate` is not perfect.
+3.  **Apply Locally**: `alembic upgrade head`
+4.  **Test**: Thoroughly test application functionality after applying the migration locally.
+5.  **Commit**: Add the migration script to the commit.
+6.  **Deployment**: The `release` command (`Procfile` on Heroku) runs `alembic upgrade head` automatically.
+7.  **Reversibility**: Ensure migrations are generally reversible (`alembic downgrade -1`).
+
+## 🔒 Security Practices
+-   **No Secrets in Code**: Use environment variables (`Settings`, `.env`, Heroku config vars) for all secrets (keys, passwords).
+-   **Authentication/Authorization**: Implement robust checks (e.g., JWT, OAuth2) for protected endpoints.
+-   **Input Validation**: Leverage Pydantic for validating and sanitizing inputs.
+-   **Be Aware**: Guard against common vulnerabilities (OWASP Top 10, injection, etc.).
+
+## ⚠️ Error Handling
+-   Use custom exception classes for specific application errors.
+-   Implement FastAPI **exception handlers** for consistent, informative JSON error responses (catching custom exceptions and `HTTPException`).
+-   **Avoid leaking sensitive details** in error messages.
+
+## 📚 API Documentation (Inline)
+-   Write clear **docstrings** for API route functions explaining purpose, parameters, and responses.
+-   Use Pydantic model **`description`** and **`example`** fields to enrich the OpenAPI documentation.
+
+## ⚡ Performance Considerations
+-   Use **`async def`** for route handlers and I/O-bound operations (DB queries, external API calls).
+-   Optimize **database queries**: select needed columns, use efficient filters, consider eager/lazy loading, add indexes for queried fields.
+-   Implement **pagination** for list endpoints.
+-   Consider **caching** for expensive or frequently accessed data.
+-   Be mindful of **resource limits** (e.g., Heroku dyno memory/CPU), profile if necessary.
+
+## 🧠 Apply These Guidelines When:
+-   Writing or modifying any Python code (`.py` files, especially within `/app`).
+-   Writing or modifying tests (`app/tests/`).
+-   Developing any new feature or fixing any bug.
+-   Refactoring existing code.
+-   Adding or updating dependencies.
+-   Changing database models (requiring migrations).
+-   Performing any step of the TDD cycle.
+-   Preparing code for a Pull Request.
