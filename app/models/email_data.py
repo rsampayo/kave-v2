@@ -72,8 +72,8 @@ class Attachment(Base):
     """Model representing an email attachment.
 
     Stores metadata and content information about files attached to emails.
-    May include the actual file content or a reference to where the file
-    is stored on disk.
+    The actual content is stored either in S3 (production) or the local
+    filesystem (development) referenced by the storage_uri field.
     """
 
     __tablename__ = "attachments"
@@ -104,11 +104,21 @@ class Attachment(Base):
 
     # Storage information
     file_path: Mapped[Optional[str]] = mapped_column(
-        String(512), nullable=True, comment="Path to the stored file on disk"
+        String(512),
+        nullable=True,
+        comment="Path to the stored file on disk (deprecated)",
     )
     content: Mapped[Optional[bytes]] = mapped_column(
         nullable=True,
-        comment="Raw binary content of the attachment, if stored in database",
+        comment=(
+            "Raw binary content of the attachment, "
+            "if stored in database (deprecated)"
+        ),
+    )
+    storage_uri: Mapped[Optional[str]] = mapped_column(
+        String(1024),
+        nullable=True,
+        comment="URI for the stored file (s3:// or file:// scheme)",
     )
 
     # Relationship with the parent email - Reference to the parent email

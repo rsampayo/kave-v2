@@ -7,7 +7,7 @@ from typing import AsyncIterator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.endpoints import email_webhooks
+from app.api.endpoints import attachments, email_webhooks
 from app.core.config import settings
 from app.db.session import engine
 
@@ -65,6 +65,7 @@ def create_application() -> FastAPI:
 
     # Include API routers
     app.include_router(email_webhooks.router)
+    app.include_router(attachments.router, prefix="/attachments", tags=["attachments"])
 
     return app
 

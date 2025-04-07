@@ -1,10 +1,8 @@
 """Unit tests for the email processing service."""
 
 import base64
-import os
 import uuid
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
@@ -19,6 +17,7 @@ from app.services.email_processing_service import (
     EmailProcessingService,
     get_email_service,
 )
+from app.services.storage_service import StorageService
 
 
 def create_test_webhook() -> MailchimpWebhook:
@@ -55,25 +54,37 @@ def schema_to_model_attachment(
     )
 
 
+@pytest.fixture
+def mock_storage_service() -> AsyncMock:
+    """Create a mock storage service for tests."""
+    mock = AsyncMock(spec=StorageService)
+    mock.save_file.return_value = "file:///test/path/to/file.txt"
+    return mock
+
+
 @pytest.mark.asyncio
 async def test_get_email_service() -> None:
     """Test that get_email_service returns a proper EmailProcessingService instance."""
-    # Mock database session
+    # Mock database session and storage service
     mock_db = AsyncMock(spec=AsyncSession)
+    mock_storage = AsyncMock(spec=StorageService)
 
     # Get service from dependency function
-    service = await get_email_service(mock_db)
+    service = await get_email_service(mock_db, mock_storage)
 
-    # Verify service was created with the right DB session
+    # Verify service was created with the right DB session and storage
     assert isinstance(service, EmailProcessingService)
     assert service.db == mock_db
+    assert service.storage == mock_storage
 
 
 @pytest.mark.asyncio
-async def test_store_email(db_session: AsyncSession, setup_db: Any) -> None:
+async def test_store_email(
+    db_session: AsyncSession, mock_storage_service: AsyncMock, setup_db: Any
+) -> None:
     """Test storing an email in the database."""
     # GIVEN
-    service = EmailProcessingService(db_session)
+    service = EmailProcessingService(db_session, mock_storage_service)
     email_data = InboundEmailData(
         message_id="test123@example.com",
         from_email="sender@example.com",
@@ -113,10 +124,12 @@ async def test_store_email(db_session: AsyncSession, setup_db: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_process_attachments(db_session: AsyncSession, setup_db: Any) -> None:
+async def test_process_attachments(
+    db_session: AsyncSession, mock_storage_service: AsyncMock, setup_db: Any
+) -> None:
     """Test processing of email attachments."""
     # GIVEN
-    service = EmailProcessingService(db_session)
+    service = EmailProcessingService(db_session, mock_storage_service)
 
     # Create a test email
     email = Email(
@@ -149,54 +162,48 @@ async def test_process_attachments(db_session: AsyncSession, setup_db: Any) -> N
     # Convert to model attachments
     attachments = [schema_to_model_attachment(a) for a in schema_attachments]
 
-    # Create a test directory
-    test_attachments_dir = Path(os.path.dirname(__file__)) / "test_attachments"
-    test_attachments_dir.mkdir(exist_ok=True, parents=True)
+    # Setup mock for storage service
+    expected_storage_uri = f"file:///test/attachments/{email.id}/test.txt"
+    mock_storage_service.save_file.return_value = expected_storage_uri
 
-    # Run the real function but with a patch to redirect the file writes
-    with patch("app.core.config.settings.ATTACHMENTS_BASE_DIR", test_attachments_dir):
-        # When using the real function, we need to handle the database commit
-        try:
-            # WHEN
-            result = await service.process_attachments(email.id, attachments)
+    # WHEN
+    result = await service.process_attachments(email.id, attachments)
 
-            # Explicitly commit to make sure the attachment is saved
-            await db_session.commit()
+    # Explicitly commit to make sure the attachment is saved
+    await db_session.commit()
 
-            # THEN
-            assert len(result) == 1
-            assert result[0].filename == "test.txt"
-            assert result[0].content_type == "text/plain"
-            assert result[0].content_id == "att001"
-            assert result[0].size == len(test_content)
+    # THEN
+    assert len(result) == 1
+    assert result[0].filename == "test.txt"
+    assert result[0].content_type == "text/plain"
+    assert result[0].content_id == "att001"
+    assert result[0].size == len(test_content)
+    assert result[0].storage_uri == expected_storage_uri
 
-            # Verify an attachment was added to the database
-            query = select(Attachment).where(Attachment.email_id == email.id)
-            db_result = await db_session.execute(query)
-            attachment_records = db_result.scalars().all()
-            assert len(attachment_records) == 1
-            assert attachment_records[0].filename == "test.txt"
+    # Verify an attachment was added to the database
+    query = select(Attachment).where(Attachment.email_id == email.id)
+    db_result = await db_session.execute(query)
+    attachment_records = db_result.scalars().all()
+    assert len(attachment_records) == 1
+    assert attachment_records[0].filename == "test.txt"
+    assert attachment_records[0].storage_uri == expected_storage_uri
 
-            # Verify file was created - use the file_path from the database record
-            assert attachment_records[0].file_path is not None
-            file_path = Path(attachment_records[0].file_path)
-            assert file_path.exists()
-
-        finally:
-            # Clean up after the test
-            import shutil
-
-            if test_attachments_dir.exists():
-                shutil.rmtree(test_attachments_dir)
+    # Verify storage service was called correctly
+    mock_storage_service.save_file.assert_called_once()
+    call_args = mock_storage_service.save_file.call_args[1]
+    assert call_args["content_type"] == "text/plain"
+    assert isinstance(call_args["file_data"], bytes)
+    assert "attachments/" in call_args["object_key"]
+    assert "test.txt" in call_args["object_key"]
 
 
 @pytest.mark.asyncio
 async def test_process_attachments_file_write_error(
-    db_session: AsyncSession, setup_db: Any
+    db_session: AsyncSession, mock_storage_service: AsyncMock, setup_db: Any
 ) -> None:
     """Test handling of file write errors during attachment processing."""
     # GIVEN
-    service = EmailProcessingService(db_session)
+    service = EmailProcessingService(db_session, mock_storage_service)
 
     # Create a test email
     email = Email(
@@ -227,41 +234,27 @@ async def test_process_attachments_file_write_error(
     # Convert to model attachment
     attachments = [schema_to_model_attachment(schema_attachment)]
 
-    # Mock the file open operation to raise an error
-    test_attachments_dir = Path(os.path.dirname(__file__)) / "test_error_attachments"
-    test_attachments_dir.mkdir(exist_ok=True, parents=True)
+    # Make storage service raise an error
+    mock_storage_service.save_file.side_effect = PermissionError("Permission denied")
 
-    try:
-        with (
-            patch(
-                "app.core.config.settings.ATTACHMENTS_BASE_DIR",
-                test_attachments_dir,
-            ),
-            patch("builtins.open", side_effect=PermissionError("Permission denied")),
-        ):
-            # WHEN/THEN - Ensure the error is propagated
-            with pytest.raises(PermissionError, match="Permission denied"):
-                await service.process_attachments(email.id, attachments)
+    # WHEN/THEN - Ensure the error is propagated
+    with pytest.raises(PermissionError, match="Permission denied"):
+        await service.process_attachments(email.id, attachments)
 
-            # Verify attachment record was not created
-            query = select(Attachment).where(Attachment.email_id == email.id)
-            result = await db_session.execute(query)
-            attachments_db = result.scalars().all()
-            assert len(attachments_db) == 0
-
-    finally:
-        # Clean up after the test
-        import shutil
-
-        if test_attachments_dir.exists():
-            shutil.rmtree(test_attachments_dir)
+    # Verify attachment record was not created
+    query = select(Attachment).where(Attachment.email_id == email.id)
+    result = await db_session.execute(query)
+    attachments_db = result.scalars().all()
+    assert len(attachments_db) == 0
 
 
 @pytest.mark.asyncio
-async def test_process_webhook_basic(db_session: AsyncSession, setup_db: Any) -> None:
+async def test_process_webhook_basic(
+    db_session: AsyncSession, mock_storage_service: AsyncMock, setup_db: Any
+) -> None:
     """Test processing a basic webhook with no attachments."""
     # GIVEN
-    service = EmailProcessingService(db_session)
+    service = EmailProcessingService(db_session, mock_storage_service)
 
     # Create a test webhook
     webhook = create_test_webhook()
@@ -289,11 +282,11 @@ async def test_process_webhook_basic(db_session: AsyncSession, setup_db: Any) ->
 
 @pytest.mark.asyncio
 async def test_process_webhook_with_attachments(
-    db_session: AsyncSession, setup_db: Any
+    db_session: AsyncSession, mock_storage_service: AsyncMock, setup_db: Any
 ) -> None:
     """Test processing a webhook with attachments."""
     # Arrange
-    service = EmailProcessingService(db_session)
+    service = EmailProcessingService(db_session, mock_storage_service)
     webhook = create_test_webhook()
 
     # Add an attachment to the webhook
@@ -306,46 +299,36 @@ async def test_process_webhook_with_attachments(
     )
     webhook.data.attachments.append(schema_attachment)
 
-    # Create a Path object for test attachments directory
-    test_attachments_dir = Path(os.path.dirname(__file__)) / "test_webhook_attachments"
-    test_attachments_dir.mkdir(exist_ok=True, parents=True)
+    # Setup mock for storage service
+    mock_storage_service.save_file.return_value = "file:///test/attachments/test.txt"
 
-    try:
-        # Run the real function but with a patch to redirect the file writes
-        with patch(
-            "app.core.config.settings.ATTACHMENTS_BASE_DIR",
-            test_attachments_dir,
-        ):
-            # Act
-            email = await service.process_webhook(webhook)
+    # Act
+    email = await service.process_webhook(webhook)
 
-        # Assert
-        assert email is not None
-        assert email.message_id == webhook.data.message_id
+    # Assert
+    assert email is not None
+    assert email.message_id == webhook.data.message_id
 
-        # Check for attachment in database
-        query = select(Attachment).where(Attachment.email_id == email.id)
-        result = await db_session.execute(query)
-        attachments = result.scalars().all()
-        assert len(attachments) == 1
-        assert attachments[0].filename == "test.txt"
-        assert attachments[0].content_type == "text/plain"
+    # Check for attachment in database
+    query = select(Attachment).where(Attachment.email_id == email.id)
+    result = await db_session.execute(query)
+    attachments = result.scalars().all()
+    assert len(attachments) == 1
+    assert attachments[0].filename == "test.txt"
+    assert attachments[0].content_type == "text/plain"
+    assert attachments[0].storage_uri == "file:///test/attachments/test.txt"
 
-    finally:
-        # Clean up
-        import shutil
-
-        if test_attachments_dir.exists():
-            shutil.rmtree(test_attachments_dir)
+    # Verify storage service was called
+    mock_storage_service.save_file.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_process_webhook_error_handling(
-    db_session: AsyncSession, setup_db: Any
+    db_session: AsyncSession, mock_storage_service: AsyncMock, setup_db: Any
 ) -> None:
     """Test error handling in process_webhook when something fails."""
     # Arrange
-    service = EmailProcessingService(db_session)
+    service = EmailProcessingService(db_session, mock_storage_service)
     webhook = create_test_webhook()
 
     # Create a unique message ID for this test
@@ -370,11 +353,11 @@ async def test_process_webhook_error_handling(
 
 @pytest.mark.asyncio
 async def test_duplicate_email_handling(
-    db_session: AsyncSession, setup_db: Any
+    db_session: AsyncSession, mock_storage_service: AsyncMock, setup_db: Any
 ) -> None:
     """Test handling of duplicate emails."""
     # GIVEN
-    service = EmailProcessingService(db_session)
+    service = EmailProcessingService(db_session, mock_storage_service)
     webhook = create_test_webhook()
 
     # First store the email
@@ -402,10 +385,12 @@ async def test_duplicate_email_handling(
 
 
 @pytest.mark.asyncio
-async def test_get_email_by_message_id(db_session: AsyncSession, setup_db: Any) -> None:
+async def test_get_email_by_message_id(
+    db_session: AsyncSession, mock_storage_service: AsyncMock, setup_db: Any
+) -> None:
     """Test retrieval of an email by its message ID."""
     # GIVEN
-    service = EmailProcessingService(db_session)
+    service = EmailProcessingService(db_session, mock_storage_service)
     message_id = "test_retrieval@example.com"
 
     # Create a test email in the database

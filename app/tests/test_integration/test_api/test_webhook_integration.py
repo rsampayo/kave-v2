@@ -19,6 +19,7 @@ from app.models.email_data import Attachment, Email
 from app.schemas.webhook_schemas import EmailAttachment as SchemaEmailAttachment
 from app.schemas.webhook_schemas import InboundEmailData, MailchimpWebhook
 from app.services.email_processing_service import EmailProcessingService
+from app.services.storage_service import StorageService
 
 
 def create_test_webhook_payload(with_attachment: bool = False) -> Dict[str, Any]:
@@ -105,7 +106,8 @@ async def test_webhook_endpoint_success(
     )
 
     # Create service and process
-    service = EmailProcessingService(db_session)
+    storage_service = StorageService()
+    service = EmailProcessingService(db_session, storage_service)
     with (
         mock.patch(
             "app.core.config.settings.ATTACHMENTS_BASE_DIR",
@@ -172,7 +174,8 @@ async def test_webhook_with_attachments(
     )
 
     # Create service and process
-    service = EmailProcessingService(db_session)
+    storage_service = StorageService()
+    service = EmailProcessingService(db_session, storage_service)
     with (
         mock.patch(
             "app.core.config.settings.ATTACHMENTS_BASE_DIR",
@@ -208,7 +211,8 @@ async def test_email_processing_service(
 ) -> None:
     """Test the EmailProcessingService directly."""
     # GIVEN
-    service = EmailProcessingService(db_session)
+    storage_service = StorageService()
+    service = EmailProcessingService(db_session, storage_service)
     webhook_payload = create_test_webhook_payload()
 
     # Create a webhook object with proper types
@@ -264,7 +268,8 @@ async def test_error_handling_in_service(
 ) -> None:
     """Test error handling in the email processing service."""
     # GIVEN
-    service = EmailProcessingService(db_session)
+    storage_service = StorageService()
+    service = EmailProcessingService(db_session, storage_service)
     webhook_payload = create_test_webhook_payload()
 
     # Create a webhook object with proper types

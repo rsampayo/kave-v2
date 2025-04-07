@@ -27,14 +27,17 @@ async def test_verify_webhook_signature_valid() -> None:
     mock_client.verify_webhook_signature.assert_called_once_with(mock_request)
 
 
+# Patch any database access related to the mailchimp client
 @pytest.mark.asyncio
-async def test_verify_webhook_signature_invalid() -> None:
+@patch("app.integrations.email.client.MailchimpClient.verify_webhook_signature")
+async def test_verify_webhook_signature_invalid(mock_verify: AsyncMock) -> None:
     """Test verify_webhook_signature when signature is invalid."""
-    # Mock the MailChimp client
-    mock_client = AsyncMock(spec=MailchimpClient)
-    mock_client.verify_webhook_signature.return_value = False
+    # Configure the mock to return False
+    mock_verify.return_value = False
 
-    # Mock request
+    # Mock client and request
+    mock_client = AsyncMock(spec=MailchimpClient)
+    mock_client.verify_webhook_signature = mock_verify
     mock_request = MagicMock(spec=Request)
 
     # Call the function, expecting exception
@@ -44,7 +47,7 @@ async def test_verify_webhook_signature_invalid() -> None:
     # Verify exception details
     assert exc_info.value.status_code == 401
     assert "Invalid webhook signature" in exc_info.value.detail
-    mock_client.verify_webhook_signature.assert_called_once_with(mock_request)
+    mock_verify.assert_called_once_with(mock_request)
 
 
 @pytest.mark.asyncio

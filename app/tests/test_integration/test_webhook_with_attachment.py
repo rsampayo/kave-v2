@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy import select
 
-from app.db.session import Base, engine, get_db
+from app.db.session import Base, engine, get_session
 from app.models.email_data import Attachment
 from app.schemas.webhook_schemas import (
     EmailAttachment,
@@ -15,6 +15,7 @@ from app.schemas.webhook_schemas import (
     MailchimpWebhook,
 )
 from app.services.email_processing_service import EmailProcessingService
+from app.services.storage_service import StorageService
 
 
 @pytest.mark.asyncio
@@ -59,10 +60,13 @@ async def test_webhook_with_attachment() -> None:
     attachments_dir = Path("data/attachments")
     os.makedirs(attachments_dir, exist_ok=True)
 
-    # Get a database session
-    async for db in get_db():
+    # Use direct session creation instead of get_db async generator
+    # This avoids issues with asyncio task cleanup
+    db = get_session()
+    try:
         # Process the webhook
-        service = EmailProcessingService(db)
+        storage_service = StorageService()
+        service = EmailProcessingService(db, storage_service)
         email = await service.process_webhook(webhook)
 
         # Check the result
@@ -96,7 +100,12 @@ async def test_webhook_with_attachment() -> None:
             else:
                 print("    File exists: No")
 
-        break
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise e
+    finally:
+        await db.close()
 
 
 if __name__ == "__main__":

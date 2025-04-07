@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     # File Storage
     ATTACHMENTS_BASE_DIR: Path = Path("data/attachments")
 
+    # S3 Storage
+    S3_BUCKET_NAME: str = ""
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+    AWS_REGION: str = "us-east-1"
+    USE_S3_STORAGE: bool = False
+
     @classmethod
     @field_validator("DATABASE_URL")
     def validate_db_url(cls, v: str) -> str:

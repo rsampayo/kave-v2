@@ -1,6 +1,5 @@
 import base64
 import logging
-import os
 import uuid
 from datetime import datetime
 from typing import List, Optional
@@ -9,11 +8,11 @@ from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.db.session import get_db
 from app.models.email_data import Attachment, Email, EmailAttachment
 from app.schemas.webhook_schemas import EmailAttachment as SchemaEmailAttachment
 from app.schemas.webhook_schemas import InboundEmailData, MailchimpWebhook
+from app.services.storage_service import StorageService, get_storage_service
 
 logger = logging.getLogger(__name__)
 
@@ -56,13 +55,15 @@ def _schema_to_model_attachments(
 class EmailProcessingService:
     """Service responsible for processing emails and attachments."""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, storage: StorageService):
         """Initialize the email processing service.
 
         Args:
             db: Database session
+            storage: Storage service for handling attachments
         """
         self.db = db
+        self.storage = storage
 
     async def process_webhook(self, webhook: MailchimpWebhook) -> Email:
         """Process a webhook containing email data.
@@ -134,7 +135,7 @@ class EmailProcessingService:
             received_at=datetime.utcnow(),
         )
 
-        self.db.add(email)
+        self.db.add(email)  # This is synchronous in SQLAlchemy 2.0+
         # Flush to get the ID (but don't commit yet)
         await self.db.flush()
 
@@ -154,16 +155,11 @@ class EmailProcessingService:
         """
         result = []
 
-        # Ensure attachments directory exists
-        os.makedirs(settings.ATTACHMENTS_BASE_DIR, exist_ok=True)
-
         for attach_data in attachments:
-            # Create path for storing the attachment with a unique identifier
+            # Get filename and generate a unique object key
             filename = attach_data.name
-            unique_id = str(uuid.uuid4())[:8]  # Use first 8 chars of UUID for brevity
-            file_path = (
-                settings.ATTACHMENTS_BASE_DIR / f"{email_id}_{unique_id}_{filename}"
-            )
+            unique_id = str(uuid.uuid4())[:8]
+            object_key = f"attachments/{email_id}/{unique_id}_{filename}"
 
             # Create the attachment model
             attachment = Attachment(
@@ -172,20 +168,29 @@ class EmailProcessingService:
                 content_type=attach_data.type,
                 content_id=attach_data.content_id,
                 size=attach_data.size,
-                file_path=str(file_path),
+                # Leave storage_uri empty initially
             )
 
             # If attachment has content, decode and save it
             if attach_data.content:
                 # Decode base64 content
                 content = base64.b64decode(attach_data.content)
+
+                # Save to storage service (S3 or filesystem based on settings)
+                storage_uri = await self.storage.save_file(
+                    file_data=content,
+                    object_key=object_key,
+                    content_type=attach_data.type,
+                )
+
+                # Update the model with the storage URI
+                attachment.storage_uri = storage_uri
+
+                # For backward compatibility, keep the content in the database
+                # This can be removed once migration is complete
                 attachment.content = content
 
-                # Save to file system
-                with open(file_path, "wb") as f:
-                    f.write(content)
-
-            self.db.add(attachment)
+            self.db.add(attachment)  # This is synchronous in SQLAlchemy 2.0+
             result.append(attachment)
 
         return result
@@ -206,13 +211,15 @@ class EmailProcessingService:
 
 async def get_email_service(
     db: AsyncSession = Depends(get_db),
+    storage: StorageService = Depends(get_storage_service),
 ) -> EmailProcessingService:
     """Dependency function to get the email processing service.
 
     Args:
         db: Database session
+        storage: Storage service
 
     Returns:
         EmailProcessingService: The email processing service
     """
-    return EmailProcessingService(db)
+    return EmailProcessingService(db, storage)
