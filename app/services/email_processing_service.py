@@ -1,6 +1,7 @@
 import base64
 import logging
 import os
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -160,9 +161,10 @@ class EmailProcessingService:
         os.makedirs(ATTACHMENTS_DIR, exist_ok=True)
 
         for attach_data in attachments:
-            # Create path for storing the attachment
+            # Create path for storing the attachment with a unique identifier
             filename = attach_data.name
-            file_path = ATTACHMENTS_DIR / f"{email_id}_{filename}"
+            unique_id = str(uuid.uuid4())[:8]  # Use first 8 chars of UUID for brevity
+            file_path = ATTACHMENTS_DIR / f"{email_id}_{unique_id}_{filename}"
 
             # Create the attachment model
             attachment = Attachment(

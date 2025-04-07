@@ -178,8 +178,9 @@ async def test_process_attachments(db_session: AsyncSession, setup_db: Any) -> N
             assert len(attachment_records) == 1
             assert attachment_records[0].filename == "test.txt"
 
-            # Verify file was created
-            file_path = test_attachments_dir / f"{email.id}_test.txt"
+            # Verify file was created - use the file_path from the database record
+            assert attachment_records[0].file_path is not None
+            file_path = Path(attachment_records[0].file_path)
             assert file_path.exists()
 
         finally:
@@ -329,8 +330,9 @@ async def test_process_webhook_with_attachments(
         assert attachments[0].content_type == "text/plain"
         assert attachments[0].size == 123
 
-        # Verify file was created
-        file_path = test_attachments_dir / f"{email.id}_test.txt"
+        # Verify file was created - use the file_path from the database record
+        assert attachments[0].file_path is not None
+        file_path = Path(attachments[0].file_path)
         assert file_path.exists()
 
     finally:
