@@ -10,39 +10,39 @@ This phase focuses on organizing the project layout and removing clutter for bet
 
 **Step 1.1: Clean Root Directory**
 
-*   **Action:** Move test-related files (`test_webhook.py`, `test_webhook_with_attachment.py`) from the root directory into the appropriate sub-directory within `app/tests/` (e.g., `app/tests/test_integration/` or `app/tests/test_e2e/`).
-*   **Action:** Move mock data files (`mock_webhook.json`, `mock_webhook_with_attachment.json`) from the root directory into `app/tests/test_data/`.
-*   **Action:** Evaluate experimental/example files (`simplified_app.py`, `test_app.py`, `test_db_connection.py`) in the root. If still useful as examples, move them to a new `examples/` directory. If obsolete, delete them.
-*   **Action:** Evaluate `setup.py`. If its functionality is fully covered by `pyproject.toml` (likely), remove it. If it contains essential custom build logic, document why it's needed.
+*   ✅ **Action:** Move test-related files (`test_webhook.py`, `test_webhook_with_attachment.py`) from the root directory into the appropriate sub-directory within `app/tests/` (e.g., `app/tests/test_integration/` or `app/tests/test_e2e/`).
+    * **Completed:** April 7, 2025. Moved both test files to `app/tests/test_integration/`. Updated file paths in the tests to point to the new location of mock data files.
+*   ✅ **Action:** Move mock data files (`mock_webhook.json`, `mock_webhook_with_attachment.json`) from the root directory into `app/tests/test_data/`.
+    * **Completed:** April 7, 2025. Created copies of these files in `app/tests/test_data/` and removed the originals from the root directory.
+*   ✅ **Action:** Evaluate experimental/example files (`simplified_app.py`, `test_app.py`, `test_db_connection.py`) in the root. If still useful as examples, move them to a new `examples/` directory. If obsolete, delete them.
+    * **Completed:** April 7, 2025. Created an `examples` directory and moved `simplified_app.py` and `test_db_connection.py` there as they're useful for reference and debugging. Added a README.md file to document their usage. Deleted `test_app.py` as it was too minimal to be useful.
+*   ✅ **Action:** Evaluate `setup.py`. If its functionality is fully covered by `pyproject.toml` (likely), remove it. If it contains essential custom build logic, document why it's needed.
+    * **Completed:** April 7, 2025. Removed `setup.py` as its functionality was already covered by the `pyproject.toml` and the comprehensive requirements files in the `requirements/` directory.
 *   **Rationale:** Creates a cleaner, more standard project root, making it easier to navigate and understand the project structure.
 
 **Step 1.2: Verify `.gitignore`**
 
-*   **Action:** Review the `.gitignore` file. Ensure it includes standard Python/FastAPI exclusions (`*.pyc`, `__pycache__/`, `venv*/`, `.venv/`, `.mypy_cache/`, `htmlcov/`, `.pytest_cache/`, `.coverage*`) and project-specific files like `dev.db`, `error.log`, `.env`.
+*   ✅ **Action:** Review the `.gitignore` file. Ensure it includes standard Python/FastAPI exclusions (`*.pyc`, `__pycache__/`, `venv*/`, `.venv/`, `.mypy_cache/`, `htmlcov/`, `.pytest_cache/`, `.coverage*`) and project-specific files like `dev.db`, `error.log`, `.env`.
+    * **Completed:** April 7, 2025. The `.gitignore` file was already quite comprehensive. Added missing patterns for `.mypy_cache/`, `.dmypy.json`, `dmypy.json`, and `.coverage.*`. Removed outdated references to mock webhook files that have been moved to the test_data directory.
 *   **Rationale:** Prevents generated files, environment secrets, and local development artifacts from being committed to version control.
 
 **Step 1.3: Remove Empty Directories**
 
-*   **Action:** Delete the empty directories `app/agents/` and `app/tools/`.
+*   ✅ **Action:** Delete the empty directories `app/agents/` and `app/tools/`.
+    * **Completed:** April 7, 2025. Verified that both directories were empty and removed them, simplifying the project structure.
 *   **Rationale:** Removes unused placeholders, simplifying the `app/` directory structure.
 
 ## Phase 2: Configuration & Environment Management (Consistency & Security)
 
 This phase focuses on standardizing configuration and ensuring environment-specific settings are handled correctly.
 
-**Step 2.1: Configure CORS Origins via Settings**
-
-*   **Action:** In `app/core/config.py`, define a setting for allowed CORS origins (e.g., `BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:3000"]`) using Pydantic `Settings`, potentially loading from environment variables.
-*   **Action:** In `app/main.py`, update the `CORSMiddleware` to use this setting: `allow_origins=settings.BACKEND_CORS_ORIGINS`.
-*   **Rationale:** Improves security by restricting allowed origins based on environment, removing the insecure `"*"` wildcard for production.
-
-**Step 2.2: Configure `ATTACHMENTS_DIR` via Settings**
+**Step 2.1: Configure `ATTACHMENTS_DIR` via Settings**
 
 *   **Action:** In `app/core/config.py`, define a setting for the base attachments directory (e.g., `ATTACHMENTS_BASE_DIR: Path = Path("data/attachments")`).
 *   **Action:** In `app/services/email_processing_service.py`, remove the hardcoded `ATTACHMENTS_DIR` constant. Import `settings` and use `settings.ATTACHMENTS_BASE_DIR` when constructing file paths.
 *   **Rationale:** Centralizes configuration, allows environment-specific paths, and improves code maintainability.
 
-**Step 2.3: Manage Database Schema Creation**
+**Step 2.2: Manage Database Schema Creation**
 
 *   **Action:** In `app/main.py`'s `lifespan` function, either remove the `await conn.run_sync(Base.metadata.create_all)` call *or* make it conditional (e.g., `if settings.ENVIRONMENT == "development": ...`).
 *   **Action:** Ensure the deployment process (e.g., `Procfile` release phase, CI/CD script) reliably executes `alembic upgrade head` *before* the application server starts.

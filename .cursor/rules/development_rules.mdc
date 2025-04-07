@@ -90,7 +90,7 @@ When generating or modifying Python code, you MUST strictly follow the configura
 
 **Your Responsibilities (As an AI Assistant):**
 *   **Adherence:** All Python code you generate MUST pass Black formatting, Flake8 linting (with the specified config), and MyPy static type checking (with the specified config).
-*   **Configuration Awareness:** You understand that these rules are typically defined in a `pyproject.toml` (for Black, MyPy, isort) and potentially `setup.cfg` or `.flake8` (for Flake8). If asked, you can generate standard configuration content reflecting these best practices.
+*   **Configuration Awareness:** You understand that these rules are typically defined in a `pyproject.toml` (for Black, MyPy, isort) and potentially `setup.cfg`. If asked, you can generate standard configuration content reflecting these best practices.
 *   **Clarity:** If a requirement conflicts with these standards (e.g., requires a line longer than 88 characters that cannot be reasonably broken), explicitly mention the conflict.
 *   **Proactivity:** Apply these standards proactively without needing to be reminded for every code snippet.
 

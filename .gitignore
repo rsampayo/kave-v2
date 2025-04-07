@@ -34,6 +34,7 @@ pythonenv*
 # Testing & Coverage
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 .tox/
 .nox/
@@ -46,6 +47,11 @@ coverage.xml
 .pytest_cache/
 nosetests.xml
 coverage/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
 # Database
 *.sqlite3
@@ -91,5 +97,3 @@ Thumbs.db
 
 # Files from git status
 data/attachments/
-mock_webhook.json
-mock_webhook_with_attachment.json

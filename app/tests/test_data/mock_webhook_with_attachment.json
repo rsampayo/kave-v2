@@ -1,0 +1,42 @@
+{
+  "webhook_id": "test-webhook-456",
+  "event": "inbound_email",
+  "timestamp": "2023-04-07T12:30:00Z",
+  "data": {
+    "message_id": "mock-attachment-email-456@example.com",
+    "from_email": "sender@example.com",
+    "from_name": "Test Sender",
+    "to_email": "recipient@kave.com",
+    "subject": "Test Email with Attachment",
+    "body_plain": "This test email contains an attachment.",
+    "body_html": "<html><body><p>This test email contains an attachment.</p></body></html>",
+    "headers": {
+      "From": "Test Sender <sender@example.com>",
+      "To": "recipient@kave.com",
+      "Subject": "Test Email with Attachment"
+    },
+    "attachments": [
+      {
+        "name": "test_document.txt",
+        "type": "text/plain",
+        "content": "VGhpcyBpcyBhIHRlc3QgZG9jdW1lbnQgYXR0YWNobWVudC4KClRoaXMgZmlsZSBjb250YWlucyB0ZXN0IGNvbnRlbnQgZm9yIGRlbW9uc3RyYXRpbmcgdGhlIGF0dGFjaG1lbnQgcHJvY2Vzc2luZyBmdW5jdGlvbmFsaXR5Lg==",
+        "content_id": "test001",
+        "size": 102
+      },
+      {
+        "name": "test_document.txt",
+        "type": "text/plain",
+        "content": "VGhpcyBpcyBhIHRlc3QgZG9jdW1lbnQgYXR0YWNobWVudC4KClRoaXMgZmlsZSBjb250YWlucyB0ZXN0IGNvbnRlbnQgZm9yIGRlbW9uc3RyYXRpbmcgdGhlIGF0dGFjaG1lbnQgcHJvY2Vzc2luZyBmdW5jdGlvbmFsaXR5Lg==",
+        "content_id": "test002",
+        "size": 102
+      },
+      {
+        "name": "test_document.txt",
+        "type": "text/plain",
+        "content": "VGhpcyBpcyBhIHRlc3QgZG9jdW1lbnQgYXR0YWNobWVudC4KClRoaXMgZmlsZSBjb250YWlucyB0ZXN0IGNvbnRlbnQgZm9yIGRlbW9uc3RyYXRpbmcgdGhlIGF0dGFjaG1lbnQgcHJvY2Vzc2luZyBmdW5jdGlvbmFsaXR5Lg==",
+        "content_id": "test003",
+        "size": 102
+      }
+    ]
+  }
+} 
