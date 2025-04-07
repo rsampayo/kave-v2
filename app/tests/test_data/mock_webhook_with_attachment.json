@@ -3,7 +3,7 @@
   "event": "inbound_email",
   "timestamp": "2023-04-07T12:30:00Z",
   "data": {
-    "message_id": "mock-attachment-email-456@example.com",
+    "message_id": "mock-attachment-email-signature-test-456@example.com",
     "from_email": "sender@example.com",
     "from_name": "Test Sender",
     "to_email": "recipient@kave.com",
