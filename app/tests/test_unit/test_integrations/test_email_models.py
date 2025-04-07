@@ -17,7 +17,7 @@ class TestEmailAttachment:
             name="test.pdf",
             type="application/pdf",
             content="base64encodedcontent",
-            url="https://example.com/test.pdf"
+            url="https://example.com/test.pdf",
         )
 
         # Act
@@ -33,10 +33,7 @@ class TestEmailAttachment:
     def test_email_attachment_with_partial_data(self) -> None:
         """Test EmailAttachment with only required fields."""
         # Arrange
-        attachment = EmailAttachment(
-            name="test.pdf",
-            type="application/pdf"
-        )
+        attachment = EmailAttachment(name="test.pdf", type="application/pdf")
 
         # Act
         result = attachment.to_dict()
@@ -67,7 +64,7 @@ class TestInboundEmailData:
             cc=["cc@example.com"],
             bcc=["bcc@example.com"],
             date=now,
-            reply_to="reply@example.com"
+            reply_to="reply@example.com",
         )
 
         # Act
@@ -92,20 +89,16 @@ class TestInboundEmailData:
         """Test the to_dict method with attachments."""
         # Arrange
         attachment1 = EmailAttachment(
-            name="test1.pdf",
-            type="application/pdf",
-            content="content1"
+            name="test1.pdf", type="application/pdf", content="content1"
         )
         attachment2 = EmailAttachment(
-            name="test2.jpg",
-            type="image/jpeg",
-            url="https://example.com/test2.jpg"
+            name="test2.jpg", type="image/jpeg", url="https://example.com/test2.jpg"
         )
         email_data = InboundEmailData(
             message_id="test123",
             from_email="sender@example.com",
             subject="Test Subject",
-            attachments=[attachment1, attachment2]
+            attachments=[attachment1, attachment2],
         )
 
         # Act
@@ -136,7 +129,7 @@ class TestMailchimpWebhook:
             data={"key": "value"},
             event="inbound",
             webhook_id="webhook123",
-            test_mode=True
+            test_mode=True,
         )
 
         # Act
@@ -158,7 +151,7 @@ class TestMailchimpWebhook:
         email_data = InboundEmailData(
             message_id="test123",
             from_email="sender@example.com",
-            subject="Test Subject"
+            subject="Test Subject",
         )
         webhook = MailchimpWebhook(
             type="inbound",
@@ -166,7 +159,7 @@ class TestMailchimpWebhook:
             data=email_data,
             event="inbound",
             webhook_id="webhook123",
-            test_mode=False
+            test_mode=False,
         )
 
         # Act
