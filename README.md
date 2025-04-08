@@ -67,6 +67,25 @@ uvicorn app.main:app --reload
 
 The API will be available at http://localhost:8000.
 
+### Database Migrations
+
+This project uses Alembic for database migrations. The application no longer automatically creates database tables at startup - instead, migrations must be run explicitly.
+
+To create and apply migrations:
+
+```bash
+# After making changes to SQLAlchemy models:
+alembic revision --autogenerate -m "Description of your changes"
+
+# To upgrade the database to the latest version:
+alembic upgrade head
+
+# To downgrade one migration:
+alembic downgrade -1
+```
+
+**Note:** When deploying to production, migrations are automatically run by the `release` command in the Procfile before the web process starts.
+
 ### Testing
 
 To run the test suite:

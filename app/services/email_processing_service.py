@@ -186,9 +186,8 @@ class EmailProcessingService:
                 # Update the model with the storage URI
                 attachment.storage_uri = storage_uri
 
-                # For backward compatibility, keep the content in the database
-                # This can be removed once migration is complete
-                attachment.content = content
+                # No longer store content in the database as it's redundant
+                # and can cause database bloat with large attachments
 
             self.db.add(attachment)  # This is synchronous in SQLAlchemy 2.0+
             result.append(attachment)

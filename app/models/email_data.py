@@ -111,8 +111,9 @@ class Attachment(Base):
     content: Mapped[Optional[bytes]] = mapped_column(
         nullable=True,
         comment=(
-            "Raw binary content of the attachment, "
-            "if stored in database (deprecated)"
+            "Raw binary content of the attachment. "
+            "DEPRECATED: Content should be stored in the filesystem or S3 only, "
+            "referenced by storage_uri. This field is kept for backward compatibility."
         ),
     )
     storage_uri: Mapped[Optional[str]] = mapped_column(

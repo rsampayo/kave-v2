@@ -2,6 +2,7 @@ import logging
 from typing import Optional
 
 import aioboto3  # type: ignore
+import aiofiles
 from botocore.exceptions import ClientError  # type: ignore
 
 from app.core.config import settings
@@ -90,9 +91,9 @@ class StorageService:
         # Ensure directory exists
         full_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Write file
-        with open(full_path, "wb") as f:
-            f.write(file_data)
+        # Write file asynchronously
+        async with aiofiles.open(full_path, "wb") as f:
+            await f.write(file_data)
 
         return f"file://{full_path.absolute()}"
 
@@ -160,8 +161,8 @@ class StorageService:
         """
         path = uri.replace("file://", "")
         try:
-            with open(path, "rb") as f:
-                return f.read()
+            async with aiofiles.open(path, "rb") as f:
+                return await f.read()
         except FileNotFoundError:
             logger.warning(f"File not found: {path}")
             return None

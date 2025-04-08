@@ -36,15 +36,12 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["tests.*", "app.tests.*"]
+# Still allowing untyped tests but requiring more type safety
 disallow_untyped_defs = false
-disallow_untyped_calls = false
 disallow_incomplete_defs = false
-check_untyped_defs = false
-
-[[tool.mypy.overrides]]
-module = ["app.api.endpoints.*"]
-disallow_untyped_calls = false
-disallow_untyped_defs = false
+check_untyped_defs = true
+warn_return_any = true
+warn_unreachable = true
 
 [tool.pytest.ini_options]
 testpaths = ["app/tests"]

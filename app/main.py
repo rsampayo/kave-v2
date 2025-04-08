@@ -24,14 +24,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Lifespan events for the FastAPI application.
 
     Handles startup and shutdown events.
+    Note: Database schema should be managed through Alembic migrations
+    before application startup.
     """
-    # Startup: Create database tables if they don't exist
-    from app.db.session import Base
-
-    async with engine.begin() as conn:
-        # Create tables if they don't exist
-        await conn.run_sync(Base.metadata.create_all)
-        logger.info("Database tables created or already exist")
+    # Startup
+    logger.info("Application starting up")
 
     # App runs here
     yield
