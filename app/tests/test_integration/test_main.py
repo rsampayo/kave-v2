@@ -76,8 +76,9 @@ async def test_lifespan_events() -> None:
 
         # Execute the lifespan context manager
         async with lifespan(dummy_app):
-            # Verify the run_sync method was called with the right argument
-            mock_conn.run_sync.assert_called_once_with(mock_metadata.create_all)
+            # No run_sync assertion - we've removed auto table creation
+            # in favor of using Alembic migrations
+            pass
 
         # Verify that after exiting the context, the dispose method was called
         mock_engine.dispose.assert_awaited_once()
