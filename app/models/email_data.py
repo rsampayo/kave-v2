@@ -62,6 +62,13 @@ class Email(Base):
         comment="Type of webhook event (e.g., 'inbound_email')",
     )
 
+    # Test column for migration example
+    test_column: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        comment="Test column for Alembic migration example",
+    )
+
     # Relationships - List of attachments associated with this email
     attachments: Mapped[List["Attachment"]] = relationship(
         "Attachment", back_populates="email", cascade="all, delete-orphan"

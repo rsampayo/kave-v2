@@ -85,12 +85,12 @@ async def test_migrate_storage_uri() -> None:
                 call(
                     file_data=base64.b64encode(b"test content 1"),
                     object_key="attachments/email-1/attach-1_test1.txt",
-                    content_type="text/plain"
+                    content_type="text/plain",
                 ),
                 call(
                     file_data=base64.b64encode(b"test content 2"),
                     object_key="attachments/email-2/attach-2_test2.txt",
-                    content_type="text/plain"
+                    content_type="text/plain",
                 ),
             ]
         )
