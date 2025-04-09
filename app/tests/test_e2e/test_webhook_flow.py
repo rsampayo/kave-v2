@@ -91,6 +91,16 @@ async def test_webhook_e2e_flow(app: FastAPI, webhook_signature: str) -> None:
                 "app.core.config.settings.ATTACHMENTS_BASE_DIR",
                 test_attachments_dir,
             ),
+            # Disable S3 for this test and use local filesystem instead
+            mock.patch(
+                "app.core.config.settings.USE_S3_STORAGE",
+                False,
+            ),
+            # In case S3 is still accessed, mock the S3 client creation
+            mock.patch(
+                "app.services.storage_service.StorageService._save_to_s3",
+                new=mock.AsyncMock(return_value="s3://test-bucket/test-object"),
+            ),
             mock.patch("builtins.open", mock.mock_open()),
         ):
             # Create an async client for making the request

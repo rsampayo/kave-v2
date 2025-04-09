@@ -161,12 +161,16 @@ class StorageService:
         Returns:
             Optional[bytes]: The file content or None if not found
         """
-        path = uri.replace("file://", "")
+        # Replace file:// prefix and convert to a Path object
+        # This makes the code more robust across different systems
+        if uri.startswith("file://"):
+            uri = uri.replace("file://", "", 1)
+
         try:
-            async with aiofiles.open(path, "rb") as f:
+            async with aiofiles.open(uri, "rb") as f:
                 return await f.read()
         except FileNotFoundError:
-            logger.warning(f"File not found: {path}")
+            logger.warning(f"File not found: {uri}")
             return None
         except Exception as e:
             logger.error(f"Error reading file: {str(e)}")

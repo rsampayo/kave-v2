@@ -3,7 +3,7 @@
 import json
 import os
 from datetime import datetime
-from typing import Any, AsyncGenerator, Type
+from typing import Any, AsyncGenerator, Callable, Type
 from unittest import mock
 
 import httpx
@@ -12,7 +12,7 @@ import pytest_asyncio
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from httpx import ASGITransport
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -29,19 +29,40 @@ class CustomJSONEncoder(json.JSONEncoder):
         return super().default(obj)
 
 
-# Test database URL (persistent file-based SQLite for tests)
-TEST_DB_DIR = os.path.join(os.path.dirname(__file__), "test_data")
-os.makedirs(TEST_DB_DIR, exist_ok=True)
-TEST_DB_PATH = os.path.join(TEST_DB_DIR, "test.db")
-TEST_DB_URL = f"sqlite+aiosqlite:///{TEST_DB_PATH}"
+# Test database configuration
+class TestDatabaseConfig:
+    """Centralized test database configuration."""
 
-# Use a separate engine for testing with connection pooling
-test_engine = create_async_engine(
-    TEST_DB_URL,
-    echo=False,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,  # Use StaticPool to share connection across sessions
-)
+    # Test database URL (persistent file-based SQLite for tests)
+    TEST_DB_DIR = os.path.join(os.path.dirname(__file__), "test_data")
+    os.makedirs(TEST_DB_DIR, exist_ok=True)
+    TEST_DB_PATH = os.path.join(TEST_DB_DIR, "test.db")
+    TEST_DB_URL = f"sqlite+aiosqlite:///{TEST_DB_PATH}"
+
+    # Alternative in-memory database for isolated tests
+    MEMORY_DB_URL = "sqlite+aiosqlite:///:memory:"
+
+    @classmethod
+    def get_engine(cls, memory_db: bool = False) -> AsyncEngine:
+        """Create an async engine with appropriate settings.
+
+        Args:
+            memory_db: If True, use in-memory database for increased isolation
+
+        Returns:
+            An async database engine
+        """
+        db_url = cls.MEMORY_DB_URL if memory_db else cls.TEST_DB_URL
+        return create_async_engine(
+            db_url,
+            echo=False,
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,  # Use StaticPool to share connection across sessions
+        )
+
+
+# Use the test database configuration to create engine and session factory
+test_engine = TestDatabaseConfig.get_engine()
 
 # Create a test session factory
 TestSessionLocal = sessionmaker(
@@ -51,9 +72,6 @@ TestSessionLocal = sessionmaker(
     class_=AsyncSession,
     bind=test_engine,
 )  # type: ignore[call-overload]
-
-# Use pytest-asyncio's built-in event loop instead of creating our own
-# This avoids the deprecation warning
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -90,6 +108,40 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         await session.close()
 
 
+@pytest_asyncio.fixture
+async def isolated_db() -> AsyncGenerator[AsyncSession, None]:
+    """Create an isolated in-memory database session for tests requiring full isolation.
+
+    This fixture creates a separate in-memory database for tests that need complete
+    isolation from other tests.
+    """
+    # Create a completely isolated in-memory engine
+    isolated_engine = TestDatabaseConfig.get_engine(memory_db=True)
+
+    # Create and initialize the schema
+    async with isolated_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    # Create a session factory for this engine
+    session_factory = sessionmaker(
+        autocommit=False,
+        autoflush=False,
+        expire_on_commit=False,
+        class_=AsyncSession,
+        bind=isolated_engine,
+    )  # type: ignore[call-overload]
+
+    # Create the session
+    session = session_factory()
+
+    try:
+        yield session
+        await session.rollback()
+    finally:
+        await session.close()
+        await isolated_engine.dispose()
+
+
 @pytest.fixture
 def app() -> FastAPI:
     """Create a minimal test FastAPI application."""
@@ -113,7 +165,7 @@ async def async_client(app: FastAPI) -> AsyncGenerator[httpx.AsyncClient, None]:
 
 
 @pytest_asyncio.fixture
-async def mock_mailchimp_client() -> AsyncGenerator[MailchimpClient, None]:
+async def mock_mailchimp_client() -> AsyncGenerator[mock.AsyncMock, None]:
     """Provide a mocked MailchimpClient for testing."""
     client = mock.AsyncMock(spec=MailchimpClient)
     # Configure default behaviors
@@ -125,3 +177,41 @@ async def mock_mailchimp_client() -> AsyncGenerator[MailchimpClient, None]:
 def json_encoder() -> Type[json.JSONEncoder]:
     """Return a custom JSON encoder that can handle datetime objects."""
     return CustomJSONEncoder
+
+
+@pytest.fixture
+def mock_factory() -> Callable[[str], mock.MagicMock]:
+    """Create a factory function to generate consistently configured mocks.
+
+    This fixture provides a factory function that creates properly configured mocks
+    with consistent settings, making test setup more consistent and maintainable.
+
+    Returns:
+        A factory function that creates mocks with the given name
+    """
+
+    def _create_mock(name: str) -> mock.MagicMock:
+        mock_obj = mock.MagicMock(name=name)
+        # Configure common mock behaviors if needed
+        return mock_obj
+
+    return _create_mock
+
+
+@pytest.fixture
+def async_mock_factory() -> Callable[[str], mock.AsyncMock]:
+    """Create a factory function to generate consistently configured async mocks.
+
+    This fixture provides a factory function that creates properly configured
+    async mocks with consistent settings.
+
+    Returns:
+        A factory function that creates async mocks with the given name
+    """
+
+    def _create_async_mock(name: str) -> mock.AsyncMock:
+        mock_obj = mock.AsyncMock(name=name)
+        # Configure common mock behaviors if needed
+        return mock_obj
+
+    return _create_async_mock

@@ -181,6 +181,16 @@ async def test_webhook_with_attachments(
             "app.core.config.settings.ATTACHMENTS_BASE_DIR",
             Path("./data/test_attachments"),
         ),
+        # Mock the S3 storage operation directly to avoid AWS client issues
+        mock.patch.object(
+            storage_service,
+            "_save_to_s3",
+            new=mock.AsyncMock(
+                return_value="s3://test-bucket/attachments/test-file.txt"
+            ),
+        ),
+        # Make sure we're using S3 storage for this test
+        mock.patch("app.core.config.settings.USE_S3_STORAGE", True),
         mock.patch("builtins.open", mock.mock_open()),
     ):
         email = await service.process_webhook(schema_webhook)
@@ -203,6 +213,8 @@ async def test_webhook_with_attachments(
     assert len(attachments) > 0
     assert attachments[0].filename == "test.txt"
     assert attachments[0].content_type == "text/plain"
+    assert attachments[0].storage_uri is not None
+    assert "s3://" in attachments[0].storage_uri
 
 
 @pytest.mark.asyncio
