@@ -270,3 +270,12 @@ mailchimp_client = MailchimpClient(
     api_key=settings.MAILCHIMP_API_KEY,
     webhook_secret=settings.MAILCHIMP_WEBHOOK_SECRET,
 )
+
+
+def get_mailchimp_client() -> MailchimpClient:
+    """Get the MailChimp client instance for dependency injection.
+
+    Returns:
+        MailchimpClient: The default client instance
+    """
+    return mailchimp_client

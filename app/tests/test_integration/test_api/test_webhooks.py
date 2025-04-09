@@ -10,7 +10,7 @@ from pytest_mock import MockerFixture
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Path constant for patching
-EMAIL_SERVICE_PATH = "app.services.email_processing_service.EmailProcessingService"
+EMAIL_SERVICE_PATH = "app.services.email_service.EmailService"
 
 # Test data for the webhook
 WEBHOOK_PAYLOAD = {

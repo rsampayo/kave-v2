@@ -159,3 +159,32 @@ class TestStorageService:
         result = await service.get_file("invalid://test-bucket/test.txt")
 
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_custom_aws_credentials(
+        self, test_file_content: bytes, mock_s3_client: AsyncMock
+    ) -> None:
+        """Test saving file to S3 with custom AWS credentials."""
+        with (
+            patch("app.services.storage_service.settings") as mock_settings,
+            patch("aioboto3.Session") as mock_session,
+        ):
+            mock_settings.USE_S3_STORAGE = True
+            mock_settings.S3_BUCKET_NAME = "test-bucket"
+            mock_session.return_value.client.return_value = mock_s3_client
+
+            custom_credentials = {
+                "aws_access_key_id": "custom-access-key",
+                "aws_secret_access_key": "custom-secret-key",
+                "region_name": "custom-region",
+            }
+
+            service = StorageService(aws_credentials=custom_credentials)
+            await service.save_file(test_file_content, "test/test_file.txt")
+
+            # Verify Session was created with custom credentials
+            mock_session.assert_called_once_with(
+                aws_access_key_id="custom-access-key",
+                aws_secret_access_key="custom-secret-key",
+                region_name="custom-region",
+            )

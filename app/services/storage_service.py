@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import Dict, Optional
 
 import aioboto3  # type: ignore
 import aiofiles
@@ -16,10 +16,20 @@ class StorageService:
     Can work with local filesystem or S3 depending on configuration.
     """
 
-    def __init__(self) -> None:
-        """Initialize the storage service."""
+    def __init__(self, aws_credentials: Optional[Dict[str, str]] = None) -> None:
+        """Initialize the storage service.
+
+        Args:
+            aws_credentials: Optional AWS credentials dictionary with
+                aws_access_key_id, aws_secret_access_key, and region_name
+        """
         self.use_s3 = settings.USE_S3_STORAGE
         self.bucket_name = settings.S3_BUCKET_NAME
+        self.aws_credentials = aws_credentials or {
+            "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
+            "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
+            "region_name": settings.AWS_REGION,
+        }
 
     async def save_file(
         self, file_data: bytes, object_key: str, content_type: Optional[str] = None
@@ -57,11 +67,7 @@ class StorageService:
             if content_type:
                 extra_args["ContentType"] = content_type
 
-            session = aioboto3.Session(
-                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                region_name=settings.AWS_REGION,
-            )
+            session = aioboto3.Session(**self.aws_credentials)
 
             async with session.client("s3") as s3:
                 await s3.put_object(
@@ -130,11 +136,7 @@ class StorageService:
             bucket_name = parts[0]
             object_key = parts[1]
 
-            session = aioboto3.Session(
-                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                region_name=settings.AWS_REGION,
-            )
+            session = aioboto3.Session(**self.aws_credentials)
 
             async with session.client("s3") as s3:
                 response = await s3.get_object(Bucket=bucket_name, Key=object_key)

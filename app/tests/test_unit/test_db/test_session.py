@@ -63,9 +63,7 @@ def test_get_db_structure() -> None:
 
     # Check it has the right docstring
     assert get_db.__doc__ is not None
-    assert (
-        "Get a database session for dependency injection" in get_db.__doc__
-    )
+    assert "Get a database session for dependency injection" in get_db.__doc__
 
     # Verify it yields the right type
     from inspect import signature

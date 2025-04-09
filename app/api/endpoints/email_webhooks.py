@@ -11,12 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import verify_webhook_signature
 from app.db.session import get_db
-from app.integrations.email.client import MailchimpClient, mailchimp_client
+from app.integrations.email.client import MailchimpClient, get_mailchimp_client
 from app.schemas.webhook_schemas import WebhookResponse
-from app.services.email_processing_service import (
-    EmailProcessingService,
-    get_email_service,
-)
+from app.services.email_service import EmailService, get_email_service
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -24,10 +21,11 @@ logger = logging.getLogger(__name__)
 # Create API router for webhooks
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
-# Create instances first to avoid function calls in parameter defaults
-email_service_dependency = Depends(get_email_service)
-mailchimp_client_instance = Depends(lambda: mailchimp_client)
-verify_signature_dependency = Depends(verify_webhook_signature)
+# Create dependencies
+verify_signature = Depends(verify_webhook_signature)
+get_db_session = Depends(get_db)
+get_mailchimp = Depends(get_mailchimp_client)
+get_email_handler = Depends(get_email_service)
 
 
 @router.post(
@@ -69,10 +67,10 @@ verify_signature_dependency = Depends(verify_webhook_signature)
 )
 async def receive_mailchimp_webhook(
     request: Request,
-    db: AsyncSession = Depends(get_db),
-    _: bool = verify_signature_dependency,
-    email_service: EmailProcessingService = email_service_dependency,
-    client: MailchimpClient = mailchimp_client_instance,
+    db: AsyncSession = get_db_session,
+    _: bool = verify_signature,
+    email_service: EmailService = get_email_handler,
+    client: MailchimpClient = get_mailchimp,
 ) -> JSONResponse:
     """Handle MailChimp email webhook.
 
