@@ -96,4 +96,4 @@ Thumbs.db
 .env.production.local
 
 # Files from git status
-data/attachments/
+data/
