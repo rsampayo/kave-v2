@@ -49,7 +49,10 @@ async def test_db_url_conversion() -> None:
 
 
 def test_get_db_structure() -> None:
-    """Test that get_db has the expected structure without testing its async behavior."""
+    """Test that get_db has the expected structure.
+
+    This test checks the function signature without executing async behavior.
+    """
     # Verify get_db function has correct signature
     assert callable(get_db)
 
@@ -60,7 +63,9 @@ def test_get_db_structure() -> None:
 
     # Check it has the right docstring
     assert get_db.__doc__ is not None
-    assert "Get a database session for dependency injection" in get_db.__doc__
+    assert (
+        "Get a database session for dependency injection" in get_db.__doc__
+    )
 
     # Verify it yields the right type
     from inspect import signature
@@ -90,8 +95,10 @@ async def test_get_db_yields_and_closes_session() -> None:
             session = await session_generator.__anext__()
             # Assert the yielded session is the one from our mock
             assert session is mock_session
-            mock_session_class.assert_called_once()  # Ensure class constructor was called
-            mock_session.close.assert_not_called()  # Close shouldn't be called yet
+            # Ensure class constructor was called
+            mock_session_class.assert_called_once()
+            # Close shouldn't be called yet
+            mock_session.close.assert_not_called()
         except StopAsyncIteration:
             pytest.fail("Generator finished without yielding.")
         finally:

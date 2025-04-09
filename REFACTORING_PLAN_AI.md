@@ -62,10 +62,16 @@ This document outlines a refactoring plan for the Kave project. The goal is to a
         *   No instances of unsafe mutable defaults in function parameters were found (e.g., `def function(arg: list = [])`)
         *   Keeping the B008 ignore is appropriate for this FastAPI + Pydantic codebase
 
-### 4.2. Fix `E501` Ignore (`app/tests/test_unit/test_db/test_session.py`, `pyproject.toml`/`setup.cfg`)
-    *   **RED:** Write a test (or modify an existing one) that indirectly relies on the logic within the long line(s) in `test_session.py`. Temporarily remove the `per-file-ignores` for `E501` in the Flake8 config. Run `flake8 .` and confirm it fails for `test_session.py`.
-    *   **GREEN:** Refactor the specific line(s) in `test_session.py` that exceed 88 characters. Break them down logically using standard Python line continuation (parentheses, backslashes if necessary) while maintaining readability.
-    *   **REFACTOR:** Remove the `per-file-ignores` entry for `test_session.py:E501` from the Flake8 configuration. Run quality checks and tests.
+### 4.2. ✅ Fix `E501` Ignore (`app/tests/test_unit/test_db/test_session.py`, `pyproject.toml`/`setup.cfg`)
+    *   **COMPLETED:** Successfully fixed the line length issues in test_session.py:
+        *   **RED:** Temporarily removed the E501 ignore in `setup.cfg` and found two specific lines that exceeded 88 characters
+        *   **GREEN:** Refactored both issues:
+            *   Split a single-line docstring into a multi-line docstring with better description
+            *   Moved comments to separate lines before the assert statements they document
+            *   Handled whitespace issues in the docstring
+        *   **REFACTOR:** Permanently removed the E501 ignore from `setup.cfg` as it's no longer needed
+        *   Verified all tests still pass and no flake8 errors remain
+        *   The code is now more readable with better-structured docstrings and comments
 
 ## 5. Database Session Management (`app/db/session.py`, `app/dependencies/`, `app/api/**/*.py`)
 
