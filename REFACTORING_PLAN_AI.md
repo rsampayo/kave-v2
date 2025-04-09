@@ -53,8 +53,14 @@ This document outlines a refactoring plan for the Kave project. The goal is to a
 
 ## 4. Linter Rule Adherence (`setup.cfg`/`pyproject.toml`, relevant `.py` files)
 
-### 4.1. Review `B008` Ignore (`pyproject.toml`/`setup.cfg`)
-    *   **Action:** Manually review code sections where `B008` might be relevant (function calls in argument defaults). Confirm it's primarily due to FastAPI `Depends()` or Pydantic `Field(default_factory=...)`. If mutable defaults (like `arg: list = []`) are found, refactor them using factories or `None` defaults (`arg: list | None = None; if arg is None: arg = []`). No specific Red/Green needed unless actual mutable defaults are found and require refactoring (which would then follow TDD).
+### 4.1. ✅ Review `B008` Ignore (`pyproject.toml`/`setup.cfg`)
+    *   **COMPLETED:** Reviewed and confirmed that B008 ignore is appropriate:
+        *   Verified that B008 (function call in argument defaults) is ignored in `setup.cfg`
+        *   Confirmed this is primarily used for FastAPI's `Depends()` pattern across the codebase in API endpoints
+        *   Found proper usage of Pydantic's `Field(default_factory=...)` pattern in schema models
+        *   The `default_factory` usage follows best practices, including using `lambda: {}` for dict defaults
+        *   No instances of unsafe mutable defaults in function parameters were found (e.g., `def function(arg: list = [])`)
+        *   Keeping the B008 ignore is appropriate for this FastAPI + Pydantic codebase
 
 ### 4.2. Fix `E501` Ignore (`app/tests/test_unit/test_db/test_session.py`, `pyproject.toml`/`setup.cfg`)
     *   **RED:** Write a test (or modify an existing one) that indirectly relies on the logic within the long line(s) in `test_session.py`. Temporarily remove the `per-file-ignores` for `E501` in the Flake8 config. Run `flake8 .` and confirm it fails for `test_session.py`.
