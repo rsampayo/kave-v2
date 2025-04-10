@@ -177,4 +177,8 @@ Once the application is running, you can access the API documentation at:
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Heroku Deployment
+
+This application is configured for Heroku deployment. Refer to the `HEROKU_DEPLOYMENT_PLAN.md` file for detailed deployment instructions. 
