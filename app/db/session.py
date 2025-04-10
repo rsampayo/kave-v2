@@ -19,9 +19,11 @@ DATABASE_URL = settings.DATABASE_URL
 # Ensure the aiosqlite dialect for SQLite
 if DATABASE_URL.startswith("sqlite://"):
     DATABASE_URL = DATABASE_URL.replace("sqlite://", "sqlite+aiosqlite://")
-# Ensure postgresql dialect for postgres
+# Ensure postgresql dialect for postgres with asyncpg driver
 elif DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+elif DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 
 # Create async engine instance
