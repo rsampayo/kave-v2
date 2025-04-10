@@ -29,6 +29,84 @@ get_db_session = Depends(get_db)
 get_mailchimp = Depends(get_mailchimp_client)
 get_email_handler = Depends(get_email_service)
 
+# Add a helper function for deep redaction at the top after the imports
+def _deep_redact_binary_content(obj, depth=0, max_depth=5):
+    """Deeply scan and redact any potential binary or base64 content in objects.
+    
+    This function recursively searches through nested dicts and lists to find
+    and redact any strings that appear to be binary data, base64 encoded content,
+    or PDF content.
+    
+    Args:
+        obj: The object to scan and redact
+        depth: Current recursion depth (internal use)
+        max_depth: Maximum recursion depth to prevent infinite loops
+        
+    Returns:
+        A copy of the object with binary content redacted
+    """
+    # Stop recursion if we hit max depth
+    if depth > max_depth:
+        return obj
+    
+    # Handle different types
+    if isinstance(obj, dict):
+        # Make a copy of the dict to avoid modifying the original
+        result = {}
+        for key, value in obj.items():
+            # These keys are known to potentially contain binary/base64 data
+            if key in ["content", "raw_msg", "html", "text", "body", "data", "attachments"]:
+                if isinstance(value, str):
+                    # Check if it looks like binary content
+                    if len(value) > 100:  # Only check longer strings
+                        # Check for PDF markers
+                        if "%PDF" in value or "trailer" in value or "startxref" in value or "%%EOF" in value:
+                            result[key] = f"[REDACTED PDF - {len(value)} chars]"
+                        # Check for base64-ish content (many consecutive alphanumeric/+/= chars)
+                        elif any(c not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/= \n\t\r" for c in value[:100]):
+                            result[key] = f"[REDACTED BINARY - {len(value)} chars]"
+                        # Check for very long strings which may be encoded data
+                        elif len(value) > 500:
+                            result[key] = f"[REDACTED LONG CONTENT - {len(value)} chars]"
+                        else:
+                            result[key] = value
+                    else:
+                        result[key] = value
+                else:
+                    # Recursively redact the value
+                    result[key] = _deep_redact_binary_content(value, depth+1, max_depth)
+            else:
+                # For other keys, recursively redact the value
+                result[key] = _deep_redact_binary_content(value, depth+1, max_depth)
+        return result
+    
+    elif isinstance(obj, list):
+        # Make a copy of the list to avoid modifying the original
+        result = []
+        for item in obj:
+            # Recursively redact the item
+            result.append(_deep_redact_binary_content(item, depth+1, max_depth))
+        return result
+    
+    elif isinstance(obj, str):
+        # Check if the string looks like binary content
+        if len(obj) > 500:  # Only check longer strings
+            # Check for PDF markers
+            if "%PDF" in obj or "trailer" in obj or "startxref" in obj or "%%EOF" in obj:
+                return f"[REDACTED PDF - {len(obj)} chars]"
+            # Check for base64-ish content
+            elif any(c not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/= \n\t\r" for c in obj[:100]):
+                return f"[REDACTED BINARY - {len(obj)} chars]"
+            # Check for very long strings which may be encoded data
+            elif len(obj) > 1000:
+                return f"[REDACTED LONG CONTENT - {len(obj)} chars]"
+        
+        # Not binary data, return as is
+        return obj
+    
+    # Not a container or string, return as is
+    return obj
+
 
 @router.head(
     "/mailchimp",
@@ -302,27 +380,11 @@ async def receive_mandrill_webhook(
                         body = json.loads(mandrill_events)
                         logger.info(f"Successfully parsed Mandrill events JSON. Event count: {len(body) if isinstance(body, list) else 1}")
                         
-                        # Redact any base64 content immediately before any logging
-                        if isinstance(body, list):
-                            for event in body:
-                                if isinstance(event, dict) and "msg" in event:
-                                    msg = event.get("msg", {})
-                                    # Redact attachments immediately
-                                    if "attachments" in msg and isinstance(msg["attachments"], list):
-                                        for attachment in msg["attachments"]:
-                                            if isinstance(attachment, dict) and "content" in attachment:
-                                                attachment["content"] = f"[REDACTED - {len(attachment.get('content', ''))} chars]"
-                                    # Redact images immediately
-                                    if "images" in msg and isinstance(msg["images"], list):
-                                        for image in msg["images"]:
-                                            if isinstance(image, dict) and "content" in image:
-                                                image["content"] = f"[REDACTED - {len(image.get('content', ''))} chars]"
-                                    # Redact raw_msg if present (contains full email)
-                                    if "raw_msg" in msg:
-                                        msg["raw_msg"] = f"[REDACTED - {len(msg.get('raw_msg', ''))} chars]"
+                        # Apply deep redaction for all potentially binary content
+                        safe_body = _deep_redact_binary_content(body)
                         
                         # Log the redacted copy for debugging
-                        logger.info(f"MANDRILL EVENTS STRUCTURE (content redacted): {body}")
+                        logger.info(f"MANDRILL EVENTS STRUCTURE (content redacted): {safe_body}")
 
                     except Exception as form_err:
                         logger.error(f"Failed to parse mandrill_events: {str(form_err)}")
@@ -404,25 +466,9 @@ async def receive_mandrill_webhook(
                     
                     # Log complete event for debugging with redacted attachment content
                     try:
-                        event_copy = event.copy() if hasattr(event, 'copy') else dict(event)
-                        # Redact all potential binary/base64 content
-                        if "msg" in event_copy:
-                            msg = event_copy["msg"]
-                            # Redact attachments
-                            if "attachments" in msg and isinstance(msg["attachments"], list):
-                                for attachment in msg["attachments"]:
-                                    if isinstance(attachment, dict) and "content" in attachment:
-                                        attachment["content"] = f"[REDACTED - {len(attachment.get('content', ''))} chars]"
-                            # Redact images 
-                            if "images" in msg and isinstance(msg["images"], list):
-                                for image in msg["images"]:
-                                    if isinstance(image, dict) and "content" in image:
-                                        image["content"] = f"[REDACTED - {len(image.get('content', ''))} chars]"
-                            # Redact raw_msg if present
-                            if "raw_msg" in msg:
-                                msg["raw_msg"] = f"[REDACTED - {len(msg.get('raw_msg', ''))} chars]"
-                        
-                        logger.info(f"MANDRILL EVENT {event_index+1} STRUCTURE (content redacted): {event_copy}")
+                        # Use deep redaction to ensure all binary content is removed
+                        safe_event = _deep_redact_binary_content(event)
+                        logger.info(f"MANDRILL EVENT {event_index+1} STRUCTURE (content redacted): {safe_event}")
                     except Exception as copy_err:
                         logger.info(f"MANDRILL EVENT {event_index+1} (could not redact - structure error): {str(copy_err)}")
                     
@@ -517,8 +563,9 @@ async def receive_mandrill_webhook(
                             }
                         }
                         
-                        # Add more debug logging before processing
-                        logger.debug(f"Formatted event for processing: {formatted_event}")
+                        # Add more debug logging before processing (with deep redaction)
+                        safe_formatted = _deep_redact_binary_content(formatted_event)
+                        logger.debug(f"Formatted event for processing: {safe_formatted}")
 
                         # Process the webhook data
                         webhook_data = await client.parse_webhook(formatted_event)
