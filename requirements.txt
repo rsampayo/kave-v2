@@ -121,6 +121,10 @@ propcache==0.3.1
     # via
     #   aiohttp
     #   yarl
+psycopg2-binary==2.9.10
+    # via
+    #   -r /Users/rsampayo/Documents/Proyectos/Kave/requirements/base.in
+    #   -r requirements/base.in
 pydantic==2.11.3
     # via
     #   -r /Users/rsampayo/Documents/Proyectos/Kave/requirements/base.in
