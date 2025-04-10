@@ -149,7 +149,7 @@ class EmailAttachment:
     """
 
     # Define slots to save memory per B903 recommendation
-    __slots__ = ["name", "type", "content", "content_id", "size"]
+    __slots__ = ["name", "type", "content", "content_id", "size", "base64"]
 
     def __init__(
         self,
@@ -158,18 +158,22 @@ class EmailAttachment:
         content: str,
         content_id: Optional[str] = None,
         size: Optional[int] = None,
+        base64: bool = True,
     ):
         """Initialize an EmailAttachment instance.
 
         Args:
             name: The filename of the attachment
             type: The MIME type of the attachment
-            content: Base64 encoded content of the attachment
+            content: Base64 encoded content of the attachment (if base64=True)
+                    or raw content (if base64=False)
             content_id: Optional Content-ID for inline attachments
             size: Optional size of the attachment in bytes
+            base64: Whether the content is base64 encoded, defaults to True
         """
         self.name = name
         self.type = type
-        self.content = content  # Base64 encoded content
+        self.content = content
         self.content_id = content_id
         self.size = size
+        self.base64 = base64

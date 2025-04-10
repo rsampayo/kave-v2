@@ -9,11 +9,12 @@ class EmailAttachment(BaseModel):
 
     name: str = Field(..., description="The filename of the attachment")
     type: str = Field(..., description="MIME type of the attachment")
-    content: Optional[str] = Field(None, description="Base64 encoded content")
+    content: Optional[str] = Field(None, description="Content of the attachment (base64-encoded if base64=True)")
     content_id: Optional[str] = Field(
         None, description="Content ID for inline attachments"
     )
     size: Optional[int] = Field(None, description="Size of the attachment in bytes")
+    base64: Optional[bool] = Field(True, description="Whether content is base64 encoded (default: True)")
 
 
 class InboundEmailData(BaseModel):

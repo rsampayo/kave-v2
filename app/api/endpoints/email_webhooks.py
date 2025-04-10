@@ -229,7 +229,8 @@ def _normalize_attachments(
         isinstance(item, dict) for item in attachments
     ):
         attachment_info = [
-            f"{a.get('name', 'unnamed')} ({a.get('type', 'unknown')})"
+            f"{a.get('name', 'unnamed')} ({a.get('type', 'unknown')}) "
+            f"[base64: {a.get('base64', True)}]"
             for a in attachments
         ]
         logger.info(
@@ -401,6 +402,13 @@ def _format_event(
             "attachments": normalized_attachments,
         },
     }
+
+    # Ensure all attachments have a base64 flag for proper processing
+    for attachment in formatted_event["data"]["attachments"]:
+        if "base64" not in attachment:
+            # Default to True unless explicitly set to False
+            attachment["base64"] = True
+            logger.info(f"Setting default base64=True for attachment: {attachment.get('name', 'unnamed')}")
 
     # Log the formatted event that will be processed
     formatted_event_copy = formatted_event.copy()
