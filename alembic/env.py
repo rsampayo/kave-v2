@@ -80,6 +80,10 @@ async def run_migrations_online() -> None:
     db_url = settings.DATABASE_URL
     if db_url.startswith("sqlite://"):
         db_url = db_url.replace("sqlite://", "sqlite+aiosqlite://")
+    elif db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
     # Create the async engine
     engine = create_async_engine(db_url)
