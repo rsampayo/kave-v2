@@ -5,14 +5,8 @@ Contains FastAPI routes for handling webhook requests from MailChimp.
 
 import logging
 from typing import Any, Dict, List, Union
-import time
-import json
-import base64
-import re
-import math
-import string
 
-from fastapi import APIRouter, Depends, Request, status, BackgroundTasks
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,152 +27,6 @@ verify_signature = Depends(verify_webhook_signature)
 get_db_session = Depends(get_db)
 get_mailchimp = Depends(get_mailchimp_client)
 get_email_handler = Depends(get_email_service)
-
-# Add a helper function for deep redaction at the top after the imports
-def _deep_redact_binary_content(data: Any, path: str = "root") -> Any:
-    """
-    Recursively traverse a data structure and redact any binary content.
-    
-    This helps prevent logging sensitive binary data (like PDF attachments)
-    that could cause issues with log storage or expose PII.
-    """
-    # Constants for detection
-    BINARY_LENGTH_THRESHOLD = 50  # Strings longer than this will be checked for binary content
-    LONG_CONTENT_THRESHOLD = 200  # Extra long content will be redacted regardless
-    
-    # Track redaction statistics
-    redaction_count = {'binary': 0, 'pdf': 0, 'long': 0, 'base64': 0}
-    
-    def _is_likely_binary_or_base64(s: str) -> tuple[bool, str]:
-        """Check if a string appears to be binary or base64 encoded content."""
-        # Quick length check first
-        if len(s) < BINARY_LENGTH_THRESHOLD:
-            return False, "too_short"
-            
-        # Check for PDF signature
-        if s.startswith('%PDF-'):
-            return True, "pdf_header"
-
-        # Check for base64 characteristics (mostly alphanumeric with possibly +, /, and = padding)
-        if len(s) % 4 == 0 and re.match(r'^[A-Za-z0-9+/]*={0,2}$', s):
-            # Additional check: base64 strings have a particular character distribution
-            uppercase = sum(1 for c in s if 'A' <= c <= 'Z')
-            lowercase = sum(1 for c in s if 'a' <= c <= 'z')
-            numbers = sum(1 for c in s if '0' <= c <= '9')
-            special = sum(1 for c in s if c in '+/=')
-            
-            # Base64 should have a somewhat balanced distribution
-            if uppercase + lowercase + numbers + special == len(s):
-                if special <= len(s) * 0.25:  # Not too many special chars
-                    return True, "base64_pattern"
-            
-        # Check for binary content (non-printable characters)
-        binary_chars = sum(1 for c in s if c not in string.printable)
-        if binary_chars > 0:
-            return True, f"binary_chars_{binary_chars}"
-            
-        # Check if it's an unusually long string with high entropy
-        if len(s) > LONG_CONTENT_THRESHOLD:
-            # Calculate entropy to detect compressed or encrypted data
-            char_count = {}
-            for c in s:
-                char_count[c] = char_count.get(c, 0) + 1
-                
-            entropy = 0
-            for count in char_count.values():
-                freq = count / len(s)
-                entropy -= freq * math.log2(freq)
-                
-            # High entropy could indicate binary/compressed data
-            if entropy > 4.5:  # Typical threshold for high entropy
-                return True, f"high_entropy_{entropy:.2f}"
-        
-        return False, "not_binary"
-        
-    def _process_item(item: Any, current_path: str) -> Any:
-        """Process a single item, redacting if necessary."""
-        if item is None:
-            return None
-        
-        if isinstance(item, str):
-            # Handle string values - check if they could be binary/base64
-            if len(item) > LONG_CONTENT_THRESHOLD:
-                is_binary, reason = _is_likely_binary_or_base64(item)
-                
-                if is_binary:
-                    if reason == "pdf_header":
-                        logger.debug(f"Redacted PDF content at {current_path}, length: {len(item)}")
-                        redaction_count['pdf'] += 1
-                        return "[REDACTED PDF CONTENT]"
-                    elif reason.startswith("binary_chars"):
-                        logger.debug(f"Redacted binary content at {current_path}, length: {len(item)}, reason: {reason}")
-                        redaction_count['binary'] += 1
-                        return "[REDACTED BINARY CONTENT]"
-                    elif reason == "base64_pattern":
-                        logger.debug(f"Redacted likely base64 content at {current_path}, length: {len(item)}")
-                        redaction_count['base64'] += 1
-                        return "[REDACTED BASE64 CONTENT]"
-                    elif reason.startswith("high_entropy"):
-                        logger.debug(f"Redacted high entropy content at {current_path}, length: {len(item)}, {reason}")
-                        redaction_count['binary'] += 1
-                        return "[REDACTED HIGH ENTROPY CONTENT]"
-                elif len(item) > LONG_CONTENT_THRESHOLD * 2:
-                    # Extra-long content gets redacted even if not detected as binary
-                    logger.debug(f"Redacted long text content at {current_path}, length: {len(item)}")
-                    redaction_count['long'] += 1
-                    return f"[REDACTED LONG CONTENT: {len(item)} CHARS]"
-            
-            return item
-            
-        elif isinstance(item, dict):
-            # Process each key-value pair in the dictionary
-            result = {}
-            for key, value in item.items():
-                # Special handling for content field in attachments
-                if key == "content" and "type" in item:
-                    # This is likely an attachment content field
-                    
-                    # For binary file types, always redact
-                    content_type = item.get("type", "").lower()
-                    if (content_type and any(btype in content_type for btype in [
-                        "pdf", "application/", "image/", "audio/", "video/", "octet-stream"
-                    ])):
-                        logger.debug(f"Redacted attachment content at {current_path}, type: {content_type}")
-                        result[key] = f"[REDACTED {content_type.upper()} CONTENT]"
-                        redaction_count['binary'] += 1
-                    else:
-                        # Process normally if it's not a known binary type
-                        new_path = f"{current_path}.{key}"
-                        result[key] = _process_item(value, new_path)
-                else:
-                    # Process normally
-                    new_path = f"{current_path}.{key}"
-                    result[key] = _process_item(value, new_path)
-            return result
-            
-        elif isinstance(item, list):
-            # Process each item in the list
-            result = []
-            for i, list_item in enumerate(item):
-                new_path = f"{current_path}[{i}]"
-                result.append(_process_item(list_item, new_path))
-            return result
-            
-        else:
-            # Return non-container types as-is
-            return item
-    
-    # Process the entire data structure
-    result = _process_item(data, path)
-    
-    # Log the redaction statistics if any redactions were made
-    total_redactions = sum(redaction_count.values())
-    if total_redactions > 0:
-        logger.info(f"Redaction summary: {total_redactions} items redacted - "
-                   f"PDF: {redaction_count['pdf']}, Binary: {redaction_count['binary']}, "
-                   f"Base64: {redaction_count['base64']}, Long: {redaction_count['long']}")
-    
-    return result
 
 
 @router.head(
@@ -408,181 +256,215 @@ async def receive_mandrill_webhook(
             - 500 INTERNAL SERVER ERROR for processing errors
     """
     try:
-        logger.info("Received Mandrill webhook")
-        # Parse the webhook data
-        form_data = await request.form()
-        mandrill_events = json.loads(form_data.get("mandrill_events", "[]"))
+        # Log the content type for debugging
+        content_type = request.headers.get("content-type", "")
+        logger.info(f"Mandrill webhook received with Content-Type: {content_type}")
         
-        if not mandrill_events:
-            logger.warning("Empty Mandrill webhook event")
-            return {"status": "success"}
-        
-        logger.info(f"Processing {len(mandrill_events)} Mandrill events")
-        
-        # Track overall attachment processing statistics
-        attachment_stats = {
-            "total": 0,
-            "success": 0,
-            "errors": 0,
-            "dict_format": 0,
-            "list_format": 0,
-            "skipped": 0
-        }
-        
-        # Process each event
-        for event_idx, event in enumerate(mandrill_events):
-            # Log the event type
-            event_type = event.get("event")
-            msg = event.get("msg", {})
-            sender = msg.get("sender", "unknown")
-            recipient = msg.get("email", "unknown")
-            subject = msg.get("subject", "no subject")
-            
-            logger.info(f"Event {event_idx+1}/{len(mandrill_events)}: Type: {event_type}, From: {sender}, To: {recipient}, Subject: {subject}")
-            
-            # Redact any potential binary content before logging
-            safe_event = _deep_redact_binary_content(event)
-            logger.debug(f"Mandrill event data: {safe_event}")
-            
-            # Process the message
-            try:
-                # Extract basic email information
-                email = msg.get("email", "")
-                subject = msg.get("subject", "")
-                
-                if not email:
-                    logger.warning("Missing email address in Mandrill webhook")
-                    continue
-                
-                logger.info(f"Processing email for {email}, subject: {subject}")
-                
-                # Process attachments if any
-                attachments = msg.get("attachments", [])
-                parsed_attachments = []
-                
-                # Log attachment details for debugging
-                attachment_stats["total"] += (len(attachments) if isinstance(attachments, list) else 
-                                            len(attachments.keys()) if isinstance(attachments, dict) else 0)
-                
-                if attachments:
-                    if isinstance(attachments, dict):
-                        attachment_stats["dict_format"] += 1
-                        logger.info(f"Processing dictionary format attachments with {len(attachments)} items")
-                        logger.debug(f"Attachment keys: {list(attachments.keys())}")
-                    elif isinstance(attachments, list):
-                        attachment_stats["list_format"] += 1
-                        logger.info(f"Processing list format attachments with {len(attachments)} items")
-                    else:
-                        logger.warning(f"Received unexpected attachment format: {type(attachments)}")
-                
-                # Handle attachments - could be a dict or a list depending on Mandrill's format
-                if isinstance(attachments, dict):
-                    # Dictionary format where keys are filenames
-                    for filename, attachment_data in attachments.items():
-                        logger.debug(f"Processing attachment: {filename}")
-                        
-                        # Check that we have the expected fields
-                        if isinstance(attachment_data, dict) and "content" in attachment_data:
-                            # Some fields may be missing, so set defaults
-                            content = attachment_data.get("content", "")
-                            content_type = attachment_data.get("type", "application/octet-stream")
-                            
-                            # Ensure we have a name
-                            name = attachment_data.get("name", filename)
-                            
-                            try:
-                                # Decode content if it's base64
-                                content_bytes = base64.b64decode(content)
-                                parsed_attachments.append({
-                                    "name": name,
-                                    "type": content_type,
-                                    "content": content_bytes
-                                })
-                                logger.info(f"Successfully processed attachment: {name} ({content_type}), size: {len(content_bytes)} bytes")
-                                attachment_stats["success"] += 1
-                            except Exception as e:
-                                logger.error(f"Error decoding attachment {name}: {str(e)}")
-                                attachment_stats["errors"] += 1
-                        else:
-                            logger.warning(f"Skipping attachment {filename} - missing required fields")
-                            attachment_stats["skipped"] += 1
-                    
-                    logger.info(f"Processed {len(parsed_attachments)}/{len(attachments)} attachments from dictionary format")
-                
-                elif isinstance(attachments, list):
-                    # List format of attachment objects
-                    for attachment in attachments:
-                        if not isinstance(attachment, dict):
-                            logger.warning(f"Skipping non-dict attachment: {type(attachment)}")
-                            attachment_stats["skipped"] += 1
-                            continue
-                            
-                        logger.debug(f"Processing list attachment: {attachment.get('name', 'unnamed')}")
-                        
-                        # Ensure we have the necessary fields
-                        if "content" in attachment and "name" in attachment:
-                            try:
-                                content = attachment.get("content", "")
-                                content_type = attachment.get("type", "application/octet-stream")
-                                name = attachment.get("name", "attachment")
-                                
-                                # Decode content if it's base64
-                                content_bytes = base64.b64decode(content)
-                                parsed_attachments.append({
-                                    "name": name,
-                                    "type": content_type,
-                                    "content": content_bytes
-                                })
-                                logger.info(f"Successfully processed list attachment: {name} ({content_type}), size: {len(content_bytes)} bytes")
-                                attachment_stats["success"] += 1
-                            except Exception as e:
-                                logger.error(f"Error decoding list attachment {attachment.get('name', 'unnamed')}: {str(e)}")
-                                attachment_stats["errors"] += 1
-                        else:
-                            missing_fields = set(["content", "name"]) - set(attachment.keys())
-                            logger.warning(f"Skipping list attachment - missing required fields: {missing_fields}")
-                            attachment_stats["skipped"] += 1
-                    
-                    logger.info(f"Processed {len(parsed_attachments)}/{len(attachments)} attachments from list format")
-                
-                elif attachments:  # Not empty but wrong type
-                    logger.warning(f"Unexpected attachment format: {type(attachments)}")
-                
-                # Create email record in database
-                # ... rest of the processing
-
-            except Exception as event_err:
-                logger.error(f"Error processing Mandrill event: {str(event_err)}")
-                continue
-        
-        # Log attachment processing summary
-        if attachment_stats["total"] > 0:
-            logger.info(
-                f"Attachment processing summary: "
-                f"Total: {attachment_stats['total']}, "
-                f"Success: {attachment_stats['success']}, "
-                f"Errors: {attachment_stats['errors']}, "
-                f"Skipped: {attachment_stats['skipped']}, "
-                f"Dict format events: {attachment_stats['dict_format']}, "
-                f"List format events: {attachment_stats['list_format']}"
+        # Get the raw request body for logging
+        raw_body = await request.body()
+        if not raw_body:
+            logger.warning("Empty request body received from Mandrill")
+            return JSONResponse(
+                content={"status": "error", "message": "Empty request body"},
+                status_code=status.HTTP_400_BAD_REQUEST,
             )
         
-        return JSONResponse(
-            content={
-                "status": "success", 
-                "message": "Email processed successfully"
-            },
-            status_code=status.HTTP_202_ACCEPTED,
-        )
-    except json.JSONDecodeError as json_err:
-        logger.error(f"Invalid JSON in Mandrill webhook: {str(json_err)}")
-        return JSONResponse(
-            content={
-                "status": "error",
-                "message": f"Invalid JSON format: {str(json_err)}",
-            },
-            status_code=status.HTTP_200_OK,  # Still return 200 for Mandrill
-        )
+        # Log body size for debugging
+        logger.debug(f"Mandrill webhook body size: {len(raw_body)} bytes")
+        
+        body = None
+        
+        # Check if we have form data (typical for Mandrill)
+        if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+            logger.info("Processing Mandrill webhook as form data")
+            try:
+                form_data = await request.form()
+                logger.debug(f"Form fields: {list(form_data.keys())}")
+                
+                if "mandrill_events" in form_data:
+                    # This is the standard Mandrill format
+                    mandrill_events = form_data["mandrill_events"]
+                    logger.debug(f"Mandrill events data type: {type(mandrill_events).__name__}")
+                    
+                    import json
+                    try:
+                        body = json.loads(mandrill_events)
+                        logger.info(f"Successfully parsed Mandrill events JSON. Event count: {len(body) if isinstance(body, list) else 1}")
+                    except Exception as form_err:
+                        logger.error(f"Failed to parse mandrill_events: {str(form_err)}")
+                        return JSONResponse(
+                            content={
+                                "status": "error", 
+                                "message": f"Invalid Mandrill webhook format: {str(form_err)}"
+                            },
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                        )
+                else:
+                    logger.warning(f"Mandrill form data missing 'mandrill_events' field. Available keys: {list(form_data.keys())}")
+                    return JSONResponse(
+                        content={
+                            "status": "error", 
+                            "message": "Missing 'mandrill_events' field in form data"
+                        },
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
+            except Exception as form_err:
+                logger.error(f"Error processing form data: {str(form_err)}")
+                return JSONResponse(
+                    content={
+                        "status": "error", 
+                        "message": f"Error processing form data: {str(form_err)}"
+                    },
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            # Try parsing as JSON in case Mandrill changes their format
+            logger.info("Attempting to process Mandrill webhook as direct JSON")
+            try:
+                body = await request.json()
+                logger.debug(f"Successfully parsed JSON body: {type(body).__name__}")
+            except Exception as json_err:
+                logger.error(f"Failed to parse request as JSON: {str(json_err)}")
+                return JSONResponse(
+                    content={
+                        "status": "error", 
+                        "message": f"Unsupported Mandrill webhook format: {str(json_err)}"
+                    },
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # Verify we have a body to process
+        if not body:
+            logger.error("No parseable body found in Mandrill webhook")
+            return JSONResponse(
+                content={"status": "error", "message": "No parseable body found"},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Check if this is a ping event for webhook validation
+        if isinstance(body, dict) and (body.get("type") == "ping" or body.get("event") == "ping"):
+            logger.info("Received Mandrill webhook validation ping")
+            return JSONResponse(
+                content={
+                    "status": "success",
+                    "message": "Webhook validation successful",
+                },
+                status_code=status.HTTP_200_OK,
+            )
+            
+        # Handle Mandrill's array-based format (standard format)
+        if isinstance(body, list):
+            # Mandrill sends an array of events
+            event_count = len(body)
+            logger.info(f"Processing {event_count} Mandrill events")
+            processed_count = 0
+            skipped_count = 0
+            
+            for event_index, event in enumerate(body):
+                # Process each event
+                try:
+                    # Log basic event info for troubleshooting
+                    event_type = event.get("event", "unknown")
+                    event_id = event.get("_id", f"unknown_{event_index}")
+                    logger.info(f"Processing Mandrill event {event_index+1}/{event_count}: type={event_type}, id={event_id}")
+                    
+                    # Format the event to match what our parse_webhook expects
+                    if "msg" in event:
+                        # Map 'inbound' event type to 'inbound_email' if needed
+                        if event_type == "inbound":
+                            event_type = "inbound_email"
+                            
+                        # Get message details for logging
+                        msg = event.get("msg", {})
+                        subject = msg.get("subject", "")[:50]  # Limit long subjects
+                        from_email = msg.get("from_email", "")
+                        logger.info(f"Email details - From: {from_email}, Subject: {subject}")
+                        
+                        # Log attachment info
+                        attachments = msg.get("attachments", [])
+                        if attachments:
+                            attachment_info = [f"{a.get('name', 'unnamed')} ({a.get('type', 'unknown')})" for a in attachments]
+                            logger.info(f"Email has {len(attachments)} attachments: {', '.join(attachment_info)}")
+                        
+                        # Get and process headers to convert any list values to strings
+                        headers = msg.get("headers", {})
+                        header_count = len(headers) if headers else 0
+                        processed_headers = _process_mandrill_headers(headers)
+                        
+                        # Log some important headers
+                        important_headers = ["message-id", "date", "to", "from", "subject"]
+                        found_headers = {k: processed_headers.get(k) for k in important_headers if k.lower() in map(str.lower, processed_headers.keys())}
+                        logger.debug(f"Processed {header_count} headers, important headers: {found_headers}")
+                            
+                        # Mandrill typically has 'msg' containing the email data
+                        formatted_event = {
+                            "event": event_type,
+                            "webhook_id": event_id,
+                            "timestamp": event.get("ts", ""),
+                            "data": {
+                                "message_id": msg.get("_id", ""),
+                                "from_email": from_email,
+                                "from_name": msg.get("from_name", ""),
+                                "to_email": msg.get("email", ""),
+                                "subject": subject,
+                                "body_plain": msg.get("text", ""),
+                                "body_html": msg.get("html", ""),
+                                "headers": processed_headers,
+                                "attachments": attachments,
+                            }
+                        }
+                        
+                        # Process the webhook data
+                        webhook_data = await client.parse_webhook(formatted_event)
+                        await email_service.process_webhook(webhook_data)
+                        processed_count += 1
+                        logger.info(f"Successfully processed Mandrill event {event_index+1}")
+                    else:
+                        logger.warning(f"Skipping Mandrill event with no msg field: event_type={event_type}, id={event_id}")
+                        skipped_count += 1
+                except Exception as event_err:
+                    logger.error(f"Error processing Mandrill event {event_index+1}: {str(event_err)}")
+                    skipped_count += 1
+            
+            # Return summary of processing
+            if processed_count > 0:
+                message = f"Processed {processed_count} events successfully"
+                if skipped_count > 0:
+                    message += f" ({skipped_count} skipped)"
+                    
+                return JSONResponse(
+                    content={
+                        "status": "success", 
+                        "message": message
+                    },
+                    status_code=status.HTTP_202_ACCEPTED,
+                )
+            else:
+                return JSONResponse(
+                    content={
+                        "status": "error", 
+                        "message": f"Failed to process any events ({skipped_count} skipped)"
+                    },
+                    status_code=status.HTTP_200_OK,  # Use 200 for Mandrill to avoid retries
+                )
+        else:
+            # Handle non-list format (unusual for Mandrill but handle it anyway)
+            logger.warning("Received Mandrill webhook with non-list format, attempting to process")
+            
+            # Process headers if present to handle list values
+            if isinstance(body, dict) and "data" in body and "headers" in body["data"]:
+                body["data"]["headers"] = _process_mandrill_headers(body["data"]["headers"])
+                
+            webhook_data = await client.parse_webhook(body)
+            await email_service.process_webhook(webhook_data)
+            
+            return JSONResponse(
+                content={
+                    "status": "success", 
+                    "message": "Email processed successfully"
+                },
+                status_code=status.HTTP_202_ACCEPTED,
+            )
     except Exception as e:
         logger.error(f"Error processing Mandrill webhook: {str(e)}")
         # Return 200 OK even for errors as Mandrill expects 2xx responses
