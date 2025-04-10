@@ -4,6 +4,7 @@ Contains FastAPI routes for handling webhook requests from MailChimp.
 """
 
 import logging
+from typing import Any, Dict, List, Union
 
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import JSONResponse
@@ -169,6 +170,28 @@ async def receive_mailchimp_webhook(
         )
 
 
+def _process_mandrill_headers(headers: Dict[str, Any]) -> Dict[str, str]:
+    """Process Mandrill headers to ensure they're all strings.
+    
+    Mandrill may send headers as lists of strings, but our schema expects Dict[str, str].
+    This function converts any list values to strings by joining them.
+    
+    Args:
+        headers: The raw headers from Mandrill
+        
+    Returns:
+        Dict[str, str]: Headers with all values as strings
+    """
+    processed_headers = {}
+    for key, value in headers.items():
+        if isinstance(value, list):
+            # Join list values with a newline for readability
+            processed_headers[key] = "\n".join(value)
+        else:
+            processed_headers[key] = str(value)
+    return processed_headers
+
+
 @router.post(
     "/mandrill",
     status_code=status.HTTP_202_ACCEPTED,
@@ -306,6 +329,12 @@ async def receive_mandrill_webhook(
                             
                         # Log the event details for troubleshooting
                         logger.info(f"Processing Mandrill event: {event_type} with ID: {event.get('_id', '')}")
+                        
+                        # Get and process headers to convert any list values to strings
+                        headers = event.get("msg", {}).get("headers", {})
+                        processed_headers = _process_mandrill_headers(headers)
+                        
+                        logger.debug(f"Processed headers: {processed_headers}")
                             
                         # Mandrill typically has 'msg' containing the email data
                         formatted_event = {
@@ -320,7 +349,7 @@ async def receive_mandrill_webhook(
                                 "subject": event.get("msg", {}).get("subject", ""),
                                 "body_plain": event.get("msg", {}).get("text", ""),
                                 "body_html": event.get("msg", {}).get("html", ""),
-                                "headers": event.get("msg", {}).get("headers", {}),
+                                "headers": processed_headers,  # Use the processed headers
                                 "attachments": event.get("msg", {}).get("attachments", []),
                             }
                         }
@@ -343,6 +372,10 @@ async def receive_mandrill_webhook(
             )
         else:
             # Regular webhook format, similar to Mailchimp
+            # Process headers if present to handle list values
+            if isinstance(body, dict) and "data" in body and "headers" in body["data"]:
+                body["data"]["headers"] = _process_mandrill_headers(body["data"]["headers"])
+                
             webhook_data = await client.parse_webhook(body)
             await email_service.process_webhook(webhook_data)
             
