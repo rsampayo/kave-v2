@@ -324,12 +324,6 @@ def _format_event(
         },
     }
 
-    # Ensure all attachments have a base64 flag for proper processing
-    for attachment in formatted_event["data"]["attachments"]:
-        if "base64" not in attachment:
-            # Default to True unless explicitly set to False
-            attachment["base64"] = True
-
     return formatted_event
 
 
