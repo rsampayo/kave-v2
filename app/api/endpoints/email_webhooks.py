@@ -465,8 +465,31 @@ async def receive_mandrill_webhook(
                                     except json.JSONDecodeError:
                                         logger.warning("Could not parse attachments string as JSON, creating empty attachments list")
                                         attachments = []
+                                elif isinstance(attachments, dict):
+                                    # Handle the case where attachments is a dictionary
+                                    # This happens when Mandrill sends a single attachment as a dict instead of a list of dicts
+                                    logger.info("Converting attachments from dict to list format")
+                                    
+                                    # Check if the dict has expected attachment fields
+                                    if "name" in attachments and "type" in attachments:
+                                        # It's likely an attachment dictionary, so wrap it in a list
+                                        attachments = [attachments]
+                                        logger.info(f"Converted single attachment dict to list: {attachments[0].get('name', 'unnamed')}")
+                                    else:
+                                        # Try to extract attachment info from the dictionary structure
+                                        attachment_list = []
+                                        for key, value in attachments.items():
+                                            if isinstance(value, dict) and "name" in value and "type" in value:
+                                                attachment_list.append(value)
+                                            
+                                        if attachment_list:
+                                            attachments = attachment_list
+                                            logger.info(f"Extracted {len(attachments)} attachments from dictionary structure")
+                                        else:
+                                            logger.warning("Could not extract attachments from dictionary, creating empty attachments list")
+                                            attachments = []
                                 else:
-                                    logger.warning("Attachments is not a list or string, creating empty attachments list")
+                                    logger.warning("Attachments is not a list, string, or dict; creating empty attachments list")
                                     attachments = []
                         
                         # Get and process headers to convert any list values to strings
