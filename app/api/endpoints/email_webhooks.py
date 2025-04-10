@@ -435,16 +435,39 @@ async def receive_mandrill_webhook(
                         # Log attachment info
                         attachments = msg.get("attachments", [])
                         if attachments:
-                            attachment_info = [f"{a.get('name', 'unnamed')} ({a.get('type', 'unknown')})" for a in attachments]
-                            logger.info(f"Email has {len(attachments)} attachments: {', '.join(attachment_info)}")
-                            
-                            # Log attachment details without the content (which could be large)
-                            for i, attachment in enumerate(attachments):
-                                attachment_copy = attachment.copy()
-                                if "content" in attachment_copy:
-                                    content_length = len(attachment_copy["content"]) if attachment_copy["content"] else 0
-                                    attachment_copy["content"] = f"[Binary data, {content_length} bytes]"
-                                _safely_log_payload(attachment_copy, f"Attachment {i+1} Details")
+                            # Check if attachments is a proper iterable of dictionaries
+                            if isinstance(attachments, list) and all(isinstance(item, dict) for item in attachments):
+                                attachment_info = [f"{a.get('name', 'unnamed')} ({a.get('type', 'unknown')})" for a in attachments]
+                                logger.info(f"Email has {len(attachments)} attachments: {', '.join(attachment_info)}")
+                                
+                                # Log attachment details without the content (which could be large)
+                                for i, attachment in enumerate(attachments):
+                                    attachment_copy = attachment.copy()
+                                    if "content" in attachment_copy:
+                                        content_length = len(attachment_copy["content"]) if attachment_copy["content"] else 0
+                                        attachment_copy["content"] = f"[Binary data, {content_length} bytes]"
+                                    _safely_log_payload(attachment_copy, f"Attachment {i+1} Details")
+                            else:
+                                # Handle case where attachments might be a string or other non-list/dict type
+                                logger.warning(f"Unexpected attachments format: {type(attachments).__name__}. Converting to proper format.")
+                                _safely_log_payload(attachments, "Raw attachments data")
+                                
+                                # Try to convert to a proper format if it's a string that might be JSON
+                                if isinstance(attachments, str):
+                                    try:
+                                        parsed_attachments = json.loads(attachments)
+                                        if isinstance(parsed_attachments, list):
+                                            attachments = parsed_attachments
+                                            logger.info(f"Successfully parsed attachments string to list of {len(attachments)} items")
+                                        else:
+                                            logger.warning("Parsed attachments is not a list, creating empty attachments list")
+                                            attachments = []
+                                    except json.JSONDecodeError:
+                                        logger.warning("Could not parse attachments string as JSON, creating empty attachments list")
+                                        attachments = []
+                                else:
+                                    logger.warning("Attachments is not a list or string, creating empty attachments list")
+                                    attachments = []
                         
                         # Get and process headers to convert any list values to strings
                         headers = msg.get("headers", {})
