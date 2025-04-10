@@ -97,3 +97,6 @@ Thumbs.db
 
 # Files from git status
 data/
+
+# Environment
+.env.postgres
