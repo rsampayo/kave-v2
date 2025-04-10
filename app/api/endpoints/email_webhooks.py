@@ -298,9 +298,18 @@ async def receive_mandrill_webhook(
                 try:
                     # Format the event to match what our parse_webhook expects
                     if "msg" in event:
+                        # Map 'inbound' event type to 'inbound_email' if needed
+                        event_type = event.get("event", "inbound_email")
+                        # For Mandrill 'inbound' events, ensure we use a compatible event type
+                        if event_type == "inbound":
+                            event_type = "inbound_email"
+                            
+                        # Log the event details for troubleshooting
+                        logger.info(f"Processing Mandrill event: {event_type} with ID: {event.get('_id', '')}")
+                            
                         # Mandrill typically has 'msg' containing the email data
                         formatted_event = {
-                            "event": event.get("event", "inbound_email"),
+                            "event": event_type,
                             "webhook_id": event.get("_id", f"mandrill_{processed_count}"),
                             "timestamp": event.get("ts", ""),
                             "data": {

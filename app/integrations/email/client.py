@@ -38,6 +38,7 @@ class MailchimpClient:
         )
         self.valid_events = [
             "inbound_email",
+            "inbound",
             "subscribe",
             "unsubscribe",
             "profile",
