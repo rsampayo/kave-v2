@@ -15,15 +15,15 @@ from datetime import datetime
 import aioboto3
 from botocore.exceptions import ClientError
 
+# Import settings from the app to use the same environment variables
+from app.core.config import settings
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
-
-# Import settings from the app to use the same environment variables
-from app.core.config import settings
 
 
 async def test_s3_connection() -> bool:

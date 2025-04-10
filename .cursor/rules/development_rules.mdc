@@ -20,6 +20,10 @@ This document outlines the mandatory development workflow for this FastAPI proje
 - **Incremental Development**: Build features and fix bugs in small, testable, working increments.
 - **Maintain Stability**: Manage dependencies carefully using pinned versions and controlled updates.
 
+## ⚙️ Minimal Changes Policy
+**MAKE ONLY THE MINIMUM CHANGES REQUIRED TO ACCOMPLISH YOUR TASK. DO NOT MAKE ANY IMPROVEMENTS, REFACTORING OR CHANGES THAT ARE NOT EXPLICITLY REQUESTED.**
+
+
 ## 🧪 Test-Driven Development (TDD) Workflow
 
 ### The TDD Cycle (Red-Green-Refactor):

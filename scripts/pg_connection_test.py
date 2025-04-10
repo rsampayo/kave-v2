@@ -44,7 +44,7 @@ async def test_postgres_connection(database_url: str = None) -> bool:
     """Test PostgreSQL connection using SQLAlchemy.
 
     Args:
-        database_url: The database URL to connect to, defaults to environment value or test value
+        database_url: Database URL to connect to, defaults to env value or test value
 
     Returns:
         bool: True if the connection is successful, False otherwise
@@ -58,9 +58,9 @@ async def test_postgres_connection(database_url: str = None) -> bool:
         logger.info("Converted postgres:// URL to postgresql:// format")
 
     try:
-        logger.info(
-            f"Testing connection to: {db_url.split('@')[1] if '@' in db_url else '[Redacted URL]'}"
-        )
+        # Log just the host part of the URL or a placeholder for privacy
+        connection_info = db_url.split("@")[1] if "@" in db_url else "[Redacted URL]"
+        logger.info(f"Testing connection to: {connection_info}")
 
         # Create engine
         engine = create_async_engine(db_url, echo=False)

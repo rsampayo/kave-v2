@@ -62,21 +62,40 @@ target_metadata = Base.metadata
 
 **Implementation Note**: Created initial migration to capture the existing schema. Then added a test migration that adds a `test_column` to the `Email` model to verify the migration system works correctly. Used `alembic stamp head` to mark the initial migration as applied since the tables already existed.
 
-## 2. Create Root Requirements.txt File ✅
+## 2. Set Up Requirements Files with pip-tools ✅
 
-Heroku looks for a requirements.txt file in the root directory.
+Heroku looks for a requirements.txt file in the root directory. We've implemented a structured dependency management approach using pip-tools.
 
-### 2.1. Create a new requirements.txt file in the project root ✅
+### 2.1. Implement pip-tools dependency management ✅
 
 ```bash
-# Option 1: Reference existing requirements files
--r requirements/base.txt
--r requirements/integrations.txt
+# Install pip-tools
+pip install pip-tools
 
-# Option 2: Copy/consolidate all dependencies into a single file
+# Create source .in files
+touch requirements/base.in
+touch requirements/integrations.in
+touch requirements/dev.in
+
+# Populate .in files with direct dependencies
+# (See requirements/base.in, requirements/integrations.in, requirements/dev.in)
+
+# Generate pinned .txt files 
+pip-compile requirements/base.in --output-file=requirements/base.txt
+pip-compile requirements/integrations.in --output-file=requirements/integrations.txt
+pip-compile requirements/dev.in --output-file=requirements/dev.txt
 ```
 
-**Implementation Note**: Created a consolidated requirements.txt file by combining the contents of requirements/base.txt and requirements/integrations.txt into a single file in the project root.
+**Implementation Note**: Created a structured dependency management system using pip-tools. The root `requirements.txt` now references `requirements/integrations.txt` to ensure Heroku installs all the necessary production dependencies with pinned versions. This approach follows best practices for Python dependency management as detailed in `DEPENDENCY_MANAGEMENT.md`.
+
+### 2.2. Create a root requirements.txt file for Heroku ✅
+
+```bash
+# Create a simple root requirements.txt that references the integrations.txt file
+echo "-r requirements/integrations.txt" > requirements.txt
+```
+
+**Implementation Note**: Updated the root requirements.txt file to reference requirements/integrations.txt instead of duplicating all dependencies, which is cleaner and easier to maintain.
 
 ## 3. Configure PostgreSQL for Production ✅
 
