@@ -5,6 +5,7 @@ Contains FastAPI routes for handling webhook requests from MailChimp.
 
 import logging
 from typing import Any, Dict, List, Union
+import time
 
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import JSONResponse
@@ -269,6 +270,13 @@ async def receive_mandrill_webhook(
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
         
+        # Log complete raw body for debugging in Heroku
+        try:
+            raw_body_text = raw_body.decode('utf-8')
+            logger.info(f"COMPLETE MANDRILL PAYLOAD: {raw_body_text}")
+        except Exception as decode_err:
+            logger.warning(f"Could not decode raw body as UTF-8: {str(decode_err)}")
+            
         # Log body size for debugging
         logger.debug(f"Mandrill webhook body size: {len(raw_body)} bytes")
         
@@ -290,6 +298,10 @@ async def receive_mandrill_webhook(
                     try:
                         body = json.loads(mandrill_events)
                         logger.info(f"Successfully parsed Mandrill events JSON. Event count: {len(body) if isinstance(body, list) else 1}")
+                        
+                        # Log the complete parsed structure for debugging
+                        logger.info(f"COMPLETE PARSED MANDRILL EVENTS: {body}")
+                        
                     except Exception as form_err:
                         logger.error(f"Failed to parse mandrill_events: {str(form_err)}")
                         return JSONResponse(
@@ -368,6 +380,9 @@ async def receive_mandrill_webhook(
                     event_id = event.get("_id", f"unknown_{event_index}")
                     logger.info(f"Processing Mandrill event {event_index+1}/{event_count}: type={event_type}, id={event_id}")
                     
+                    # Log complete event for debugging
+                    logger.info(f"COMPLETE MANDRILL EVENT {event_index+1}: {event}")
+                    
                     # Format the event to match what our parse_webhook expects
                     if "msg" in event:
                         # Map 'inbound' event type to 'inbound_email' if needed
@@ -378,13 +393,40 @@ async def receive_mandrill_webhook(
                         msg = event.get("msg", {})
                         subject = msg.get("subject", "")[:50]  # Limit long subjects
                         from_email = msg.get("from_email", "")
-                        logger.info(f"Email details - From: {from_email}, Subject: {subject}")
+                        
+                        # Extract to_email from potential nested array format
+                        to_email = msg.get("email", "")  # Default to the email field
+                        # Check for Mandrill's nested array format for 'to' field
+                        to_field = msg.get("to", [])
+                        if isinstance(to_field, list) and len(to_field) > 0:
+                            # to field is often [["email@example.com", null]] in Mandrill
+                            if isinstance(to_field[0], list) and len(to_field[0]) > 0:
+                                if to_field[0][0]:  # First item in first array is email
+                                    to_email = to_field[0][0]
+                            elif isinstance(to_field[0], str):  # or just ["email@example.com"]
+                                to_email = to_field[0]
+
+                        logger.info(f"Email details - From: {from_email}, To: {to_email}, Subject: {subject}")
                         
                         # Log attachment info
                         attachments = msg.get("attachments", [])
+                        
+                        # Validate attachment format
+                        valid_attachments = []
                         if attachments:
-                            attachment_info = [f"{a.get('name', 'unnamed')} ({a.get('type', 'unknown')})" for a in attachments]
-                            logger.info(f"Email has {len(attachments)} attachments: {', '.join(attachment_info)}")
+                            for attach in attachments:
+                                # Check if attachment is a dictionary with required fields
+                                if isinstance(attach, dict) and "name" in attach and "type" in attach:
+                                    valid_attachments.append(attach)
+                                else:
+                                    logger.warning(f"Skipping invalid attachment format: {attach}")
+                            
+                            if valid_attachments:
+                                attachment_info = [f"{a.get('name', 'unnamed')} ({a.get('type', 'unknown')})" for a in valid_attachments]
+                                logger.info(f"Email has {len(valid_attachments)} valid attachments: {', '.join(attachment_info)}")
+                            
+                            if len(valid_attachments) < len(attachments):
+                                logger.warning(f"Skipped {len(attachments) - len(valid_attachments)} invalid attachments")
                         
                         # Get and process headers to convert any list values to strings
                         headers = msg.get("headers", {})
@@ -395,6 +437,24 @@ async def receive_mandrill_webhook(
                         important_headers = ["message-id", "date", "to", "from", "subject"]
                         found_headers = {k: processed_headers.get(k) for k in important_headers if k.lower() in map(str.lower, processed_headers.keys())}
                         logger.debug(f"Processed {header_count} headers, important headers: {found_headers}")
+                        
+                        # Extract message ID, first from _id, then from headers if not available
+                        message_id = msg.get("_id", "")
+                        if not message_id:
+                            # Try to get message-id from headers (case-insensitive)
+                            for key, value in processed_headers.items():
+                                if key.lower() == "message-id":
+                                    message_id = value
+                                    break
+                            
+                            if not message_id:
+                                # Generate a fallback ID to avoid database issues
+                                message_id = f"mandrill-{event_id}-{int(time.time())}"
+                                logger.warning(f"No message ID found in email, generated fallback ID: {message_id}")
+                            else:
+                                logger.info(f"Using message-id from headers: {message_id}")
+                        else:
+                            logger.info(f"Using _id as message_id: {message_id}")
                             
                         # Mandrill typically has 'msg' containing the email data
                         formatted_event = {
@@ -402,18 +462,21 @@ async def receive_mandrill_webhook(
                             "webhook_id": event_id,
                             "timestamp": event.get("ts", ""),
                             "data": {
-                                "message_id": msg.get("_id", ""),
+                                "message_id": message_id,
                                 "from_email": from_email,
                                 "from_name": msg.get("from_name", ""),
-                                "to_email": msg.get("email", ""),
+                                "to_email": to_email,  # Use extracted to_email
                                 "subject": subject,
                                 "body_plain": msg.get("text", ""),
                                 "body_html": msg.get("html", ""),
                                 "headers": processed_headers,
-                                "attachments": attachments,
+                                "attachments": valid_attachments,  # Use validated attachments
                             }
                         }
                         
+                        # Add more debug logging before processing
+                        logger.debug(f"Formatted event for processing: {formatted_event}")
+
                         # Process the webhook data
                         webhook_data = await client.parse_webhook(formatted_event)
                         await email_service.process_webhook(webhook_data)

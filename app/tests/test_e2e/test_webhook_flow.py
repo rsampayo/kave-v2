@@ -190,5 +190,5 @@ async def test_webhook_e2e_invalid_data(app: FastAPI, webhook_signature: str) ->
             )
 
     # THEN - Check that the request was handled with an error
-    assert response.status_code == 500  # Internal Server Error
+    assert response.status_code == 400  # Bad Request
     assert "error" in response.json()["status"].lower()
