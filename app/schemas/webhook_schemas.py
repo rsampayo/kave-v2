@@ -17,7 +17,7 @@ class EmailAttachment(BaseModel):
 
 
 class InboundEmailData(BaseModel):
-    """Schema representing the parsed email data from a MailChimp webhook."""
+    """Schema representing the parsed email data from a webhook."""
 
     message_id: str = Field(
         ...,
@@ -35,14 +35,14 @@ class InboundEmailData(BaseModel):
     )
 
 
-class MailchimpWebhook(BaseModel):
-    """Schema for incoming MailChimp webhook payload."""
+class WebhookData(BaseModel):
+    """Schema for incoming email webhook payload."""
 
     webhook_id: str = Field(..., description="Unique identifier for the webhook event")
     event: str = Field(..., description="Type of event that triggered the webhook")
     timestamp: datetime = Field(..., description="When the event occurred")
 
-    # MailChimp-specific fields for different event types
+    # Email-specific fields for different event types
     data: InboundEmailData = Field(
         ...,
         description="The email data payload",
@@ -80,6 +80,10 @@ class MailchimpWebhook(BaseModel):
             }
         }
     )
+
+
+# Backwards compatibility alias
+MailchimpWebhook = WebhookData
 
 
 class WebhookResponse(BaseModel):

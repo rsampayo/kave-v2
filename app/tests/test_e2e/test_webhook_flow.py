@@ -83,7 +83,7 @@ async def test_webhook_e2e_flow(app: FastAPI, webhook_signature: str) -> None:
         # Setup the patches we need for the test
         with (
             mock.patch(
-                "app.integrations.email.client.MailchimpClient."
+                "app.integrations.email.client.WebhookClient."
                 "verify_webhook_signature",
                 return_value=True,
             ),
@@ -109,7 +109,7 @@ async def test_webhook_e2e_flow(app: FastAPI, webhook_signature: str) -> None:
             ) as client:
                 # WHEN - Send a POST request to the webhook endpoint
                 response = await client.post(
-                    "/webhooks/mailchimp",
+                    "/webhooks/mandrill",
                     json=webhook_payload,
                     headers={"X-Mailchimp-Signature": webhook_signature},
                 )
@@ -147,7 +147,7 @@ async def test_webhook_e2e_invalid_signature(
 
     # Setup signature verification to fail
     with mock.patch(
-        "app.integrations.email.client.MailchimpClient.verify_webhook_signature",
+        "app.integrations.email.client.WebhookClient.verify_webhook_signature",
         return_value=False,
     ):
         # WHEN - Send a POST request to the webhook endpoint
@@ -155,7 +155,7 @@ async def test_webhook_e2e_invalid_signature(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
             response = await client.post(
-                "/webhooks/mailchimp",
+                "/webhooks/mandrill",
                 json=webhook_payload,
                 headers={"X-Mailchimp-Signature": "invalid_signature"},
             )
@@ -173,7 +173,7 @@ async def test_webhook_e2e_invalid_data(app: FastAPI, webhook_signature: str) ->
 
     # Bypass signature verification
     with mock.patch(
-        "app.integrations.email.client.MailchimpClient.verify_webhook_signature",
+        "app.integrations.email.client.WebhookClient.verify_webhook_signature",
         return_value=True,
     ):
         # WHEN - Send a POST request with invalid data
@@ -181,7 +181,7 @@ async def test_webhook_e2e_invalid_data(app: FastAPI, webhook_signature: str) ->
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
             response = await client.post(
-                "/webhooks/mailchimp",
+                "/webhooks/mandrill",
                 content=invalid_data,
                 headers={
                     "X-Mailchimp-Signature": webhook_signature,

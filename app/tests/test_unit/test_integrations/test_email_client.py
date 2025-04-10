@@ -1,4 +1,4 @@
-"""Unit tests for the MailchimpClient."""
+"""Unit tests for the WebhookClient."""
 
 import hashlib
 import hmac
@@ -7,18 +7,18 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi import HTTPException, Request
 
-from app.integrations.email.client import MailchimpClient
-from app.schemas.webhook_schemas import MailchimpWebhook
+from app.integrations.email.client import WebhookClient
+from app.schemas.webhook_schemas import WebhookData
 
 
-def test_mailchimp_client_init() -> None:
-    """Test MailchimpClient initialization."""
+def test_webhook_client_init() -> None:
+    """Test WebhookClient initialization."""
     # Test data
     api_key = "test_api_key"
     webhook_secret = "test_webhook_secret"
 
     # Initialize client
-    client = MailchimpClient(api_key=api_key, webhook_secret=webhook_secret)
+    client = WebhookClient(api_key=api_key, webhook_secret=webhook_secret)
 
     # Verify
     assert client.api_key == api_key
@@ -46,7 +46,7 @@ async def test_verify_webhook_signature_valid() -> None:
     mock_request.body = AsyncMock(return_value=request_body)
 
     # Initialize client
-    client = MailchimpClient(api_key="test_api_key", webhook_secret=webhook_secret)
+    client = WebhookClient(api_key="test_api_key", webhook_secret=webhook_secret)
 
     # Verify signature
     result = await client.verify_webhook_signature(mock_request)
@@ -69,7 +69,7 @@ async def test_verify_webhook_signature_invalid() -> None:
     mock_request.body = AsyncMock(return_value=request_body)
 
     # Initialize client
-    client = MailchimpClient(api_key="test_api_key", webhook_secret=webhook_secret)
+    client = WebhookClient(api_key="test_api_key", webhook_secret=webhook_secret)
 
     # Verify signature
     result = await client.verify_webhook_signature(mock_request)
@@ -84,19 +84,22 @@ async def test_verify_webhook_signature_missing() -> None:
     """Test signature verification with missing signature."""
     # Test data
     webhook_secret = "test_webhook_secret"
+    request_body = b'{"test":"data"}'
 
     # Mock request with no signature
     mock_request = AsyncMock(spec=Request)
     mock_request.headers = {}
+    mock_request.body = AsyncMock(return_value=request_body)
 
     # Initialize client
-    client = MailchimpClient(api_key="test_api_key", webhook_secret=webhook_secret)
+    client = WebhookClient(api_key="test_api_key", webhook_secret=webhook_secret)
 
     # Verify signature
     result = await client.verify_webhook_signature(mock_request)
 
     # Assertions
-    assert result is True  # Changed from False to True since we now skip verification
+    assert result is True  # We allow webhooks without signatures now
+    # The body should not be accessed if no signature is provided
     mock_request.body.assert_not_called()
 
 
@@ -107,7 +110,7 @@ async def test_verify_webhook_signature_no_secret() -> None:
     mock_request = AsyncMock(spec=Request)
 
     # Initialize client with no webhook secret
-    client = MailchimpClient(api_key="test_api_key", webhook_secret="")
+    client = WebhookClient(api_key="test_api_key", webhook_secret="")
 
     # Verify signature
     result = await client.verify_webhook_signature(mock_request)
@@ -141,15 +144,15 @@ async def test_parse_webhook_valid() -> None:
     mock_request.json = AsyncMock(return_value=webhook_data)
 
     # Mock verify_webhook_signature to return True
-    with patch.object(MailchimpClient, "verify_webhook_signature", return_value=True):
+    with patch.object(WebhookClient, "verify_webhook_signature", return_value=True):
         # Initialize client
-        client = MailchimpClient(api_key="test_api_key", webhook_secret="test_secret")
+        client = WebhookClient(api_key="test_api_key", webhook_secret="test_secret")
 
         # Parse webhook
         result = await client.parse_webhook(mock_request)
 
         # Assertions
-        assert isinstance(result, MailchimpWebhook)
+        assert isinstance(result, WebhookData)
         assert result.webhook_id == webhook_data["webhook_id"]
         assert result.event == webhook_data["event"]
 
@@ -166,16 +169,16 @@ async def test_parse_webhook_invalid_signature() -> None:
     mock_request.json = AsyncMock(return_value={"data": {}})  # Minimal valid data
 
     # Mock verify_webhook_signature to return False
-    with patch.object(MailchimpClient, "verify_webhook_signature", return_value=False):
+    with patch.object(WebhookClient, "verify_webhook_signature", return_value=False):
         # Initialize client
-        client = MailchimpClient(api_key="test_api_key", webhook_secret="test_secret")
+        client = WebhookClient(api_key="test_api_key", webhook_secret="test_secret")
 
         # Now we expect the function to continue processing despite invalid signature
         try:
             result = await client.parse_webhook(mock_request)
             assert result is not None
-            # Verify that we get a valid MailchimpWebhook object
-            assert isinstance(result, MailchimpWebhook)
+            # Verify that we get a valid WebhookData object
+            assert isinstance(result, WebhookData)
         except HTTPException as e:
             # If exception is raised, it should be for a different reason
             # than the signature
@@ -192,9 +195,9 @@ async def test_parse_webhook_invalid_payload() -> None:
     mock_request.json = AsyncMock(return_value={"invalid": "data"})
 
     # Mock verify_webhook_signature to return True
-    with patch.object(MailchimpClient, "verify_webhook_signature", return_value=True):
+    with patch.object(WebhookClient, "verify_webhook_signature", return_value=True):
         # Initialize client
-        client = MailchimpClient(api_key="test_api_key", webhook_secret="test_secret")
+        client = WebhookClient(api_key="test_api_key", webhook_secret="test_secret")
 
         # Assert that HTTPException is raised
         with pytest.raises(HTTPException) as excinfo:
@@ -230,17 +233,17 @@ async def test_parse_webhook_valid_with_type() -> None:
     mock_request.json = AsyncMock(return_value=webhook_data)
 
     # Mock verify_webhook_signature to return True
-    with patch.object(MailchimpClient, "verify_webhook_signature", return_value=True):
+    with patch.object(WebhookClient, "verify_webhook_signature", return_value=True):
         # Initialize client
-        client = MailchimpClient(api_key="test_api_key", webhook_secret="test_secret")
+        client = WebhookClient(api_key="test_api_key", webhook_secret="test_secret")
 
         # Parse webhook
         result = await client.parse_webhook(mock_request)
 
         # Assertions
-        assert isinstance(result, MailchimpWebhook)
+        assert isinstance(result, WebhookData)
         assert result.webhook_id == webhook_data["webhook_id"]
         assert result.event == webhook_data["event"]
-        # Type isn't a standard field in MailchimpWebhook, so we don't check it
+        # Type isn't a standard field in WebhookData, so we don't check it
         message_id = webhook_data["data"]["message_id"]  # type: ignore[index]
         assert result.data.message_id == message_id

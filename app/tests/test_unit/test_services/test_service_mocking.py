@@ -56,8 +56,8 @@ async def test_async_mock_factory_usage(async_mock_factory: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_mailchimp_client_mocking(mock_mailchimp_client: AsyncMock) -> None:
-    """Test and demonstrate the standard pattern for mocking MailchimpClient."""
+async def test_webhook_client_mocking(mock_webhook_client: AsyncMock) -> None:
+    """Test and demonstrate the standard pattern for mocking WebhookClient."""
     # Configure the mock for the test case
     webhook_data = {
         "event": "inbound_email",
@@ -67,21 +67,21 @@ async def test_mailchimp_client_mocking(mock_mailchimp_client: AsyncMock) -> Non
     }
 
     # Set up the mock to return True for verify_webhook_signature
-    mock_mailchimp_client.verify_webhook_signature.return_value = True
+    mock_webhook_client.verify_webhook_signature.return_value = True
 
     # Configure parse_webhook to return the expected result
-    mock_mailchimp_client.parse_webhook.return_value = webhook_data
+    mock_webhook_client.parse_webhook.return_value = webhook_data
 
     # Use the mock client - verify signature
-    is_valid = await mock_mailchimp_client.verify_webhook_signature("valid-signature")
+    is_valid = await mock_webhook_client.verify_webhook_signature("valid-signature")
     assert is_valid is True
 
     # Use the mock client - parse webhook
-    result = await mock_mailchimp_client.parse_webhook(webhook_data)
+    result = await mock_webhook_client.parse_webhook(webhook_data)
 
     # Verify expected behavior
     assert result == webhook_data
-    mock_mailchimp_client.parse_webhook.assert_awaited_once_with(webhook_data)
+    mock_webhook_client.parse_webhook.assert_awaited_once_with(webhook_data)
 
 
 @pytest.mark.asyncio
@@ -146,7 +146,8 @@ async def test_settings_mocking() -> None:
         PROJECT_NAME="Test Project",
         DATABASE_URL="sqlite+aiosqlite:///:memory:",
         SECRET_KEY="test-secret-key",
-        MAILCHIMP_API_KEY="test-api-key",
+        MAILCHIMP_API_KEY="test-api-key",  # API key for email service
+        # Webhook secret for verifying signatures
         MAILCHIMP_WEBHOOK_SECRET="test-webhook-secret",
     )
 

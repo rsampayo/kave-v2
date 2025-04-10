@@ -355,7 +355,7 @@ async def test_webhook_endpoint_ping(
 
     # Send the webhook request
     response = await async_client.post(
-        "/webhooks/mailchimp",
+        "/webhooks/mandrill",
         headers={"X-Mailchimp-Signature": "test-signature"},
         json=ping_payload,
     )

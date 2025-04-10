@@ -48,11 +48,11 @@ def test_openapi_schema_completeness() -> None:
 
     # Check for webhook endpoint in paths
     assert (
-        "/webhooks/mailchimp" in openapi_schema["paths"]
+        "/webhooks/mandrill" in openapi_schema["paths"]
     ), "Webhook endpoint not found in OpenAPI schema"
 
     # Check that the webhook endpoint has the expected operations
-    webhook_endpoint = openapi_schema["paths"]["/webhooks/mailchimp"]
+    webhook_endpoint = openapi_schema["paths"]["/webhooks/mandrill"]
     assert "post" in webhook_endpoint, "POST operation missing from webhook endpoint"
 
     # Check response descriptions
@@ -116,7 +116,7 @@ def test_webhook_response_schemas() -> None:
     )
 
     # Get the webhook endpoint
-    webhook_endpoint = openapi_schema["paths"]["/webhooks/mailchimp"]
+    webhook_endpoint = openapi_schema["paths"]["/webhooks/mandrill"]
     post_operation = webhook_endpoint["post"]
 
     # Check response content

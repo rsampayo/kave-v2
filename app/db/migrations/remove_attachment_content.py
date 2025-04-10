@@ -7,7 +7,6 @@ backward compatibility, but new code should not rely on it being populated.
 """
 
 import logging
-from typing import Any, Optional
 
 from sqlalchemy import Column, LargeBinary, MetaData, Table, text
 from sqlalchemy.ext.asyncio import AsyncEngine

@@ -5,9 +5,7 @@ Run it after the database schema migration is complete.
 """
 
 import asyncio
-import base64
 import logging
-from typing import List
 
 from sqlalchemy import select
 

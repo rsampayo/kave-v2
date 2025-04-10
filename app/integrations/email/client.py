@@ -7,7 +7,7 @@ from fastapi import HTTPException, Request, status
 
 from app.core.config import settings
 from app.integrations.email.models import MailchimpWebhook as MailchimpWebhookModel
-from app.schemas.webhook_schemas import MailchimpWebhook
+from app.schemas.webhook_schemas import WebhookData
 
 logger = logging.getLogger(__name__)
 
@@ -15,18 +15,18 @@ logger = logging.getLogger(__name__)
 WebhookRequestType = Union[Request, Dict[str, Any], str, None]
 
 
-class MailchimpClient:
-    """Client for interacting with MailChimp API and webhooks."""
+class WebhookClient:
+    """Client for interacting with Email API and webhooks."""
 
     def __init__(
         self, api_key: str, webhook_secret: str, server_prefix: Optional[str] = None
     ):
-        """Initialize the MailChimp client.
+        """Initialize the Webhook client.
 
         Args:
-            api_key: MailChimp API key
+            api_key: API key
             webhook_secret: Secret for validating webhooks
-            server_prefix: MailChimp server prefix (e.g., 'us1')
+            server_prefix: Server prefix (e.g., 'us1')
         """
         self.api_key = api_key
         self.webhook_secret = webhook_secret
@@ -52,7 +52,7 @@ class MailchimpClient:
         """Extract server prefix from API key.
 
         Args:
-            api_key: MailChimp API key
+            api_key: API key
 
         Returns:
             str: Server prefix (e.g., 'us1')
@@ -188,14 +188,14 @@ class MailchimpClient:
 
     async def parse_webhook(
         self, request: Union[Request, Dict[str, Any]]
-    ) -> MailchimpWebhook:
-        """Parse and validate a webhook from MailChimp.
+    ) -> WebhookData:
+        """Parse and validate a webhook.
 
         Args:
             request: The request object (FastAPI Request or dict for tests)
 
         Returns:
-            MailchimpWebhook: The parsed webhook data
+            WebhookData: The parsed webhook data
 
         Raises:
             HTTPException: If parsing fails
@@ -214,7 +214,7 @@ class MailchimpClient:
                     # Map fired_at to timestamp (required field in schema)
                     if "fired_at" in model_data and "timestamp" not in model_data:
                         model_data["timestamp"] = model_data["fired_at"]
-                    return MailchimpWebhook(**model_data)
+                    return WebhookData(**model_data)
 
                 # Normal validation
                 await self._validate_webhook_data(request)
@@ -226,7 +226,7 @@ class MailchimpClient:
                 elif "fired_at" not in webhook_data and "timestamp" in webhook_data:
                     webhook_data["fired_at"] = webhook_data["timestamp"]
 
-                return MailchimpWebhook(**webhook_data)
+                return WebhookData(**webhook_data)
 
             # Parse the request body for FastAPI Request objects
             body = await request.json()
@@ -240,7 +240,7 @@ class MailchimpClient:
             elif "fired_at" not in webhook_data and "timestamp" in webhook_data:
                 webhook_data["fired_at"] = webhook_data["timestamp"]
 
-            return MailchimpWebhook(**webhook_data)
+            return WebhookData(**webhook_data)
         except HTTPException:
             # Re-raise HTTP exceptions
             raise
@@ -264,17 +264,34 @@ class MailchimpClient:
         return all(field in attachment for field in required_fields)
 
 
-# Default client instance using settings
-mailchimp_client = MailchimpClient(
-    api_key=settings.MAILCHIMP_API_KEY,
-    webhook_secret=settings.MAILCHIMP_WEBHOOK_SECRET,
-)
-
-
-def get_mailchimp_client() -> MailchimpClient:
-    """Get the MailChimp client instance for dependency injection.
+# Dependency for getting the webhook client
+def get_webhook_client() -> WebhookClient:
+    """Get an instance of the WebhookClient for dependency injection.
 
     Returns:
-        MailchimpClient: The default client instance
+        WebhookClient: An instantiated client instance
     """
-    return mailchimp_client
+    return WebhookClient(
+        api_key=settings.MAILCHIMP_API_KEY,
+        webhook_secret=settings.MAILCHIMP_WEBHOOK_SECRET,
+        server_prefix=None,
+    )
+
+
+# For backward compatibility with tests that haven't been updated yet
+def get_mailchimp_client() -> WebhookClient:
+    """Deprecated: Get an instance of the WebhookClient for dependency injection.
+
+    Will be removed in a future release.
+
+    Returns:
+        WebhookClient: An instantiated client instance
+    """
+    return get_webhook_client()
+
+
+# Singleton instance for simple access
+webhook_client = get_webhook_client()
+
+# For backward compatibility with tests that haven't been updated yet
+mailchimp_client = webhook_client

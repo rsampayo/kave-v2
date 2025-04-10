@@ -17,7 +17,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.db.session import Base
-from app.integrations.email.client import MailchimpClient
+from app.integrations.email.client import WebhookClient
 from app.main import create_application
 
 
@@ -165,12 +165,20 @@ async def async_client(app: FastAPI) -> AsyncGenerator[httpx.AsyncClient, None]:
 
 
 @pytest_asyncio.fixture
-async def mock_mailchimp_client() -> AsyncGenerator[mock.AsyncMock, None]:
-    """Provide a mocked MailchimpClient for testing."""
-    client = mock.AsyncMock(spec=MailchimpClient)
+async def mock_webhook_client() -> AsyncGenerator[mock.AsyncMock, None]:
+    """Provide a mocked WebhookClient for testing."""
+    client = mock.AsyncMock(spec=WebhookClient)
     # Configure default behaviors
     client.verify_webhook_signature.return_value = True
     yield client
+
+
+# For backward compatibility
+@pytest_asyncio.fixture
+async def mock_mailchimp_client() -> AsyncGenerator[mock.AsyncMock, None]:
+    """Deprecated: Alias for mock_webhook_client for backward compatibility."""
+    async for client in mock_webhook_client():
+        yield client
 
 
 @pytest.fixture

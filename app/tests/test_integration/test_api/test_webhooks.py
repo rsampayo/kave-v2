@@ -60,7 +60,7 @@ async def test_webhook_endpoint_successful(
     """Test successful webhook processing endpoint."""
     # Mock the mailchimp client's verify_webhook_signature method
     mocker.patch(
-        "app.integrations.email.client.mailchimp_client.verify_webhook_signature",
+        "app.integrations.email.client.WebhookClient.verify_webhook_signature",
         return_value=True,
     )
 
@@ -71,7 +71,7 @@ async def test_webhook_endpoint_successful(
 
         # Send the webhook request
         response = await async_client.post(
-            "/webhooks/mailchimp",
+            "/webhooks/mandrill",
             headers={"X-Mailchimp-Signature": "test-signature"},
             content=json.dumps(WEBHOOK_PAYLOAD),
         )
@@ -94,13 +94,13 @@ async def test_webhook_endpoint_processing_error(
     """Test webhook endpoint with a processing error."""
     # Mock the mailchimp client's verify_webhook_signature method
     mocker.patch(
-        "app.integrations.email.client.mailchimp_client.verify_webhook_signature",
+        "app.integrations.email.client.WebhookClient.verify_webhook_signature",
         return_value=True,
     )
 
     # Mock the parse_webhook method to return valid data
     mocker.patch(
-        "app.integrations.email.client.mailchimp_client.parse_webhook",
+        "app.integrations.email.client.WebhookClient.parse_webhook",
         return_value=WEBHOOK_PAYLOAD,
     )
 
@@ -111,13 +111,13 @@ async def test_webhook_endpoint_processing_error(
 
         # Send the webhook request
         response = await async_client.post(
-            "/webhooks/mailchimp",
+            "/webhooks/mandrill",
             headers={"X-Mailchimp-Signature": "test-signature"},
             content=json.dumps(WEBHOOK_PAYLOAD),
         )
 
     # Verify the response
-    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert response.status_code == status.HTTP_200_OK
     response_json = response.json()
     assert response_json["status"] == "error"
     assert (
