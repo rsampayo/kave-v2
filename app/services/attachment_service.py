@@ -60,17 +60,24 @@ class AttachmentService:
             # If attachment has content, decode and save it
             if attach_data.content:
                 # Check if base64 flag is set and is False, otherwise assume it's base64 encoded
-                is_base64 = getattr(attach_data, 'base64', True)
-                
+                is_base64 = getattr(attach_data, "base64", True)
+
                 if is_base64:
                     # Decode base64 content
                     content = base64.b64decode(attach_data.content)
                 else:
                     # Content is already binary data
-                    content = attach_data.content.encode('utf-8') if isinstance(attach_data.content, str) else attach_data.content
-                
+                    content = (
+                        attach_data.content.encode("utf-8")
+                        if isinstance(attach_data.content, str)
+                        else attach_data.content
+                    )
+
                 # Log details about the attachment content
-                logger.info(f"Processing attachment '{filename}': base64={is_base64}, size={len(content)} bytes")
+                logger.info(
+                    f"Processing attachment {filename!r}: base64={is_base64}, "
+                    f"size={len(content)} bytes"
+                )
 
                 # Save to storage service (S3 or filesystem based on settings)
                 storage_uri = await self.storage.save_file(

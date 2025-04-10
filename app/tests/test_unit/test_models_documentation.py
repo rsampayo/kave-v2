@@ -134,6 +134,13 @@ def test_model_and_schema_consistency() -> None:
         "body_plain": "body_text",  # InboundEmailData.body_plain -> Email.body_text
     }
 
+    # Fields to ignore in the consistency check (schema-only fields)
+    ignore_fields = {
+        "attachments",  # Relationship field
+        "headers",  # Dictionary field
+        "base64",  # Processing flag, not stored in DB
+    }
+
     for model, schema in model_schema_pairs:
         # Get all fields from the schema
         schema_fields = schema.model_fields.keys()
@@ -148,8 +155,8 @@ def test_model_and_schema_consistency() -> None:
 
         # Check that fields in the schema have a column in the model
         for field in schema_fields:
-            # Skip relationship fields and header dictionaries
-            if field in ["attachments", "headers"]:
+            # Skip fields that should be ignored
+            if field in ignore_fields:
                 continue
 
             # Check if we have a mapping for this field
