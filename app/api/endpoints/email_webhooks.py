@@ -346,7 +346,9 @@ def _format_event(
     attachments = msg.get("attachments", [])
     normalized_attachments = _normalize_attachments(attachments)
 
+    # Log attachment details without modifying the original content
     for i, attachment in enumerate(normalized_attachments):
+        # Create a deep copy for logging so we don't modify the original
         attachment_copy = attachment.copy()
         if "content" in attachment_copy:
             content_length = (
@@ -412,17 +414,22 @@ def _format_event(
 
     # Log the formatted event that will be processed
     formatted_event_copy = formatted_event.copy()
-    if "attachments" in formatted_event_copy.get("data", {}):
+    formatted_event_copy["data"] = formatted_event_copy["data"].copy()
+    
+    if "attachments" in formatted_event_copy["data"]:
+        # Create a copy of the attachments list to avoid modifying the original
+        formatted_event_copy["data"]["attachments"] = [
+            attachment.copy() for attachment in formatted_event_copy["data"]["attachments"]
+        ]
+        
         for attachment in formatted_event_copy["data"]["attachments"]:
             if "content" in attachment:
                 content_length = (
                     len(attachment["content"]) if attachment["content"] else 0
                 )
                 attachment["content"] = f"[Binary data, {content_length} bytes]"
-    _safely_log_payload(
-        formatted_event_copy,
-        f"Mandrill Event {event_index+1} Formatted for Processing",
-    )
+                
+    _safely_log_payload(formatted_event_copy, f"Mandrill Event {event_index+1} Formatted for Processing (JSON)")
 
     return formatted_event
 
