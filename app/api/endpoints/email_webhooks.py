@@ -3,6 +3,7 @@
 Contains FastAPI routes for handling webhook requests from MailChimp.
 """
 
+import json
 import logging
 from typing import Any, Dict, List, Union
 
@@ -192,6 +193,35 @@ def _process_mandrill_headers(headers: Dict[str, Any]) -> Dict[str, str]:
     return processed_headers
 
 
+def _safely_log_payload(payload: Any, label: str) -> None:
+    """Safely log a payload in a structured way.
+    
+    Args:
+        payload: The payload to log
+        label: A label for the log message
+    """
+    try:
+        if isinstance(payload, bytes):
+            # Try to decode as utf-8 first
+            try:
+                text_payload = payload.decode("utf-8")
+                logger.info(f"{label} (decoded): {text_payload}")
+            except UnicodeDecodeError:
+                # If we can't decode, log the hex representation
+                logger.info(f"{label} (bytes hex): {payload.hex()}")
+                # Also log the raw bytes as a fallback
+                logger.info(f"{label} (raw bytes): {payload}")
+        elif isinstance(payload, (dict, list)):
+            # Format JSON for better readability
+            formatted_json = json.dumps(payload, indent=2)
+            logger.info(f"{label} (JSON): {formatted_json}")
+        else:
+            # Log as string for anything else
+            logger.info(f"{label}: {payload}")
+    except Exception as e:
+        logger.error(f"Error logging {label}: {str(e)}")
+
+
 @router.post(
     "/mandrill",
     status_code=status.HTTP_202_ACCEPTED,
@@ -256,6 +286,11 @@ async def receive_mandrill_webhook(
             - 500 INTERNAL SERVER ERROR for processing errors
     """
     try:
+        # Log all request headers for troubleshooting
+        logger.info("======= MANDRILL WEBHOOK RECEIVED =======")
+        headers_dict = dict(request.headers.items())
+        _safely_log_payload(headers_dict, "Mandrill Request Headers")
+        
         # Log the content type for debugging
         content_type = request.headers.get("content-type", "")
         logger.info(f"Mandrill webhook received with Content-Type: {content_type}")
@@ -269,8 +304,16 @@ async def receive_mandrill_webhook(
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
         
-        # Log body size for debugging
-        logger.debug(f"Mandrill webhook body size: {len(raw_body)} bytes")
+        # Log the complete raw body in different formats for maximum debugging
+        logger.info(f"Mandrill webhook body size: {len(raw_body)} bytes")
+        _safely_log_payload(raw_body, "Mandrill Raw Request Body")
+        
+        # Try to decode the raw body as string for easier viewing
+        try:
+            decoded_raw_body = raw_body.decode("utf-8")
+            logger.info(f"Mandrill Raw Body (decoded): {decoded_raw_body}")
+        except Exception as decode_err:
+            logger.warning(f"Could not decode raw body as UTF-8: {str(decode_err)}")
         
         body = None
         
@@ -279,16 +322,18 @@ async def receive_mandrill_webhook(
             logger.info("Processing Mandrill webhook as form data")
             try:
                 form_data = await request.form()
-                logger.debug(f"Form fields: {list(form_data.keys())}")
+                form_dict = {key: str(form_data[key]) for key in form_data}
+                _safely_log_payload(form_dict, "Mandrill Form Data")
                 
                 if "mandrill_events" in form_data:
                     # This is the standard Mandrill format
                     mandrill_events = form_data["mandrill_events"]
-                    logger.debug(f"Mandrill events data type: {type(mandrill_events).__name__}")
+                    logger.info(f"Mandrill events data type: {type(mandrill_events).__name__}")
+                    _safely_log_payload(mandrill_events, "Mandrill Events Raw String")
                     
-                    import json
                     try:
                         body = json.loads(mandrill_events)
+                        _safely_log_payload(body, "Mandrill Events Parsed JSON")
                         logger.info(f"Successfully parsed Mandrill events JSON. Event count: {len(body) if isinstance(body, list) else 1}")
                     except Exception as form_err:
                         logger.error(f"Failed to parse mandrill_events: {str(form_err)}")
@@ -322,6 +367,7 @@ async def receive_mandrill_webhook(
             logger.info("Attempting to process Mandrill webhook as direct JSON")
             try:
                 body = await request.json()
+                _safely_log_payload(body, "Mandrill Direct JSON Body")
                 logger.debug(f"Successfully parsed JSON body: {type(body).__name__}")
             except Exception as json_err:
                 logger.error(f"Failed to parse request as JSON: {str(json_err)}")
@@ -368,6 +414,9 @@ async def receive_mandrill_webhook(
                     event_id = event.get("_id", f"unknown_{event_index}")
                     logger.info(f"Processing Mandrill event {event_index+1}/{event_count}: type={event_type}, id={event_id}")
                     
+                    # Log the complete event data for full visibility
+                    _safely_log_payload(event, f"Mandrill Event {event_index+1} Data")
+                    
                     # Format the event to match what our parse_webhook expects
                     if "msg" in event:
                         # Map 'inbound' event type to 'inbound_email' if needed
@@ -380,16 +429,30 @@ async def receive_mandrill_webhook(
                         from_email = msg.get("from_email", "")
                         logger.info(f"Email details - From: {from_email}, Subject: {subject}")
                         
+                        # Log complete message data
+                        _safely_log_payload(msg, f"Mandrill Event {event_index+1} Message Data")
+                        
                         # Log attachment info
                         attachments = msg.get("attachments", [])
                         if attachments:
                             attachment_info = [f"{a.get('name', 'unnamed')} ({a.get('type', 'unknown')})" for a in attachments]
                             logger.info(f"Email has {len(attachments)} attachments: {', '.join(attachment_info)}")
+                            
+                            # Log attachment details without the content (which could be large)
+                            for i, attachment in enumerate(attachments):
+                                attachment_copy = attachment.copy()
+                                if "content" in attachment_copy:
+                                    content_length = len(attachment_copy["content"]) if attachment_copy["content"] else 0
+                                    attachment_copy["content"] = f"[Binary data, {content_length} bytes]"
+                                _safely_log_payload(attachment_copy, f"Attachment {i+1} Details")
                         
                         # Get and process headers to convert any list values to strings
                         headers = msg.get("headers", {})
                         header_count = len(headers) if headers else 0
                         processed_headers = _process_mandrill_headers(headers)
+                        
+                        # Log all headers
+                        _safely_log_payload(processed_headers, f"Mandrill Event {event_index+1} Headers")
                         
                         # Log some important headers
                         important_headers = ["message-id", "date", "to", "from", "subject"]
@@ -413,6 +476,15 @@ async def receive_mandrill_webhook(
                                 "attachments": attachments,
                             }
                         }
+                        
+                        # Log the formatted event that will be processed
+                        formatted_event_copy = formatted_event.copy()
+                        if "attachments" in formatted_event_copy.get("data", {}):
+                            for attachment in formatted_event_copy["data"]["attachments"]:
+                                if "content" in attachment:
+                                    content_length = len(attachment["content"]) if attachment["content"] else 0
+                                    attachment["content"] = f"[Binary data, {content_length} bytes]"
+                        _safely_log_payload(formatted_event_copy, f"Mandrill Event {event_index+1} Formatted for Processing")
                         
                         # Process the webhook data
                         webhook_data = await client.parse_webhook(formatted_event)
@@ -450,6 +522,7 @@ async def receive_mandrill_webhook(
         else:
             # Handle non-list format (unusual for Mandrill but handle it anyway)
             logger.warning("Received Mandrill webhook with non-list format, attempting to process")
+            _safely_log_payload(body, "Mandrill Non-List Format Body")
             
             # Process headers if present to handle list values
             if isinstance(body, dict) and "data" in body and "headers" in body["data"]:
