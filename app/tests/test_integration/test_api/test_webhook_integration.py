@@ -7,9 +7,11 @@ from pathlib import Path
 from typing import Any, Dict
 from unittest import mock
 
+import httpx
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, status
 from fastapi.testclient import TestClient
+from pytest_mock import MockerFixture
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +22,9 @@ from app.schemas.webhook_schemas import EmailAttachment as SchemaEmailAttachment
 from app.schemas.webhook_schemas import InboundEmailData, MailchimpWebhook
 from app.services.email_processing_service import EmailProcessingService
 from app.services.storage_service import StorageService
+
+# Path to the email service for mocking
+EMAIL_SERVICE_PATH = "app.services.email_service.EmailService"
 
 
 def create_test_webhook_payload(with_attachment: bool = False) -> Dict[str, Any]:
@@ -59,6 +64,16 @@ def create_test_webhook_payload(with_attachment: bool = False) -> Dict[str, Any]
         "event": "inbound_email",
         "timestamp": datetime.utcnow().isoformat(),
         "data": data,
+    }
+
+
+def create_ping_event() -> Dict[str, Any]:
+    """Create a test ping event payload for webhook registration."""
+    return {
+        "type": "ping",
+        "event": "ping",
+        "webhook_id": f"test_webhook_{uuid.uuid4()}",
+        "timestamp": datetime.utcnow().isoformat(),
     }
 
 
@@ -322,3 +337,32 @@ async def test_error_handling_in_service(
     result = await db_session.execute(query)
     db_email = result.scalar_one_or_none()
     assert db_email is None  # Transaction rolled back, so no email saved
+
+
+@pytest.mark.asyncio
+async def test_webhook_endpoint_ping(
+    async_client: httpx.AsyncClient, mocker: MockerFixture
+) -> None:
+    """Test webhook endpoint handling of Mailchimp ping events."""
+    # Mock the mailchimp client's verify_webhook_signature method
+    mocker.patch(
+        "app.integrations.email.client.mailchimp_client.verify_webhook_signature",
+        return_value=True,
+    )
+
+    # Create a ping event payload
+    ping_payload = create_ping_event()
+
+    # Send the webhook request
+    response = await async_client.post(
+        "/webhooks/mailchimp",
+        headers={"X-Mailchimp-Signature": "test-signature"},
+        json=ping_payload,
+    )
+
+    # Verify the response - should be 200 OK for ping events
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == {
+        "status": "success",
+        "message": "Webhook validation successful",
+    }

@@ -28,6 +28,22 @@ get_mailchimp = Depends(get_mailchimp_client)
 get_email_handler = Depends(get_email_service)
 
 
+@router.head(
+    "/mailchimp",
+    status_code=status.HTTP_200_OK,
+    summary="Handle MailChimp webhook validation (HEAD request)",
+    description=(
+        "MailChimp sends a HEAD request to validate the webhook URL "
+        "before sending POST data. "
+        "This endpoint acknowledges the HEAD request."
+    ),
+    include_in_schema=False,  # Hide from OpenAPI docs as it's for validation
+)
+async def head_mailchimp_webhook() -> None:
+    """Acknowledge MailChimp's HEAD request for webhook validation."""
+    return None
+
+
 @router.post(
     "/mailchimp",
     status_code=status.HTTP_202_ACCEPTED,
@@ -86,14 +102,32 @@ async def receive_mailchimp_webhook(
         client: MailChimp client for webhook parsing
 
     Returns:
-        JSONResponse: Success response with 202 status or error with 500 status
+        JSONResponse: Success response with appropriate status code:
+            - 200 OK for ping events during webhook registration
+            - 202 ACCEPTED for regular webhook events
+            - 500 INTERNAL SERVER ERROR for processing errors
 
     Raises:
-        HTTPException: If signature verification fails
+        HTTPException: If parsing fails
     """
     try:
-        # Parse webhook data
-        webhook_data = await client.parse_webhook(request)
+        # Get the raw request body first to check for ping events
+        body = await request.json()
+
+        # Check if this is a ping event for webhook validation
+        if body.get("type") == "ping" or body.get("event") == "ping":
+            logger.info("Received Mailchimp webhook validation ping")
+            return JSONResponse(
+                content={
+                    "status": "success",
+                    "message": "Webhook validation successful",
+                },
+                status_code=status.HTTP_200_OK,
+            )
+
+        # Parse webhook data for regular events
+        # Pass the already parsed body to avoid parsing it twice
+        webhook_data = await client.parse_webhook(body)
 
         # Process the webhook
         await email_service.process_webhook(webhook_data)

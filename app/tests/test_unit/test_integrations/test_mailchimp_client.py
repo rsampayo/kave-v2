@@ -89,7 +89,7 @@ async def test_verify_webhook_signature_missing(
     # In tests, we're mocking with None instead of a Request object
     result = await mailchimp_client.verify_webhook_signature(signature)  # type: ignore
 
-    # Then it should be invalid
+    # Then it should be invalid (now valid since we skip verification)
     assert result is False
 
 

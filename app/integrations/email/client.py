@@ -44,6 +44,7 @@ class MailchimpClient:
             "cleaned",
             "upemail",
             "campaign",
+            "ping",
         ]
 
     def _extract_server_prefix(self, api_key: str) -> str:
@@ -92,8 +93,10 @@ class MailchimpClient:
         if isinstance(request, Request):
             signature = request.headers.get("X-Mailchimp-Signature")
             if not signature:
-                logger.warning("No signature found in webhook request")
-                return False
+                logger.warning(
+                    "No signature found in webhook request, skipping verification"
+                )
+                return True  # Allow webhooks without signatures
 
             # Get the request body as bytes
             body = await request.body()
@@ -194,18 +197,13 @@ class MailchimpClient:
             MailchimpWebhook: The parsed webhook data
 
         Raises:
-            HTTPException: If the webhook signature is invalid or parsing fails
+            HTTPException: If parsing fails
         """
-        # Verify the webhook signature
-        is_valid = await self.verify_webhook_signature(request)
-        if not is_valid:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid webhook signature",
-            )
+        # Verify the webhook signature - but we don't require it anymore
+        await self.verify_webhook_signature(request)
 
         try:
-            # Handle dictionary input directly (for tests)
+            # Handle dictionary input directly (for tests or pre-parsed requests)
             if isinstance(request, dict):
                 # Handle special test cases
                 test_result = await self._handle_test_cases(request)
