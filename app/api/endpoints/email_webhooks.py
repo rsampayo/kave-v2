@@ -482,13 +482,32 @@ async def receive_mandrill_webhook(
                         found_headers = {k: processed_headers.get(k) for k in important_headers if k.lower() in map(str.lower, processed_headers.keys())}
                         logger.debug(f"Processed {header_count} headers, important headers: {found_headers}")
                             
+                        # Extract message_id from headers if available (try different case variations)
+                        message_id = ""
+                        if headers:
+                            for header_name in ["Message-Id", "Message-ID", "message-id", "message_id"]:
+                                if header_name in headers:
+                                    message_id = headers[header_name]
+                                    # Strip any < > characters that might be around the message ID
+                                    message_id = message_id.strip("<>")
+                                    logger.info(f"Found message ID in headers: {message_id}")
+                                    break
+                        
+                        # If no message ID in headers, fall back to Mandrill's internal ID
+                        if not message_id:
+                            message_id = msg.get("_id", "")
+                            if message_id:
+                                logger.info(f"Using Mandrill internal ID: {message_id}")
+                            else:
+                                logger.warning("No message ID found in headers or Mandrill data")
+                                
                         # Mandrill typically has 'msg' containing the email data
                         formatted_event = {
                             "event": event_type,
                             "webhook_id": event_id,
                             "timestamp": event.get("ts", ""),
                             "data": {
-                                "message_id": msg.get("_id", ""),
+                                "message_id": message_id,
                                 "from_email": from_email,
                                 "from_name": msg.get("from_name", ""),
                                 "to_email": msg.get("email", ""),
