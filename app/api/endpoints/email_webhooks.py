@@ -239,10 +239,8 @@ async def receive_mandrill_webhook(
     """Handle Mandrill email webhook.
 
     This endpoint receives webhooks from Mandrill containing email data.
-    It validates the webhook signature, processes the email content including
-    any attachments, and stores the data in the database.
-
-    Mandrill webhook format may differ from Mailchimp, with events wrapped in a 'mandrill_events' field.
+    Mandrill typically sends data as form data with a field named 'mandrill_events'
+    containing a JSON string with an array of events.
 
     Args:
         request: The FastAPI request object containing the webhook payload
@@ -258,39 +256,75 @@ async def receive_mandrill_webhook(
             - 500 INTERNAL SERVER ERROR for processing errors
     """
     try:
-        # First try to get the raw request body as text
+        # Log the content type for debugging
+        content_type = request.headers.get("content-type", "")
+        logger.info(f"Mandrill webhook received with Content-Type: {content_type}")
+        
+        # Get the raw request body for logging
         raw_body = await request.body()
         if not raw_body:
+            logger.warning("Empty request body received from Mandrill")
             return JSONResponse(
                 content={"status": "error", "message": "Empty request body"},
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
-            
-        # Log the raw body for debugging
-        logger.debug(f"Raw Mandrill webhook body: {raw_body}")
         
-        try:
-            # Try to parse the JSON
-            body = await request.json()
-        except Exception as json_err:
-            logger.error(f"Failed to parse Mandrill webhook JSON: {str(json_err)}")
-            # Try to handle form data if JSON parsing fails
-            form_data = await request.form()
-            if "mandrill_events" in form_data:
-                # Mandrill sends events in a form field called 'mandrill_events'
-                import json
-                try:
-                    body = json.loads(form_data["mandrill_events"])
-                except Exception as form_err:
-                    logger.error(f"Failed to parse mandrill_events: {str(form_err)}")
+        # Log body size for debugging
+        logger.debug(f"Mandrill webhook body size: {len(raw_body)} bytes")
+        
+        body = None
+        
+        # Check if we have form data (typical for Mandrill)
+        if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+            logger.info("Processing Mandrill webhook as form data")
+            try:
+                form_data = await request.form()
+                logger.debug(f"Form fields: {list(form_data.keys())}")
+                
+                if "mandrill_events" in form_data:
+                    # This is the standard Mandrill format
+                    mandrill_events = form_data["mandrill_events"]
+                    logger.debug(f"Mandrill events data type: {type(mandrill_events).__name__}")
+                    
+                    import json
+                    try:
+                        body = json.loads(mandrill_events)
+                        logger.info(f"Successfully parsed Mandrill events JSON. Event count: {len(body) if isinstance(body, list) else 1}")
+                    except Exception as form_err:
+                        logger.error(f"Failed to parse mandrill_events: {str(form_err)}")
+                        return JSONResponse(
+                            content={
+                                "status": "error", 
+                                "message": f"Invalid Mandrill webhook format: {str(form_err)}"
+                            },
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                        )
+                else:
+                    logger.warning(f"Mandrill form data missing 'mandrill_events' field. Available keys: {list(form_data.keys())}")
                     return JSONResponse(
                         content={
                             "status": "error", 
-                            "message": f"Invalid Mandrill webhook format: {str(form_err)}"
+                            "message": "Missing 'mandrill_events' field in form data"
                         },
                         status_code=status.HTTP_400_BAD_REQUEST,
                     )
-            else:
+            except Exception as form_err:
+                logger.error(f"Error processing form data: {str(form_err)}")
+                return JSONResponse(
+                    content={
+                        "status": "error", 
+                        "message": f"Error processing form data: {str(form_err)}"
+                    },
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            # Try parsing as JSON in case Mandrill changes their format
+            logger.info("Attempting to process Mandrill webhook as direct JSON")
+            try:
+                body = await request.json()
+                logger.debug(f"Successfully parsed JSON body: {type(body).__name__}")
+            except Exception as json_err:
+                logger.error(f"Failed to parse request as JSON: {str(json_err)}")
                 return JSONResponse(
                     content={
                         "status": "error", 
@@ -298,6 +332,14 @@ async def receive_mandrill_webhook(
                     },
                     status_code=status.HTTP_400_BAD_REQUEST,
                 )
+
+        # Verify we have a body to process
+        if not body:
+            logger.error("No parseable body found in Mandrill webhook")
+            return JSONResponse(
+                content={"status": "error", "message": "No parseable body found"},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Check if this is a ping event for webhook validation
         if isinstance(body, dict) and (body.get("type") == "ping" or body.get("event") == "ping"):
@@ -310,68 +352,105 @@ async def receive_mandrill_webhook(
                 status_code=status.HTTP_200_OK,
             )
             
-        # Handle Mandrill's array-based format if needed
+        # Handle Mandrill's array-based format (standard format)
         if isinstance(body, list):
-            # Mandrill might send an array of events
-            logger.info(f"Processing {len(body)} Mandrill events")
+            # Mandrill sends an array of events
+            event_count = len(body)
+            logger.info(f"Processing {event_count} Mandrill events")
             processed_count = 0
+            skipped_count = 0
             
-            for event in body:
+            for event_index, event in enumerate(body):
                 # Process each event
                 try:
+                    # Log basic event info for troubleshooting
+                    event_type = event.get("event", "unknown")
+                    event_id = event.get("_id", f"unknown_{event_index}")
+                    logger.info(f"Processing Mandrill event {event_index+1}/{event_count}: type={event_type}, id={event_id}")
+                    
                     # Format the event to match what our parse_webhook expects
                     if "msg" in event:
                         # Map 'inbound' event type to 'inbound_email' if needed
-                        event_type = event.get("event", "inbound_email")
-                        # For Mandrill 'inbound' events, ensure we use a compatible event type
                         if event_type == "inbound":
                             event_type = "inbound_email"
                             
-                        # Log the event details for troubleshooting
-                        logger.info(f"Processing Mandrill event: {event_type} with ID: {event.get('_id', '')}")
+                        # Get message details for logging
+                        msg = event.get("msg", {})
+                        subject = msg.get("subject", "")[:50]  # Limit long subjects
+                        from_email = msg.get("from_email", "")
+                        logger.info(f"Email details - From: {from_email}, Subject: {subject}")
+                        
+                        # Log attachment info
+                        attachments = msg.get("attachments", [])
+                        if attachments:
+                            attachment_info = [f"{a.get('name', 'unnamed')} ({a.get('type', 'unknown')})" for a in attachments]
+                            logger.info(f"Email has {len(attachments)} attachments: {', '.join(attachment_info)}")
                         
                         # Get and process headers to convert any list values to strings
-                        headers = event.get("msg", {}).get("headers", {})
+                        headers = msg.get("headers", {})
+                        header_count = len(headers) if headers else 0
                         processed_headers = _process_mandrill_headers(headers)
                         
-                        logger.debug(f"Processed headers: {processed_headers}")
+                        # Log some important headers
+                        important_headers = ["message-id", "date", "to", "from", "subject"]
+                        found_headers = {k: processed_headers.get(k) for k in important_headers if k.lower() in map(str.lower, processed_headers.keys())}
+                        logger.debug(f"Processed {header_count} headers, important headers: {found_headers}")
                             
                         # Mandrill typically has 'msg' containing the email data
                         formatted_event = {
                             "event": event_type,
-                            "webhook_id": event.get("_id", f"mandrill_{processed_count}"),
+                            "webhook_id": event_id,
                             "timestamp": event.get("ts", ""),
                             "data": {
-                                "message_id": event.get("msg", {}).get("_id", ""),
-                                "from_email": event.get("msg", {}).get("from_email", ""),
-                                "from_name": event.get("msg", {}).get("from_name", ""),
-                                "to_email": event.get("msg", {}).get("email", ""),
-                                "subject": event.get("msg", {}).get("subject", ""),
-                                "body_plain": event.get("msg", {}).get("text", ""),
-                                "body_html": event.get("msg", {}).get("html", ""),
-                                "headers": processed_headers,  # Use the processed headers
-                                "attachments": event.get("msg", {}).get("attachments", []),
+                                "message_id": msg.get("_id", ""),
+                                "from_email": from_email,
+                                "from_name": msg.get("from_name", ""),
+                                "to_email": msg.get("email", ""),
+                                "subject": subject,
+                                "body_plain": msg.get("text", ""),
+                                "body_html": msg.get("html", ""),
+                                "headers": processed_headers,
+                                "attachments": attachments,
                             }
                         }
                         
+                        # Process the webhook data
                         webhook_data = await client.parse_webhook(formatted_event)
                         await email_service.process_webhook(webhook_data)
                         processed_count += 1
+                        logger.info(f"Successfully processed Mandrill event {event_index+1}")
                     else:
-                        logger.warning(f"Skipping Mandrill event with no msg field: {event}")
-                        
+                        logger.warning(f"Skipping Mandrill event with no msg field: event_type={event_type}, id={event_id}")
+                        skipped_count += 1
                 except Exception as event_err:
-                    logger.error(f"Error processing Mandrill event {processed_count}: {str(event_err)}")
+                    logger.error(f"Error processing Mandrill event {event_index+1}: {str(event_err)}")
+                    skipped_count += 1
             
-            return JSONResponse(
-                content={
-                    "status": "success", 
-                    "message": f"Processed {processed_count} events successfully"
-                },
-                status_code=status.HTTP_202_ACCEPTED,
-            )
+            # Return summary of processing
+            if processed_count > 0:
+                message = f"Processed {processed_count} events successfully"
+                if skipped_count > 0:
+                    message += f" ({skipped_count} skipped)"
+                    
+                return JSONResponse(
+                    content={
+                        "status": "success", 
+                        "message": message
+                    },
+                    status_code=status.HTTP_202_ACCEPTED,
+                )
+            else:
+                return JSONResponse(
+                    content={
+                        "status": "error", 
+                        "message": f"Failed to process any events ({skipped_count} skipped)"
+                    },
+                    status_code=status.HTTP_200_OK,  # Use 200 for Mandrill to avoid retries
+                )
         else:
-            # Regular webhook format, similar to Mailchimp
+            # Handle non-list format (unusual for Mandrill but handle it anyway)
+            logger.warning("Received Mandrill webhook with non-list format, attempting to process")
+            
             # Process headers if present to handle list values
             if isinstance(body, dict) and "data" in body and "headers" in body["data"]:
                 body["data"]["headers"] = _process_mandrill_headers(body["data"]["headers"])
