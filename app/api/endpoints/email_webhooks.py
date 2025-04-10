@@ -21,7 +21,6 @@ from app.db.session import get_db
 from app.integrations.email.client import MailchimpClient, get_mailchimp_client
 from app.schemas.webhook_schemas import WebhookResponse
 from app.services.email_service import EmailService, get_email_service
-from app.db.models import Customer
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -456,15 +455,6 @@ async def receive_mandrill_webhook(
                     continue
                 
                 logger.info(f"Processing email for {email}, subject: {subject}")
-                
-                # Get the customer for this email
-                customer = db.query(Customer).filter(
-                    Customer.email == email
-                ).first()
-                
-                if not customer:
-                    logger.warning(f"Customer not found for email: {email}")
-                    continue
                 
                 # Process attachments if any
                 attachments = msg.get("attachments", [])
