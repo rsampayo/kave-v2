@@ -69,6 +69,13 @@ class Email(Base):
         comment="Test column for Alembic migration example",
     )
 
+    # Second test column for Alembic functionality testing
+    test_column_two: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        comment="Second test column for Alembic migration testing",
+    )
+
     # Relationships - List of attachments associated with this email
     attachments: Mapped[List["Attachment"]] = relationship(
         "Attachment", back_populates="email", cascade="all, delete-orphan"
