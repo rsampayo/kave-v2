@@ -288,7 +288,8 @@ async def receive_mandrill_webhook(
             logger.info("Processing Mandrill webhook as form data")
             try:
                 form_data = await request.form()
-                logger.debug(f"Form fields: {list(form_data.keys())}")
+                # Log only the keys, not the values (to avoid logging attachment content)
+                logger.info(f"Form field keys: {list(form_data.keys())}")
                 
                 if "mandrill_events" in form_data:
                     # This is the standard Mandrill format
@@ -297,30 +298,32 @@ async def receive_mandrill_webhook(
                     
                     import json
                     try:
+                        # Parse but don't log the raw body yet
                         body = json.loads(mandrill_events)
                         logger.info(f"Successfully parsed Mandrill events JSON. Event count: {len(body) if isinstance(body, list) else 1}")
                         
-                        # Log the complete parsed structure for debugging
-                        # Create a copy for logging and redact attachment content
+                        # Redact any base64 content immediately before any logging
                         if isinstance(body, list):
-                            log_body = []
                             for event in body:
-                                try:
-                                    event_copy = event.copy() if hasattr(event, 'copy') else dict(event)
-                                    if "msg" in event_copy and "attachments" in event_copy["msg"]:
-                                        # Redact attachment content
-                                        for attachment in event_copy["msg"]["attachments"]:
-                                            if "content" in attachment:
+                                if isinstance(event, dict) and "msg" in event:
+                                    msg = event.get("msg", {})
+                                    # Redact attachments immediately
+                                    if "attachments" in msg and isinstance(msg["attachments"], list):
+                                        for attachment in msg["attachments"]:
+                                            if isinstance(attachment, dict) and "content" in attachment:
                                                 attachment["content"] = f"[REDACTED - {len(attachment.get('content', ''))} chars]"
-                                    log_body.append(event_copy)
-                                except Exception as copy_err:
-                                    # If we can't copy the event, just add a placeholder
-                                    log_body.append(f"[EVENT STRUCTURE ERROR: {str(copy_err)}]")
-                        else:
-                            log_body = "[NOT A LIST]"
+                                    # Redact images immediately
+                                    if "images" in msg and isinstance(msg["images"], list):
+                                        for image in msg["images"]:
+                                            if isinstance(image, dict) and "content" in image:
+                                                image["content"] = f"[REDACTED - {len(image.get('content', ''))} chars]"
+                                    # Redact raw_msg if present (contains full email)
+                                    if "raw_msg" in msg:
+                                        msg["raw_msg"] = f"[REDACTED - {len(msg.get('raw_msg', ''))} chars]"
                         
-                        logger.info(f"COMPLETE PARSED MANDRILL EVENTS (content redacted): {log_body}")
-                        
+                        # Log the redacted copy for debugging
+                        logger.info(f"MANDRILL EVENTS STRUCTURE (content redacted): {body}")
+
                     except Exception as form_err:
                         logger.error(f"Failed to parse mandrill_events: {str(form_err)}")
                         return JSONResponse(
@@ -402,15 +405,26 @@ async def receive_mandrill_webhook(
                     # Log complete event for debugging with redacted attachment content
                     try:
                         event_copy = event.copy() if hasattr(event, 'copy') else dict(event)
-                        if "msg" in event_copy and "attachments" in event_copy["msg"]:
-                            # Redact attachment content
-                            for attachment in event_copy["msg"]["attachments"]:
-                                if "content" in attachment:
-                                    attachment["content"] = f"[REDACTED - {len(attachment.get('content', ''))} chars]"
+                        # Redact all potential binary/base64 content
+                        if "msg" in event_copy:
+                            msg = event_copy["msg"]
+                            # Redact attachments
+                            if "attachments" in msg and isinstance(msg["attachments"], list):
+                                for attachment in msg["attachments"]:
+                                    if isinstance(attachment, dict) and "content" in attachment:
+                                        attachment["content"] = f"[REDACTED - {len(attachment.get('content', ''))} chars]"
+                            # Redact images 
+                            if "images" in msg and isinstance(msg["images"], list):
+                                for image in msg["images"]:
+                                    if isinstance(image, dict) and "content" in image:
+                                        image["content"] = f"[REDACTED - {len(image.get('content', ''))} chars]"
+                            # Redact raw_msg if present
+                            if "raw_msg" in msg:
+                                msg["raw_msg"] = f"[REDACTED - {len(msg.get('raw_msg', ''))} chars]"
                         
-                        logger.info(f"COMPLETE MANDRILL EVENT {event_index+1} (content redacted): {event_copy}")
+                        logger.info(f"MANDRILL EVENT {event_index+1} STRUCTURE (content redacted): {event_copy}")
                     except Exception as copy_err:
-                        logger.info(f"COMPLETE MANDRILL EVENT {event_index+1} (structure error): {str(copy_err)}")
+                        logger.info(f"MANDRILL EVENT {event_index+1} (could not redact - structure error): {str(copy_err)}")
                     
                     # Format the event to match what our parse_webhook expects
                     if "msg" in event:
