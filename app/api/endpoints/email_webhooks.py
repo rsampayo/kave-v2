@@ -76,7 +76,7 @@ async def _handle_form_data(
             value = form_data[key]
             value_type = type(value).__name__
             value_preview = (
-                str(value)[:75] if isinstance(value, (str, bytes)) else str(value)
+                str(value)[:70] if isinstance(value, (str, bytes)) else str(value)
             )
             logger.info(f"Form field {key!r} (type: {value_type}): {value_preview}...")
 
@@ -95,7 +95,8 @@ async def _handle_form_data(
                     else mandrill_events
                 )
                 logger.info(
-                    f"Attempting to parse mandrill_events as JSON, length: {len(str(mandrill_events_str))}"
+                    "Attempting to parse mandrill_events as JSON, "
+                    f"length: {len(str(mandrill_events_str))}"
                 )
                 body = json.loads(mandrill_events_str)
                 logger.info(
@@ -165,6 +166,93 @@ async def _handle_form_data(
         )
 
 
+async def _parse_json_from_bytes(raw_body: bytes) -> Any:
+    """Attempt to parse JSON directly from raw bytes.
+
+    Args:
+        raw_body: Raw request body bytes
+
+    Returns:
+        The parsed JSON data
+
+    Raises:
+        json.JSONDecodeError: If parsing fails
+    """
+    body = json.loads(raw_body)
+    logger.info("Successfully parsed raw bytes as JSON directly")
+    return body
+
+
+async def _parse_json_from_string(raw_body: bytes) -> Any:
+    """Attempt to parse JSON by first decoding bytes to string.
+
+    Args:
+        raw_body: Raw request body bytes
+
+    Returns:
+        The parsed JSON data
+
+    Raises:
+        Exception: If decoding or parsing fails
+    """
+    string_body = raw_body.decode("utf-8")
+    logger.info("Decoded body as UTF-8, attempting JSON parse")
+    body = json.loads(string_body)
+    logger.info("Successfully parsed string body as JSON")
+    return body
+
+
+async def _parse_json_from_request(request: Request) -> Any:
+    """Attempt to parse JSON using request.json() method.
+
+    Args:
+        request: FastAPI request object
+
+    Returns:
+        The parsed JSON data
+
+    Raises:
+        Exception: If parsing fails
+    """
+    body = await request.json()
+    logger.info("Successfully parsed body using request.json() method")
+    return body
+
+
+def _log_parsed_body_info(body: Any) -> None:
+    """Log information about the parsed body.
+
+    Args:
+        body: The parsed JSON body
+    """
+    if isinstance(body, list):
+        logger.info(f"Parsed JSON body is a list with {len(body)} items")
+        if body and isinstance(body[0], dict):
+            logger.info(f"First item keys: {list(body[0].keys())[:10]}")
+    elif isinstance(body, dict):
+        logger.info(f"Parsed JSON body is a dict with keys: {list(body.keys())[:10]}")
+    else:
+        logger.info(f"Parsed JSON body is of type: {type(body).__name__}")
+
+
+def _create_json_error_response(error_message: str) -> JSONResponse:
+    """Create a JSON error response.
+
+    Args:
+        error_message: The error message
+
+    Returns:
+        JSONResponse: The error response
+    """
+    return JSONResponse(
+        content={
+            "status": "error",
+            "message": error_message,
+        },
+        status_code=status.HTTP_400_BAD_REQUEST,
+    )
+
+
 async def _handle_json_body(
     request: Request,
 ) -> Tuple[
@@ -188,23 +276,16 @@ async def _handle_json_body(
             f"Attempting to parse raw body as JSON, size: {len(raw_body)} bytes"
         )
 
-        # Try direct JSON loading from bytes
+        # Try multiple parsing strategies in sequence
         try:
-            body = json.loads(raw_body)
-            logger.info("Successfully parsed raw bytes as JSON directly")
+            body = await _parse_json_from_bytes(raw_body)
         except json.JSONDecodeError:
-            # If that fails, try decoding to string first
             try:
-                string_body = raw_body.decode("utf-8")
-                logger.info("Decoded body as UTF-8, attempting JSON parse")
-                body = json.loads(string_body)
-                logger.info("Successfully parsed string body as JSON")
+                body = await _parse_json_from_string(raw_body)
             except Exception as decode_err:
                 logger.error(f"Failed to decode and parse body: {str(decode_err)}")
-                # Try using request.json() as a fallback (especially useful for tests)
                 try:
-                    body = await request.json()
-                    logger.info("Successfully parsed body using request.json() method")
+                    body = await _parse_json_from_request(request)
                 except Exception as json_err:
                     logger.error(
                         f"Failed to parse using request.json(): {str(json_err)}"
@@ -212,16 +293,7 @@ async def _handle_json_body(
                     raise decode_err
 
         # Log information about the parsed body
-        if isinstance(body, list):
-            logger.info(f"Parsed JSON body is a list with {len(body)} items")
-            if body and isinstance(body[0], dict):
-                logger.info(f"First item keys: {list(body[0].keys())[:10]}")
-        elif isinstance(body, dict):
-            logger.info(
-                f"Parsed JSON body is a dict with keys: {list(body.keys())[:10]}"
-            )
-        else:
-            logger.info(f"Parsed JSON body is of type: {type(body).__name__}")
+        _log_parsed_body_info(body)
 
         return body, None
     except json.JSONDecodeError as json_err:
@@ -232,22 +304,14 @@ async def _handle_json_body(
             logger.error(f"Sample of unparseable JSON content: {sample}...")
         except Exception:
             logger.error("Could not decode body to show sample")
-        return None, JSONResponse(
-            content={
-                "status": "error",
-                "message": f"Invalid JSON format: {str(json_err)}",
-            },
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
+
+        error_message = f"Invalid JSON format: {str(json_err)}"
+        return None, _create_json_error_response(error_message)
     except Exception as json_err:
         logger.error(f"Failed to parse request as JSON: {str(json_err)}")
-        return None, JSONResponse(
-            content={
-                "status": "error",
-                "message": f"Unsupported Mandrill webhook format: {str(json_err)}",
-            },
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
+
+        error_message = f"Unsupported Mandrill webhook format: {str(json_err)}"
+        return None, _create_json_error_response(error_message)
 
 
 def _parse_message_id(headers: Dict[str, Any]) -> str:
