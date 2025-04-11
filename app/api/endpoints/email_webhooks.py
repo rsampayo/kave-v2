@@ -358,6 +358,21 @@ def _normalize_attachments(
     Returns:
         List[Dict[str, Any]]: Normalized attachments list
     """
+    # Log the raw attachment data for debugging
+    logger.debug(f"Raw attachments data type: {type(attachments).__name__}")
+    if isinstance(attachments, list) and len(attachments) > 0:
+        logger.debug(f"Number of attachments: {len(attachments)}")
+        # Log the content types of the first few attachments
+        for i, att in enumerate(
+            attachments[:3]
+        ):  # Log only first 3 to avoid excessive logging
+            if isinstance(att, dict):
+                logger.debug(
+                    f"Attachment {i+1} details: "
+                    f"name={att.get('name', 'N/A')!r}, "
+                    f"type={att.get('type', 'N/A')!r}"
+                )
+
     # Handle case where attachments might be a string or other non-list/dict type
     if not attachments:
         return []
@@ -368,7 +383,13 @@ def _normalize_attachments(
         # Decode any MIME-encoded filenames
         for attachment in attachments:
             if "name" in attachment and attachment["name"]:
+                original_name = attachment["name"]
                 attachment["name"] = _decode_mime_header(attachment["name"])
+                if original_name != attachment["name"]:
+                    logger.info(
+                        f"Decoded MIME filename from {original_name!r} to {attachment['name']!r}, "
+                        f"content_type={attachment.get('type', 'N/A')!r}"
+                    )
         return attachments
 
     logger.debug(f"Converting attachments from {type(attachments).__name__} format")

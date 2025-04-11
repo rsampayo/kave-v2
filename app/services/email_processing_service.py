@@ -170,20 +170,31 @@ class EmailProcessingService:
             object_key = f"attachments/{email_id}/{unique_id}_{filename}"
 
             # Determine proper content type - enhance content type detection
-            content_type = attach_data.type
+            original_content_type = attach_data.type
+            content_type = original_content_type
+
+            logger.info(
+                f"Processing attachment: filename={filename!r}, "
+                f"original_content_type={original_content_type!r}"
+            )
+
             if content_type == "application/octet-stream" or not content_type:
                 # Try to get a better content type based on file extension
                 guessed_type, _ = mimetypes.guess_type(filename)
                 if guessed_type:
                     content_type = guessed_type
                     logger.info(
-                        f"Improved content type from {attach_data.type} to {content_type} for {filename}"
+                        f"Improved content type from {original_content_type!r} to {content_type!r} "
+                        f"for {filename!r} using mimetypes.guess_type()"
                     )
 
             # Special handling for PDF files
             if filename.lower().endswith(".pdf") and content_type != "application/pdf":
                 content_type = "application/pdf"
-                logger.info(f"Setting content type to application/pdf for {filename}")
+                logger.info(
+                    f"Setting content type to 'application/pdf' for {filename!r} "
+                    f"(was: {original_content_type!r})"
+                )
 
             # Create the attachment model
             attachment = Attachment(
@@ -213,8 +224,8 @@ class EmailProcessingService:
 
                 # Log details about the attachment content
                 logger.info(
-                    f"Processing attachment {filename!r}: base64={is_base64}, "
-                    f"size={len(content)} bytes, content_type={content_type}"
+                    f"Saving attachment: filename={filename!r}, size={len(content)} bytes, "
+                    f"content_type={content_type!r}, storage_key={object_key!r}"
                 )
 
                 # Save to storage service (S3 or filesystem based on settings)
