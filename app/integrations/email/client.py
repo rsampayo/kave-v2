@@ -61,63 +61,6 @@ class WebhookClient:
             return api_key.split("-")[-1]
         return "us1"  # Default to us1 if no prefix found in API key
 
-    async def verify_webhook_signature(self, request: WebhookRequestType) -> bool:
-        """Verify that a webhook request is authentic.
-
-        Args:
-            request: The request object (FastAPI Request, str, dict, etc.)
-
-        Returns:
-            bool: True if the signature is valid, False otherwise
-        """
-        # Support for test cases where request might be None
-        if request is None:
-            logger.warning("Request is None, skipping verification")
-            return False
-
-        if not self.webhook_secret:
-            logger.warning("No webhook secret configured, skipping verification")
-            return True
-
-        # For tests with string signatures
-        if isinstance(request, str):
-            # Always true in test cases for "valid_signature"
-            return hmac.compare_digest(request, request)
-
-        # For dictionary inputs in tests
-        if isinstance(request, dict):
-            # In tests, we're treating the dictionary as a valid parsed webhook
-            return True
-
-        # Normal FastAPI Request object handling
-        # Get the signature from the headers
-        if isinstance(request, Request):
-            signature = request.headers.get("X-Mailchimp-Signature")
-            if not signature:
-                logger.warning(
-                    "No signature found in webhook request, skipping verification"
-                )
-                return True  # Allow webhooks without signatures
-
-            # Get the request body as bytes
-            body = await request.body()
-
-            # Calculate the expected signature
-            expected_signature = hmac.new(
-                key=self.webhook_secret.encode(),
-                msg=body,
-                digestmod=hashlib.sha256,
-            ).hexdigest()
-
-            # Compare signatures
-            if not hmac.compare_digest(signature, expected_signature):
-                logger.warning("Invalid webhook signature")
-                return False
-
-            return True
-
-        return False
-
     async def _validate_webhook_data(self, data: Dict[str, Any]) -> None:
         """Validate webhook data structure.
 
@@ -200,9 +143,6 @@ class WebhookClient:
         Raises:
             HTTPException: If parsing fails
         """
-        # Verify the webhook signature - but we don't require it anymore
-        await self.verify_webhook_signature(request)
-
         try:
             # Handle dictionary input directly (for tests or pre-parsed requests)
             if isinstance(request, dict):

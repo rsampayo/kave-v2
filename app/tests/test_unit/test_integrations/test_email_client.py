@@ -27,100 +27,6 @@ def test_webhook_client_init() -> None:
 
 
 @pytest.mark.asyncio
-async def test_verify_webhook_signature_valid() -> None:
-    """Test signature verification with valid signature."""
-    # Test data
-    webhook_secret = "test_webhook_secret"
-    request_body = b'{"test":"data"}'
-
-    # Calculate expected signature
-    expected_signature = hmac.new(
-        key=webhook_secret.encode(),
-        msg=request_body,
-        digestmod=hashlib.sha256,
-    ).hexdigest()
-
-    # Mock request
-    mock_request = AsyncMock(spec=Request)
-    mock_request.headers = {"X-Mailchimp-Signature": expected_signature}
-    mock_request.body = AsyncMock(return_value=request_body)
-
-    # Initialize client
-    client = WebhookClient(api_key="test_api_key", webhook_secret=webhook_secret)
-
-    # Verify signature
-    result = await client.verify_webhook_signature(mock_request)
-
-    # Assertions
-    assert result is True
-    mock_request.body.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_verify_webhook_signature_invalid() -> None:
-    """Test signature verification with invalid signature."""
-    # Test data
-    webhook_secret = "test_webhook_secret"
-    request_body = b'{"test":"data"}'
-
-    # Mock request with incorrect signature
-    mock_request = AsyncMock(spec=Request)
-    mock_request.headers = {"X-Mailchimp-Signature": "invalid_signature"}
-    mock_request.body = AsyncMock(return_value=request_body)
-
-    # Initialize client
-    client = WebhookClient(api_key="test_api_key", webhook_secret=webhook_secret)
-
-    # Verify signature
-    result = await client.verify_webhook_signature(mock_request)
-
-    # Assertions
-    assert result is False
-    mock_request.body.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_verify_webhook_signature_missing() -> None:
-    """Test signature verification with missing signature."""
-    # Test data
-    webhook_secret = "test_webhook_secret"
-    request_body = b'{"test":"data"}'
-
-    # Mock request with no signature
-    mock_request = AsyncMock(spec=Request)
-    mock_request.headers = {}
-    mock_request.body = AsyncMock(return_value=request_body)
-
-    # Initialize client
-    client = WebhookClient(api_key="test_api_key", webhook_secret=webhook_secret)
-
-    # Verify signature
-    result = await client.verify_webhook_signature(mock_request)
-
-    # Assertions
-    assert result is True  # We allow webhooks without signatures now
-    # The body should not be accessed if no signature is provided
-    mock_request.body.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_verify_webhook_signature_no_secret() -> None:
-    """Test signature verification when no webhook secret is configured."""
-    # Mock request
-    mock_request = AsyncMock(spec=Request)
-
-    # Initialize client with no webhook secret
-    client = WebhookClient(api_key="test_api_key", webhook_secret="")
-
-    # Verify signature
-    result = await client.verify_webhook_signature(mock_request)
-
-    # Assertions
-    assert result is True  # Should return True when no secret is configured
-    mock_request.body.assert_not_called()
-
-
-@pytest.mark.asyncio
 async def test_parse_webhook_valid() -> None:
     """Test parsing a valid webhook."""
     # Test data
@@ -139,73 +45,38 @@ async def test_parse_webhook_valid() -> None:
         },
     }
 
-    # Mock request
-    mock_request = AsyncMock(spec=Request)
-    mock_request.json = AsyncMock(return_value=webhook_data)
+    # Initialize client
+    client = WebhookClient(api_key="test_api_key", webhook_secret="test_secret")
 
-    # Mock verify_webhook_signature to return True
-    with patch.object(WebhookClient, "verify_webhook_signature", return_value=True):
-        # Initialize client
-        client = WebhookClient(api_key="test_api_key", webhook_secret="test_secret")
+    # Parse webhook directly with the webhook data
+    result = await client.parse_webhook(webhook_data)
 
-        # Parse webhook
-        result = await client.parse_webhook(mock_request)
+    # Assertions
+    assert isinstance(result, WebhookData)
+    assert result.webhook_id == webhook_data["webhook_id"]
+    assert result.event == webhook_data["event"]
 
-        # Assertions
-        assert isinstance(result, WebhookData)
-        assert result.webhook_id == webhook_data["webhook_id"]
-        assert result.event == webhook_data["event"]
-
-        # Check data field properties
-        message_id = webhook_data["data"]["message_id"]  # type: ignore[index]
-        assert result.data.message_id == message_id
-
-
-@pytest.mark.asyncio
-async def test_parse_webhook_invalid_signature() -> None:
-    """Test parsing a webhook with invalid signature."""
-    # Mock request with JSON implementation
-    mock_request = AsyncMock(spec=Request)
-    mock_request.json = AsyncMock(return_value={"data": {}})  # Minimal valid data
-
-    # Mock verify_webhook_signature to return False
-    with patch.object(WebhookClient, "verify_webhook_signature", return_value=False):
-        # Initialize client
-        client = WebhookClient(api_key="test_api_key", webhook_secret="test_secret")
-
-        # Now we expect the function to continue processing despite invalid signature
-        try:
-            result = await client.parse_webhook(mock_request)
-            assert result is not None
-            # Verify that we get a valid WebhookData object
-            assert isinstance(result, WebhookData)
-        except HTTPException as e:
-            # If exception is raised, it should be for a different reason
-            # than the signature
-            assert e.status_code == 400
-            assert "Invalid webhook payload" in e.detail
-            assert "Invalid webhook signature" not in e.detail
+    # Check data field properties
+    message_id = webhook_data["data"]["message_id"]
+    assert result.data.message_id == message_id
 
 
 @pytest.mark.asyncio
 async def test_parse_webhook_invalid_payload() -> None:
     """Test parsing a webhook with invalid payload."""
-    # Mock request
-    mock_request = AsyncMock(spec=Request)
-    mock_request.json = AsyncMock(return_value={"invalid": "data"})
+    # Invalid data
+    invalid_data = {"invalid": "data"}
 
-    # Mock verify_webhook_signature to return True
-    with patch.object(WebhookClient, "verify_webhook_signature", return_value=True):
-        # Initialize client
-        client = WebhookClient(api_key="test_api_key", webhook_secret="test_secret")
+    # Initialize client
+    client = WebhookClient(api_key="test_api_key", webhook_secret="test_secret")
 
-        # Assert that HTTPException is raised
-        with pytest.raises(HTTPException) as excinfo:
-            await client.parse_webhook(mock_request)
+    # Assert that HTTPException is raised
+    with pytest.raises(HTTPException) as excinfo:
+        await client.parse_webhook(invalid_data)
 
-        # Verify exception details
-        assert excinfo.value.status_code == 400
-        assert "Invalid webhook payload" in excinfo.value.detail
+    # Verify exception details
+    assert excinfo.value.status_code == 400
+    assert "Invalid webhook payload" in excinfo.value.detail
 
 
 @pytest.mark.asyncio
@@ -228,22 +99,16 @@ async def test_parse_webhook_valid_with_type() -> None:
         },
     }
 
-    # Mock request
-    mock_request = AsyncMock(spec=Request)
-    mock_request.json = AsyncMock(return_value=webhook_data)
+    # Initialize client
+    client = WebhookClient(api_key="test_api_key", webhook_secret="test_secret")
 
-    # Mock verify_webhook_signature to return True
-    with patch.object(WebhookClient, "verify_webhook_signature", return_value=True):
-        # Initialize client
-        client = WebhookClient(api_key="test_api_key", webhook_secret="test_secret")
+    # Parse webhook
+    result = await client.parse_webhook(webhook_data)
 
-        # Parse webhook
-        result = await client.parse_webhook(mock_request)
-
-        # Assertions
-        assert isinstance(result, WebhookData)
-        assert result.webhook_id == webhook_data["webhook_id"]
-        assert result.event == webhook_data["event"]
-        # Type isn't a standard field in WebhookData, so we don't check it
-        message_id = webhook_data["data"]["message_id"]  # type: ignore[index]
-        assert result.data.message_id == message_id
+    # Assertions
+    assert isinstance(result, WebhookData)
+    assert result.webhook_id == webhook_data["webhook_id"]
+    assert result.event == webhook_data["event"]
+    # Type isn't a standard field in WebhookData, so we don't check it
+    message_id = webhook_data["data"]["message_id"]
+    assert result.data.message_id == message_id

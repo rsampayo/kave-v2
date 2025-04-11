@@ -83,11 +83,6 @@ async def test_webhook_e2e_flow(app: FastAPI, webhook_signature: str) -> None:
         # Setup the patches we need for the test
         with (
             mock.patch(
-                "app.integrations.email.client.WebhookClient."
-                "verify_webhook_signature",
-                return_value=True,
-            ),
-            mock.patch(
                 "app.core.config.settings.ATTACHMENTS_BASE_DIR",
                 test_attachments_dir,
             ),
@@ -145,20 +140,15 @@ async def test_webhook_e2e_invalid_signature(
     # GIVEN
     webhook_payload = create_test_webhook_payload()
 
-    # Setup signature verification to fail
-    with mock.patch(
-        "app.integrations.email.client.WebhookClient.verify_webhook_signature",
-        return_value=False,
-    ):
-        # WHEN - Send a POST request to the webhook endpoint
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            response = await client.post(
-                "/webhooks/mandrill",
-                json=webhook_payload,
-                headers={"X-Mailchimp-Signature": "invalid_signature"},
-            )
+    # WHEN - Send a POST request to the webhook endpoint
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/webhooks/mandrill",
+            json=webhook_payload,
+            headers={"X-Mailchimp-Signature": "invalid_signature"},
+        )
 
     # THEN - Check that the request was processed successfully despite invalid signature
     assert response.status_code == 202  # Accepted
@@ -171,23 +161,18 @@ async def test_webhook_e2e_invalid_data(app: FastAPI, webhook_signature: str) ->
     # GIVEN - Invalid webhook data (not JSON)
     invalid_data = "This is not JSON"
 
-    # Bypass signature verification
-    with mock.patch(
-        "app.integrations.email.client.WebhookClient.verify_webhook_signature",
-        return_value=True,
-    ):
-        # WHEN - Send a POST request with invalid data
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            response = await client.post(
-                "/webhooks/mandrill",
-                content=invalid_data,
-                headers={
-                    "X-Mailchimp-Signature": webhook_signature,
-                    "Content-Type": "text/plain",
-                },
-            )
+    # WHEN - Send a POST request with invalid data
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/webhooks/mandrill",
+            content=invalid_data,
+            headers={
+                "X-Mailchimp-Signature": webhook_signature,
+                "Content-Type": "text/plain",
+            },
+        )
 
     # THEN - Check that the request was handled with an error
     assert response.status_code == 400  # Bad Request

@@ -11,7 +11,6 @@ from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import verify_webhook_signature
 from app.db.session import get_db
 from app.integrations.email.client import WebhookClient, get_webhook_client
 from app.schemas.webhook_schemas import WebhookResponse
@@ -24,7 +23,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 # Create dependencies
-verify_signature = Depends(verify_webhook_signature)
 get_db_session = Depends(get_db)
 get_webhook = Depends(get_webhook_client)
 get_email_handler = Depends(get_email_service)
@@ -517,7 +515,6 @@ async def _prepare_webhook_body(
 async def receive_mandrill_webhook(
     request: Request,
     db: AsyncSession = get_db_session,
-    _: bool = verify_signature,
     email_service: EmailService = get_email_handler,
     client: WebhookClient = get_webhook,
 ) -> JSONResponse:
@@ -530,7 +527,6 @@ async def receive_mandrill_webhook(
     Args:
         request: The FastAPI request object containing the webhook payload
         db: Database session for persistence operations
-        _: Dependency to verify webhook signature (automatically checks auth)
         email_service: Service for processing email data
         client: Webhook client for webhook parsing
 

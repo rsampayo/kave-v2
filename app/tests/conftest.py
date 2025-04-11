@@ -168,8 +168,6 @@ async def async_client(app: FastAPI) -> AsyncGenerator[httpx.AsyncClient, None]:
 async def mock_webhook_client() -> AsyncGenerator[mock.AsyncMock, None]:
     """Provide a mocked WebhookClient for testing."""
     client = mock.AsyncMock(spec=WebhookClient)
-    # Configure default behaviors
-    client.verify_webhook_signature.return_value = True
     yield client
 
 

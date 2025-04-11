@@ -66,15 +66,8 @@ async def test_webhook_client_mocking(mock_webhook_client: AsyncMock) -> None:
         "data": {"email": "test@example.com"},
     }
 
-    # Set up the mock to return True for verify_webhook_signature
-    mock_webhook_client.verify_webhook_signature.return_value = True
-
     # Configure parse_webhook to return the expected result
     mock_webhook_client.parse_webhook.return_value = webhook_data
-
-    # Use the mock client - verify signature
-    is_valid = await mock_webhook_client.verify_webhook_signature("valid-signature")
-    assert is_valid is True
 
     # Use the mock client - parse webhook
     result = await mock_webhook_client.parse_webhook(webhook_data)

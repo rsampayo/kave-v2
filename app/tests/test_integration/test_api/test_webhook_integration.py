@@ -344,12 +344,6 @@ async def test_webhook_endpoint_ping(
     async_client: httpx.AsyncClient, mocker: MockerFixture
 ) -> None:
     """Test webhook endpoint handling of Mailchimp ping events."""
-    # Mock the mailchimp client's verify_webhook_signature method
-    mocker.patch(
-        "app.integrations.email.client.mailchimp_client.verify_webhook_signature",
-        return_value=True,
-    )
-
     # Create a ping event payload
     ping_payload = create_ping_event()
 

@@ -46,17 +46,6 @@ def webhook_payload() -> Dict[str, Any]:
 
 
 @pytest.mark.asyncio
-async def test_verify_webhook_signature(webhook_client: WebhookClient) -> None:
-    """Test verifying webhook signatures."""
-    # For test strings, hmac.compare_digest is mocked to return True in the test
-    # This is defined in the verify_webhook_signature method
-    result = await webhook_client.verify_webhook_signature(
-        "valid_signature_for_testing"
-    )
-    assert result is True
-
-
-@pytest.mark.asyncio
 async def test_validate_webhook_data_valid(
     webhook_client: WebhookClient, webhook_payload: Dict[str, Any]
 ) -> None:

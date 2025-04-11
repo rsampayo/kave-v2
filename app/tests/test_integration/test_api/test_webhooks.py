@@ -58,12 +58,6 @@ async def test_webhook_endpoint_successful(
     async_client: httpx.AsyncClient, mocker: MockerFixture, db_session: AsyncSession
 ) -> None:
     """Test successful webhook processing endpoint."""
-    # Mock the mailchimp client's verify_webhook_signature method
-    mocker.patch(
-        "app.integrations.email.client.WebhookClient.verify_webhook_signature",
-        return_value=True,
-    )
-
     # Mock the email service's process_webhook method
     with patch(f"{EMAIL_SERVICE_PATH}.process_webhook") as mock_process:
         # Configure the mock to return a specific email ID
@@ -92,12 +86,6 @@ async def test_webhook_endpoint_processing_error(
     async_client: httpx.AsyncClient, mocker: MockerFixture, db_session: AsyncSession
 ) -> None:
     """Test webhook endpoint with a processing error."""
-    # Mock the mailchimp client's verify_webhook_signature method
-    mocker.patch(
-        "app.integrations.email.client.WebhookClient.verify_webhook_signature",
-        return_value=True,
-    )
-
     # Mock the parse_webhook method to return valid data
     mocker.patch(
         "app.integrations.email.client.WebhookClient.parse_webhook",
