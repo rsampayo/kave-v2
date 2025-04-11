@@ -2,7 +2,6 @@ import base64
 import email.header
 import logging
 import mimetypes
-import os
 import uuid
 from typing import List
 

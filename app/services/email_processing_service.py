@@ -1,7 +1,6 @@
 import base64
 import logging
 import mimetypes
-import os
 import uuid
 from datetime import datetime
 from typing import List, Optional

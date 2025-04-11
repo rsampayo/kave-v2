@@ -3,9 +3,9 @@
 Contains FastAPI routes for handling webhook requests from Mandrill.
 """
 
+import email.header  # Add this import for MIME header decoding
 import json
 import logging
-import email.header  # Add this import for MIME header decoding
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from fastapi import APIRouter, Depends, Request, status
@@ -347,6 +347,68 @@ def _decode_mime_header(header_value: str) -> str:
         return header_value
 
 
+def _decode_filenames_in_attachments(attachments: List[Dict[str, Any]]) -> None:
+    """Decode MIME-encoded filenames in a list of attachment dictionaries.
+
+    Args:
+        attachments: List of attachment dictionaries to process
+    """
+    for attachment in attachments:
+        if "name" in attachment and attachment["name"]:
+            original_name = attachment["name"]
+            attachment["name"] = _decode_mime_header(attachment["name"])
+            if original_name != attachment["name"]:
+                logger.info(
+                    f"Decoded MIME filename from {original_name!r} to {attachment['name']!r}, "
+                    f"content_type={attachment.get('type', 'N/A')!r}"
+                )
+
+
+def _parse_attachment_string(attachments_str: str) -> List[Dict[str, Any]]:
+    """Parse a JSON string to get attachment data.
+
+    Args:
+        attachments_str: JSON string with attachment data
+
+    Returns:
+        List[Dict[str, Any]]: List of parsed attachments or empty list on error
+    """
+    try:
+        parsed_attachments = json.loads(attachments_str)
+        if isinstance(parsed_attachments, list):
+            _decode_filenames_in_attachments(parsed_attachments)
+            return parsed_attachments
+        return []
+    except json.JSONDecodeError:
+        return []
+
+
+def _process_attachment_dict(attachment_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Process a dictionary that may contain attachment data.
+
+    Args:
+        attachment_dict: Dictionary possibly containing attachment information
+
+    Returns:
+        List[Dict[str, Any]]: Normalized list of attachments
+    """
+    # Check if the dict directly represents an attachment
+    if "name" in attachment_dict and "type" in attachment_dict:
+        if attachment_dict["name"]:
+            attachment_dict["name"] = _decode_mime_header(attachment_dict["name"])
+        return [attachment_dict]
+
+    # Try to extract attachment info from nested structure
+    attachment_list = []
+    for _key, value in attachment_dict.items():
+        if isinstance(value, dict) and "name" in value and "type" in value:
+            if value["name"]:
+                value["name"] = _decode_mime_header(value["name"])
+            attachment_list.append(value)
+
+    return attachment_list
+
+
 def _normalize_attachments(
     attachments: Union[List[Dict[str, Any]], Dict[str, Any], str, Any],
 ) -> List[Dict[str, Any]]:
@@ -377,64 +439,24 @@ def _normalize_attachments(
     if not attachments:
         return []
 
+    # Handle list of dictionaries (normal case)
     if isinstance(attachments, list) and all(
         isinstance(item, dict) for item in attachments
     ):
-        # Decode any MIME-encoded filenames
-        for attachment in attachments:
-            if "name" in attachment and attachment["name"]:
-                original_name = attachment["name"]
-                attachment["name"] = _decode_mime_header(attachment["name"])
-                if original_name != attachment["name"]:
-                    logger.info(
-                        f"Decoded MIME filename from {original_name!r} to {attachment['name']!r}, "
-                        f"content_type={attachment.get('type', 'N/A')!r}"
-                    )
+        _decode_filenames_in_attachments(attachments)
         return attachments
 
     logger.debug(f"Converting attachments from {type(attachments).__name__} format")
 
-    # Try to convert to a proper format if it's a string that might be JSON
+    # Handle JSON string
     if isinstance(attachments, str):
-        try:
-            parsed_attachments = json.loads(attachments)
-            if isinstance(parsed_attachments, list):
-                # Decode any MIME-encoded filenames
-                for attachment in parsed_attachments:
-                    if (
-                        isinstance(attachment, dict)
-                        and "name" in attachment
-                        and attachment["name"]
-                    ):
-                        attachment["name"] = _decode_mime_header(attachment["name"])
-                return parsed_attachments
-            else:
-                return []
-        except json.JSONDecodeError:
-            return []
-    elif isinstance(attachments, dict):
-        # Handle the case where attachments is a dictionary
-        # Check if the dict has expected attachment fields
-        if "name" in attachments and "type" in attachments:
-            # Decode filename if needed
-            if attachments["name"]:
-                attachments["name"] = _decode_mime_header(attachments["name"])
-            # It's likely an attachment dictionary, so wrap it in a list
-            return [attachments]
-        else:
-            # Try to extract attachment info from the dictionary structure
-            attachment_list = []
-            for _key, value in attachments.items():
-                if isinstance(value, dict) and "name" in value and "type" in value:
-                    # Decode filename if needed
-                    if value["name"]:
-                        value["name"] = _decode_mime_header(value["name"])
-                    attachment_list.append(value)
+        return _parse_attachment_string(attachments)
 
-            if attachment_list:
-                return attachment_list
-            else:
-                return []
+    # Handle dictionary
+    elif isinstance(attachments, dict):
+        return _process_attachment_dict(attachments)
+
+    # Handle unsupported types
     else:
         return []
 
