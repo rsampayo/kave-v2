@@ -1,5 +1,7 @@
 """Unit tests for the WebhookClient."""
 
+from typing import Any, Dict
+
 import pytest
 from fastapi import HTTPException
 
@@ -53,7 +55,8 @@ async def test_parse_webhook_valid() -> None:
     assert result.event == webhook_data["event"]
 
     # Check data field properties
-    message_id = webhook_data["data"]["message_id"]
+    webhook_dict: Dict[str, Any] = webhook_data
+    message_id = webhook_dict["data"]["message_id"]
     assert result.data.message_id == message_id
 
 
@@ -106,5 +109,6 @@ async def test_parse_webhook_valid_with_type() -> None:
     assert result.webhook_id == webhook_data["webhook_id"]
     assert result.event == webhook_data["event"]
     # Type isn't a standard field in WebhookData, so we don't check it
-    message_id = webhook_data["data"]["message_id"]
+    webhook_dict: Dict[str, Any] = webhook_data
+    message_id = webhook_dict["data"]["message_id"]
     assert result.data.message_id == message_id
