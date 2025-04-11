@@ -630,10 +630,24 @@ async def receive_mandrill_webhook(
 
         # Verify we have a body to process
         if not body:
-            logger.error("No parseable body found in Mandrill webhook")
+            logger.info("Empty webhook body received (null or empty list)")
             return JSONResponse(
-                content={"status": "error", "message": "No parseable body found"},
-                status_code=status.HTTP_400_BAD_REQUEST,
+                content={
+                    "status": "success",
+                    "message": "Empty webhook body received and acknowledged",
+                },
+                status_code=status.HTTP_200_OK,
+            )
+        
+        # Check if this is just an empty event array
+        if isinstance(body, list) and len(body) == 0:
+            logger.info("Received empty events list from Mandrill")
+            return JSONResponse(
+                content={
+                    "status": "success", 
+                    "message": "Empty events list acknowledged"
+                },
+                status_code=status.HTTP_200_OK,
             )
 
         # Check if this is a ping event for webhook validation
