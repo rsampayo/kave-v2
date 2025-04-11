@@ -1766,3 +1766,50 @@ def test_normalize_attachments_complex_dictionary() -> None:
     types = {att["type"] for att in result}
     assert "application/pdf" in types
     assert "image/jpeg" in types
+
+
+@pytest.mark.parametrize(
+    "encoded_filename,expected",
+    [
+        ("normal_file.pdf", "normal_file.pdf"),
+        ("=?utf-8?Q?72b511d5=5FDocReq12744.pdf?=", "72b511d5_DocReq12744.pdf"),
+        ("=?iso-8859-1?Q?file=F1ame.pdf?=", "fileñame.pdf"),
+        ("=?UTF-8?B?ZmlsZW5hbWUucGRm?=", "filename.pdf"),  # Base64 encoded
+        ("", ""),
+        (None, None),
+    ],
+)
+def test_decode_mime_header(encoded_filename, expected):
+    """Test that MIME-encoded filenames are properly decoded."""
+    from app.api.endpoints.email_webhooks import _decode_mime_header
+
+    result = _decode_mime_header(encoded_filename)
+    assert result == expected
+
+
+def test_normalize_attachments_decodes_filenames():
+    """Test that attachment filenames are decoded when normalized."""
+    from app.api.endpoints.email_webhooks import _normalize_attachments
+
+    # Test with a list of attachments
+    attachments = [
+        {"name": "=?utf-8?Q?72b511d5=5FDocReq12744.pdf?=", "type": "application/pdf"},
+        {"name": "normal_file.txt", "type": "text/plain"},
+    ]
+
+    result = _normalize_attachments(attachments)
+
+    assert len(result) == 2
+    assert result[0]["name"] == "72b511d5_DocReq12744.pdf"
+    assert result[1]["name"] == "normal_file.txt"
+
+    # Test with a single attachment as dict
+    single_attachment = {
+        "name": "=?utf-8?Q?72b511d5=5FDocReq12744.pdf?=",
+        "type": "application/pdf",
+    }
+
+    result = _normalize_attachments(single_attachment)
+
+    assert len(result) == 1
+    assert result[0]["name"] == "72b511d5_DocReq12744.pdf"

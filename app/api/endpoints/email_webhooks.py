@@ -5,6 +5,7 @@ Contains FastAPI routes for handling webhook requests from Mandrill.
 
 import json
 import logging
+import email.header  # Add this import for MIME header decoding
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from fastapi import APIRouter, Depends, Request, status
@@ -311,6 +312,41 @@ def _parse_message_id(headers: Dict[str, Any]) -> str:
     return message_id
 
 
+def _decode_mime_header(header_value: str) -> str:
+    """Decode a MIME-encoded header value.
+
+    This handles headers encoded with formats like:
+    =?utf-8?Q?filename.pdf?=
+
+    Args:
+        header_value: The MIME-encoded header value
+
+    Returns:
+        str: The decoded header value
+    """
+    if not header_value or "=?" not in header_value:
+        return header_value
+
+    try:
+        # email.header.decode_header returns a list of (decoded_string, charset) tuples
+        decoded_parts = email.header.decode_header(header_value)
+
+        # Join the parts together
+        result = ""
+        for part, charset in decoded_parts:
+            if isinstance(part, bytes) and charset:
+                result += part.decode(charset, errors="replace")
+            elif isinstance(part, bytes):
+                result += part.decode("utf-8", errors="replace")
+            else:
+                result += str(part)
+
+        return result
+    except Exception as e:
+        logger.warning(f"Failed to decode MIME header: {str(e)}")
+        return header_value
+
+
 def _normalize_attachments(
     attachments: Union[List[Dict[str, Any]], Dict[str, Any], str, Any],
 ) -> List[Dict[str, Any]]:
@@ -329,6 +365,10 @@ def _normalize_attachments(
     if isinstance(attachments, list) and all(
         isinstance(item, dict) for item in attachments
     ):
+        # Decode any MIME-encoded filenames
+        for attachment in attachments:
+            if "name" in attachment and attachment["name"]:
+                attachment["name"] = _decode_mime_header(attachment["name"])
         return attachments
 
     logger.debug(f"Converting attachments from {type(attachments).__name__} format")
@@ -338,6 +378,14 @@ def _normalize_attachments(
         try:
             parsed_attachments = json.loads(attachments)
             if isinstance(parsed_attachments, list):
+                # Decode any MIME-encoded filenames
+                for attachment in parsed_attachments:
+                    if (
+                        isinstance(attachment, dict)
+                        and "name" in attachment
+                        and attachment["name"]
+                    ):
+                        attachment["name"] = _decode_mime_header(attachment["name"])
                 return parsed_attachments
             else:
                 return []
@@ -347,6 +395,9 @@ def _normalize_attachments(
         # Handle the case where attachments is a dictionary
         # Check if the dict has expected attachment fields
         if "name" in attachments and "type" in attachments:
+            # Decode filename if needed
+            if attachments["name"]:
+                attachments["name"] = _decode_mime_header(attachments["name"])
             # It's likely an attachment dictionary, so wrap it in a list
             return [attachments]
         else:
@@ -354,6 +405,9 @@ def _normalize_attachments(
             attachment_list = []
             for _key, value in attachments.items():
                 if isinstance(value, dict) and "name" in value and "type" in value:
+                    # Decode filename if needed
+                    if value["name"]:
+                        value["name"] = _decode_mime_header(value["name"])
                     attachment_list.append(value)
 
             if attachment_list:
