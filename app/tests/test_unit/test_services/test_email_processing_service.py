@@ -418,3 +418,71 @@ async def test_get_email_by_message_id(
     # Try with a non-existent message ID
     result = await service.get_email_by_message_id("nonexistent@example.com")
     assert result is None
+
+
+@pytest.mark.asyncio
+async def test_process_attachments_corrects_pdf_content_type(
+    db_session: AsyncSession, mock_storage_service: AsyncMock, setup_db: Any
+) -> None:
+    """Test that PDF files with wrong content type get application/pdf content type."""
+    # Create the service
+    service = EmailProcessingService(db_session, mock_storage_service)
+    
+    # Test data - a PDF file with application/octet-stream content type
+    email_id = 123
+    attachments = [
+        EmailAttachment(
+            name="document.pdf",
+            type="application/octet-stream",  # Wrong content type
+            content="SGVsbG8gV29ybGQ=",  # Base64 encoded "Hello World"
+            content_id="123",
+            size=100,
+            base64=True,
+        ),
+        EmailAttachment(
+            name="another.PDF",  # Upper case extension
+            type="binary/octet-stream",  # Another incorrect type
+            content="SGVsbG8gV29ybGQ=",
+            content_id="456",
+            size=100,
+            base64=True,
+        ),
+        EmailAttachment(
+            name="normal.txt",  # Not a PDF
+            type="text/plain",
+            content="SGVsbG8gV29ybGQ=",
+            content_id="789",
+            size=100,
+            base64=True,
+        ),
+    ]
+    
+    # Configure mock storage service
+    mock_storage_service.save_file.return_value = "s3://bucket/path"
+    
+    # Process attachments
+    result = await service.process_attachments(email_id, attachments)
+    
+    # Verify content types were corrected
+    assert len(result) == 3
+    assert result[0].content_type == "application/pdf"
+    assert result[1].content_type == "application/pdf"
+    assert result[2].content_type == "text/plain"  # This one should remain unchanged
+    
+    # Verify storage service was called with correct content types
+    assert mock_storage_service.save_file.call_count == 3
+    call_args_list = mock_storage_service.save_file.call_args_list
+    
+    # Extract the content_type from each call
+    pdf1_call = call_args_list[0].kwargs
+    pdf2_call = call_args_list[1].kwargs
+    txt_call = call_args_list[2].kwargs
+    
+    assert pdf1_call["content_type"] == "application/pdf"
+    assert pdf2_call["content_type"] == "application/pdf"
+    assert txt_call["content_type"] == "text/plain"
+    
+    # Check object keys contain corrected filenames
+    assert "document.pdf" in pdf1_call["object_key"]
+    assert "another.PDF" in pdf2_call["object_key"]  # Should preserve case
+    assert "normal.txt" in txt_call["object_key"]

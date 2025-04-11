@@ -1,5 +1,7 @@
 import base64
 import logging
+import mimetypes
+import os
 import uuid
 from datetime import datetime
 from typing import List, Optional
@@ -167,11 +169,27 @@ class EmailProcessingService:
             unique_id = str(uuid.uuid4())[:8]
             object_key = f"attachments/{email_id}/{unique_id}_{filename}"
 
+            # Determine proper content type - enhance content type detection
+            content_type = attach_data.type
+            if content_type == "application/octet-stream" or not content_type:
+                # Try to get a better content type based on file extension
+                guessed_type, _ = mimetypes.guess_type(filename)
+                if guessed_type:
+                    content_type = guessed_type
+                    logger.info(
+                        f"Improved content type from {attach_data.type} to {content_type} for {filename}"
+                    )
+
+            # Special handling for PDF files
+            if filename.lower().endswith(".pdf") and content_type != "application/pdf":
+                content_type = "application/pdf"
+                logger.info(f"Setting content type to application/pdf for {filename}")
+
             # Create the attachment model
             attachment = Attachment(
                 email_id=email_id,
                 filename=filename,
-                content_type=attach_data.type,
+                content_type=content_type,
                 content_id=attach_data.content_id,
                 size=attach_data.size,
                 # Leave storage_uri empty initially
@@ -196,14 +214,14 @@ class EmailProcessingService:
                 # Log details about the attachment content
                 logger.info(
                     f"Processing attachment {filename!r}: base64={is_base64}, "
-                    f"size={len(content)} bytes"
+                    f"size={len(content)} bytes, content_type={content_type}"
                 )
 
                 # Save to storage service (S3 or filesystem based on settings)
                 storage_uri = await self.storage.save_file(
                     file_data=content,
                     object_key=object_key,
-                    content_type=attach_data.type,
+                    content_type=content_type,
                 )
 
                 # Update the model with the storage URI
