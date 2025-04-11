@@ -1,5 +1,8 @@
 import base64
+import email.header
 import logging
+import mimetypes
+import os
 import uuid
 from typing import List
 
@@ -42,16 +45,44 @@ class AttachmentService:
         result = []
 
         for attach_data in attachments:
-            # Get filename and generate a unique object key
-            filename = attach_data.name
+            # Get filename and decode any MIME encoded filename
+            original_filename = attach_data.name
+            filename = self._decode_mime_header(original_filename)
+            if original_filename != filename:
+                logger.info(
+                    f"Decoded MIME filename from {original_filename!r} to {filename!r}"
+                )
+
             unique_id = str(uuid.uuid4())[:8]
             object_key = f"attachments/{email_id}/{unique_id}_{filename}"
+
+            # Determine proper content type - enhance content type detection
+            original_content_type = attach_data.type
+            content_type = original_content_type
+
+            if content_type == "application/octet-stream" or not content_type:
+                # Try to get a better content type based on file extension
+                guessed_type, _ = mimetypes.guess_type(filename)
+                if guessed_type:
+                    content_type = guessed_type
+                    logger.info(
+                        f"Improved content type from {original_content_type!r} to {content_type!r} "
+                        f"for {filename!r}"
+                    )
+
+            # Special handling for PDF files
+            if filename.lower().endswith(".pdf") and content_type != "application/pdf":
+                content_type = "application/pdf"
+                logger.info(
+                    f"Setting content type to 'application/pdf' for {filename!r} "
+                    f"(was: {original_content_type!r})"
+                )
 
             # Create the attachment model
             attachment = Attachment(
                 email_id=email_id,
                 filename=filename,
-                content_type=attach_data.type,
+                content_type=content_type,
                 content_id=attach_data.content_id,
                 size=attach_data.size,
                 # Leave storage_uri empty initially
@@ -76,14 +107,15 @@ class AttachmentService:
                 # Log details about the attachment content
                 logger.info(
                     f"Processing attachment {filename!r}: base64={is_base64}, "
-                    f"size={len(content)} bytes"
+                    f"size={len(content)} bytes, content_type={content_type!r}, "
+                    f"storage_key={object_key!r}"
                 )
 
                 # Save to storage service (S3 or filesystem based on settings)
                 storage_uri = await self.storage.save_file(
                     file_data=content,
                     object_key=object_key,
-                    content_type=attach_data.type,
+                    content_type=content_type,
                 )
 
                 # Update the model with the storage URI
@@ -93,6 +125,40 @@ class AttachmentService:
             result.append(attachment)
 
         return result
+
+    def _decode_mime_header(self, header_value: str) -> str:
+        """Decode a MIME-encoded header value.
+
+        This handles headers encoded with formats like:
+        =?utf-8?Q?filename.pdf?=
+
+        Args:
+            header_value: The MIME-encoded header value
+
+        Returns:
+            str: The decoded header value
+        """
+        if not header_value or "=?" not in header_value:
+            return header_value
+
+        try:
+            # email.header.decode_header returns a list of (decoded_string, charset) tuples
+            decoded_parts = email.header.decode_header(header_value)
+
+            # Join the parts together
+            result = ""
+            for part, charset in decoded_parts:
+                if isinstance(part, bytes) and charset:
+                    result += part.decode(charset, errors="replace")
+                elif isinstance(part, bytes):
+                    result += part.decode("utf-8", errors="replace")
+                else:
+                    result += str(part)
+
+            return result
+        except Exception as e:
+            logger.warning(f"Failed to decode MIME header: {str(e)}")
+            return header_value
 
 
 async def get_attachment_service(
