@@ -1,11 +1,7 @@
 """Unit tests for the WebhookClient."""
 
-import hashlib
-import hmac
-from unittest.mock import AsyncMock, patch
-
 import pytest
-from fastapi import HTTPException, Request
+from fastapi import HTTPException
 
 from app.integrations.email.client import WebhookClient
 from app.schemas.webhook_schemas import WebhookData
