@@ -524,6 +524,8 @@ async def test_handle_json_body_success() -> None:
 
     # Create a mock request with valid JSON
     mock_request = AsyncMock(spec=Request)
+    # Set the body return value first as the code tries to read the body first
+    mock_request.body.return_value = b'{"event": "inbound", "data": {"key": "value"}}'
     mock_request.json.return_value = {"event": "inbound", "data": {"key": "value"}}
 
     # Call the function
@@ -543,6 +545,8 @@ async def test_handle_json_body_error() -> None:
 
     # Create a mock request that raises an exception when json() is called
     mock_request = AsyncMock(spec=Request)
+    # Set a body that will fail to parse as JSON
+    mock_request.body.return_value = b'{"invalid json syntax"'
     mock_request.json.side_effect = Exception("Invalid JSON")
 
     # Call the function
@@ -552,7 +556,7 @@ async def test_handle_json_body_error() -> None:
     assert body is None
     assert error is not None
     assert error.status_code == 400
-    assert "Unsupported Mandrill webhook format" in error.body.decode()
+    assert "Invalid JSON format" in error.body.decode()
 
 
 def test_normalize_attachments_list() -> None:
@@ -1351,11 +1355,11 @@ async def test_prepare_webhook_body_other_content_type() -> None:
     )
 
     # Call function
-    body, error_response = await _prepare_webhook_body(mock_request)
+    body, error = await _prepare_webhook_body(mock_request)
 
     # Should default to JSON parsing
     assert body == {"test": "data"}
-    assert error_response is None
+    assert error is None
 
 
 @pytest.mark.asyncio
