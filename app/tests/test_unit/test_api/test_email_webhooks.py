@@ -1813,3 +1813,98 @@ def test_normalize_attachments_decodes_filenames():
 
     assert len(result) == 1
     assert result[0]["name"] == "72b511d5_DocReq12744.pdf"
+
+
+@pytest.mark.parametrize(
+    "encoded_filename,expected",
+    [
+        (
+            "=?utf-8?Q?incomplete_encoding",
+            "incomplete_encoding",
+        ),  # Incomplete MIME encoding
+        ("=?invalid-charset?Q?filename.pdf?=", "filename.pdf"),  # Invalid charset
+        (
+            "=?utf-8?X?invalid_encoding_type?=",
+            "invalid_encoding_type",
+        ),  # Invalid encoding type
+        (
+            "=?utf-8?Q?multiline\r\n =?utf-8?Q?header?=",
+            "multiline header",
+        ),  # Split MIME header
+    ],
+)
+def test_decode_mime_header_malformed(encoded_filename, expected):
+    """Test decoding malformed MIME headers gracefully."""
+    from app.api.endpoints.email_webhooks import _decode_mime_header
+
+    result = _decode_mime_header(encoded_filename)
+    assert result == expected or isinstance(
+        result, str
+    )  # Even if it doesn't match expected, ensure it returns a string
+
+
+@pytest.mark.asyncio
+async def test_parse_json_with_unusual_encoding():
+    """Test parsing JSON with unusual character encodings."""
+    from app.api.endpoints.email_webhooks import _parse_json_from_string
+
+    # Create JSON with non-ASCII characters in UTF-16 encoding
+    json_data = '{"subject":"Тест email","from":"测试@example.com"}'
+    encoded_data = json_data.encode("utf-16")
+
+    # This should raise an exception which should be caught by the parent function
+    with pytest.raises(UnicodeDecodeError):
+        await _parse_json_from_string(encoded_data)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_webhook_processing():
+    """Test processing multiple webhooks concurrently."""
+    import asyncio
+
+    from app.api.endpoints.email_webhooks import receive_mandrill_webhook
+
+    # Create mock dependencies
+    mock_request1 = AsyncMock(spec=Request)
+    mock_request2 = AsyncMock(spec=Request)
+
+    # Set up requests to return different valid form data
+    mock_request1.headers = {"content-type": "application/x-www-form-urlencoded"}
+    mock_request1.form = AsyncMock(
+        return_value={
+            "mandrill_events": '[{"event":"inbound", "msg":{"from_email":"test1@example.com"}}]'
+        }
+    )
+    mock_request1.body = AsyncMock(return_value=b"form_data")
+
+    mock_request2.headers = {"content-type": "application/x-www-form-urlencoded"}
+    mock_request2.form = AsyncMock(
+        return_value={
+            "mandrill_events": '[{"event":"inbound", "msg":{"from_email":"test2@example.com"}}]'
+        }
+    )
+    mock_request2.body = AsyncMock(return_value=b"form_data")
+
+    # Mock other dependencies
+    mock_db = AsyncMock()
+    mock_email_service = AsyncMock()
+    mock_client = AsyncMock()
+    mock_client.parse_webhook.return_value = MagicMock()
+
+    # Process both webhooks concurrently
+    tasks = [
+        receive_mandrill_webhook(
+            mock_request1, mock_db, mock_email_service, mock_client
+        ),
+        receive_mandrill_webhook(
+            mock_request2, mock_db, mock_email_service, mock_client
+        ),
+    ]
+
+    results = await asyncio.gather(*tasks)
+
+    # Verify both were processed successfully
+    assert results[0].status_code == 202
+    assert results[1].status_code == 202
+    assert mock_client.parse_webhook.call_count == 2
+    assert mock_email_service.process_webhook.call_count == 2

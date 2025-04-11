@@ -1,6 +1,19 @@
 """Email webhook endpoints module.
 
 Contains FastAPI routes for handling webhook requests from Mandrill.
+
+This module provides FastAPI routes and supporting functions for processing webhook
+requests from Mandrill email service. The main functionality includes:
+
+1. Receiving and validating webhook requests in various formats (JSON, form data)
+2. Processing email events (inbound emails, delivery notifications, etc.)
+3. Normalizing and formatting data for consistent internal representation
+4. Handling attachments with proper MIME decoding
+5. Storing processed email data through the email service
+
+The module is structured with a main endpoint function (receive_mandrill_webhook) that
+orchestrates the request handling process, supported by helper functions that handle
+specific aspects of webhook processing.
 """
 
 import email.header  # Add this import for MIME header decoding
@@ -72,58 +85,14 @@ async def _handle_form_data(
 
         if "mandrill_events" in form_data:
             # This is the standard Mandrill format
-            mandrill_events = form_data["mandrill_events"]
-
-            try:
-                # Ensure we have a string before trying to parse as JSON
-                mandrill_events_str = (
-                    str(mandrill_events)
-                    if not isinstance(mandrill_events, (str, bytes, bytearray))
-                    else mandrill_events
-                )
-                body = json.loads(mandrill_events_str)
-                logger.info(
-                    f"Parsed Mandrill events. Count: {len(body) if isinstance(body, list) else 1}"
-                )
-                return body, None
-            except Exception as form_err:
-                logger.error(f"Failed to parse mandrill_events: {str(form_err)}")
-                # Log a sample of the content that failed to parse
-                sample = (
-                    str(mandrill_events)[:100] + "..."
-                    if len(str(mandrill_events)) > 100
-                    else str(mandrill_events)
-                )
-                logger.error(f"Sample of unparseable content: {sample}")
-                return None, JSONResponse(
-                    content={
-                        "status": "error",
-                        "message": f"Invalid Mandrill webhook format: {str(form_err)}",
-                    },
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                )
+            return _parse_form_field(form_data, "mandrill_events")
         else:
             # Try alternate field names that Mandrill might use
-            alternate_fields = ["events", "data", "payload", "webhook"]
-            for field in alternate_fields:
-                if field in form_data:
-                    logger.info(
-                        f"Using alternate field {field!r} instead of 'mandrill_events'"
-                    )
-                    try:
-                        field_value = form_data[field]
-                        field_value_str = (
-                            str(field_value)
-                            if not isinstance(field_value, (str, bytes))
-                            else field_value
-                        )
-                        body = json.loads(field_value_str)
-                        return body, None
-                    except Exception as alt_err:
-                        logger.error(
-                            f"Failed to parse alternate field {field!r}: {str(alt_err)}"
-                        )
+            body, error = _check_alternate_form_fields(form_data)
+            if body is not None or error is not None:
+                return body, error
 
+            # If we get here, no valid fields were found
             logger.warning("Missing 'mandrill_events' field in form data")
             return None, JSONResponse(
                 content={
@@ -141,6 +110,80 @@ async def _handle_form_data(
             },
             status_code=status.HTTP_400_BAD_REQUEST,
         )
+
+
+def _parse_form_field(
+    form_data: Any, field_name: str
+) -> Tuple[
+    Optional[Union[Dict[str, Any], List[Dict[str, Any]]]], Optional[JSONResponse]
+]:
+    """Parse a form field as JSON.
+
+    Args:
+        form_data: The form data dictionary
+        field_name: The name of the field to parse
+
+    Returns:
+        Tuple containing:
+        - The parsed field value or None if parsing failed
+        - An error response or None if successful
+    """
+    try:
+        field_value = form_data[field_name]
+        field_value_str = (
+            str(field_value)
+            if not isinstance(field_value, (str, bytes, bytearray))
+            else field_value
+        )
+        body = json.loads(field_value_str)
+        if field_name == "mandrill_events":
+            logger.info(
+                f"Parsed Mandrill events. Count: {len(body) if isinstance(body, list) else 1}"
+            )
+        else:
+            logger.info(
+                f"Using alternate field {field_name!r} instead of 'mandrill_events'"
+            )
+        return body, None
+    except Exception as err:
+        logger.error(f"Failed to parse {field_name}: {str(err)}")
+        # Log a sample of the content that failed to parse
+        if field_name in form_data:
+            sample = (
+                str(form_data[field_name])[:100] + "..."
+                if len(str(form_data[field_name])) > 100
+                else str(form_data[field_name])
+            )
+            logger.error(f"Sample of unparseable content: {sample}")
+        return None, JSONResponse(
+            content={
+                "status": "error",
+                "message": f"Invalid Mandrill webhook format: {str(err)}",
+            },
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+
+def _check_alternate_form_fields(
+    form_data: Any,
+) -> Tuple[
+    Optional[Union[Dict[str, Any], List[Dict[str, Any]]]], Optional[JSONResponse]
+]:
+    """Check alternate field names that Mandrill might use.
+
+    Args:
+        form_data: The form data dictionary
+
+    Returns:
+        Tuple containing:
+        - The parsed field value or None if no valid fields found
+        - An error response or None if successful
+    """
+    alternate_fields = ["events", "data", "payload", "webhook"]
+    for field in alternate_fields:
+        if field in form_data:
+            return _parse_form_field(form_data, field)
+    return None, None
 
 
 async def _parse_json_from_bytes(raw_body: bytes) -> Any:
@@ -227,6 +270,129 @@ def _create_json_error_response(error_message: str) -> JSONResponse:
     )
 
 
+def _is_ping_event(body: Union[Dict[str, Any], List[Dict[str, Any]]]) -> bool:
+    """Check if the webhook body represents a ping event for validation.
+
+    Mandrill sends a ping event during the initial webhook setup process to verify
+    the endpoint is working correctly. This function detects these validation events
+    so they can be handled with a simple acknowledgment rather than full processing.
+
+    A ping event is identified by either a "type" or "event" field with value "ping".
+
+    Args:
+        body: The parsed webhook body (either a dictionary or list)
+
+    Returns:
+        bool: True if this is a ping event, False otherwise
+    """
+    return isinstance(body, dict) and (
+        body.get("type") == "ping" or body.get("event") == "ping"
+    )
+
+
+def _is_empty_event_list(body: Union[Dict[str, Any], List[Dict[str, Any]]]) -> bool:
+    """Check if the webhook body is an empty list.
+
+    Mandrill sometimes sends empty lists in webhooks, which don't need processing.
+    This function provides a clean way to detect this case early in the processing pipeline.
+
+    Args:
+        body: The parsed webhook body (either a dictionary or list)
+
+    Returns:
+        bool: True if body is a list with zero elements, False otherwise
+    """
+    return isinstance(body, list) and len(body) == 0
+
+
+async def _parse_json_body(
+    request: Request,
+) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
+    """Try different methods to parse JSON body from request.
+
+    Args:
+        request: The FastAPI request object
+
+    Returns:
+        The parsed webhook body (dict or list) or None if all parsing methods fail
+    """
+    raw_body = await request.body()
+    logger.debug(f"Attempting to parse raw body as JSON: {len(raw_body)} bytes")
+
+    # Try each parsing method sequentially
+    body = None
+
+    # Method 1: Parse raw bytes directly
+    if body is None:
+        try:
+            body = await _parse_json_from_bytes(raw_body)
+        except json.JSONDecodeError as err:
+            logger.debug(f"Failed to parse raw bytes directly: {str(err)}")
+
+    # Method 2: Parse after decoding to string
+    if body is None:
+        try:
+            body = await _parse_json_from_string(raw_body)
+        except Exception as err:
+            logger.debug(f"Failed to parse JSON from UTF-8 string: {str(err)}")
+
+    # Method 3: Use request.json()
+    if body is None:
+        try:
+            body = await _parse_json_from_request(request)
+        except Exception as err:
+            logger.error(f"All JSON parsing methods failed. Error: {str(err)}")
+            return None
+
+    # Explicit type cast to satisfy mypy
+    if isinstance(body, (dict, list)):
+        return body
+    return None
+
+
+def _handle_empty_events(
+    body: Union[Dict[str, Any], List[Dict[str, Any]]],
+) -> Optional[JSONResponse]:
+    """Handle empty event lists from webhook.
+
+    Args:
+        body: The parsed webhook body
+
+    Returns:
+        JSONResponse if body is an empty event list, None otherwise
+    """
+    if _is_empty_event_list(body):
+        logger.info("Received empty events list")
+        return JSONResponse(
+            content={"status": "error", "message": "No parseable body found"},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    return None
+
+
+def _handle_ping_event(
+    body: Union[Dict[str, Any], List[Dict[str, Any]]],
+) -> Optional[JSONResponse]:
+    """Handle ping events for webhook validation.
+
+    Args:
+        body: The parsed webhook body
+
+    Returns:
+        JSONResponse if body is a ping event, None otherwise
+    """
+    if _is_ping_event(body):
+        logger.info("Received webhook validation ping")
+        return JSONResponse(
+            content={
+                "status": "success",
+                "message": "Webhook validation successful",
+            },
+            status_code=status.HTTP_200_OK,
+        )
+    return None
+
+
 async def _handle_json_body(
     request: Request,
 ) -> Tuple[
@@ -243,47 +409,32 @@ async def _handle_json_body(
         - An error response or None if successful
     """
     try:
-        # Try to reread the body for JSON parsing
-        # This is needed because request.body() might have been called already
-        raw_body = await request.body()
-        logger.debug(f"Attempting to parse raw body as JSON: {len(raw_body)} bytes")
-
-        # Try multiple parsing strategies in sequence
-        try:
-            body = await _parse_json_from_bytes(raw_body)
-        except json.JSONDecodeError:
-            try:
-                body = await _parse_json_from_string(raw_body)
-            except Exception as decode_err:
-                logger.error(f"Failed to decode and parse body: {str(decode_err)}")
-                try:
-                    body = await _parse_json_from_request(request)
-                except Exception as json_err:
-                    logger.error(
-                        f"Failed to parse using request.json(): {str(json_err)}"
-                    )
-                    raise decode_err
+        # Try to parse the JSON body
+        body = await _parse_json_body(request)
+        if body is None:
+            return None, _create_json_error_response("Invalid JSON format")
 
         # Log information about the parsed body
         _log_parsed_body_info(body)
 
+        # Check for special cases
+        empty_response = _handle_empty_events(body)
+        if empty_response:
+            return None, empty_response
+
+        ping_response = _handle_ping_event(body)
+        if ping_response:
+            return None, ping_response
+
         return body, None
     except json.JSONDecodeError as json_err:
-        logger.error(f"JSON parsing error: {str(json_err)}")
-        # Attempt to log a sample of what we tried to parse
-        try:
-            sample = raw_body.decode("utf-8", errors="replace")[:100]
-            logger.error(f"Sample of unparseable JSON content: {sample}...")
-        except Exception:
-            logger.error("Could not decode body to show sample")
-
-        error_message = f"Invalid JSON format: {str(json_err)}"
-        return None, _create_json_error_response(error_message)
-    except Exception as json_err:
-        logger.error(f"Failed to parse request as JSON: {str(json_err)}")
-
-        error_message = f"Unsupported Mandrill webhook format: {str(json_err)}"
-        return None, _create_json_error_response(error_message)
+        logger.error(f"JSON parse error: {str(json_err)}")
+        return None, _create_json_error_response(
+            f"Invalid JSON format: {str(json_err)}"
+        )
+    except Exception as err:
+        logger.error(f"Error parsing JSON body: {str(err)}")
+        return None, _create_json_error_response(f"Failed to parse JSON: {str(err)}")
 
 
 def _parse_message_id(headers: Dict[str, Any]) -> str:
@@ -315,14 +466,25 @@ def _parse_message_id(headers: Dict[str, Any]) -> str:
 def _decode_mime_header(header_value: str) -> str:
     """Decode a MIME-encoded header value.
 
-    This handles headers encoded with formats like:
-    =?utf-8?Q?filename.pdf?=
+    This function handles MIME-encoded email headers according to RFC 2047, which defines
+    formats like: =?charset?encoding?encoded-text?=
+
+    Common encodings include:
+    - Q-encoding (=?utf-8?Q?filename.pdf?=) for quoted-printable
+    - B-encoding (=?UTF-8?B?ZmlsZW5hbWUucGRm?=) for base64
+
+    The function uses Python's email.header module to handle the decoding process,
+    with fallbacks for various error cases to ensure robustness in processing
+    potentially malformed headers from different email clients.
 
     Args:
-        header_value: The MIME-encoded header value
+        header_value: The potentially MIME-encoded header value
 
     Returns:
-        str: The decoded header value
+        str: The decoded header value, or the original string if:
+             - The input is None or empty
+             - The string doesn't contain MIME encoding markers
+             - Decoding fails for any reason
     """
     if not header_value or "=?" not in header_value:
         return header_value
@@ -383,6 +545,22 @@ def _parse_attachment_string(attachments_str: str) -> List[Dict[str, Any]]:
         return []
 
 
+def _parse_attachments_from_string(attachments_str: str) -> List[Dict[str, Any]]:
+    """Extract attachment data from a string input.
+
+    This function handles string inputs to the _normalize_attachments function.
+    It attempts to parse the string as JSON and then applies MIME decoding to any filenames.
+
+    Args:
+        attachments_str: String containing attachment data, expected to be JSON
+
+    Returns:
+        List[Dict[str, Any]]: Normalized list of attachments
+    """
+    logger.debug(f"Parsing attachments from string: {len(attachments_str)} characters")
+    return _parse_attachment_string(attachments_str)
+
+
 def _process_attachment_dict(attachment_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Process a dictionary that may contain attachment data.
 
@@ -409,16 +587,78 @@ def _process_attachment_dict(attachment_dict: Dict[str, Any]) -> List[Dict[str, 
     return attachment_list
 
 
+def _parse_attachments_from_dict(
+    attachment_dict: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """Extract attachment data from a dictionary input.
+
+    This function handles dictionary inputs to the _normalize_attachments function.
+    It processes both direct attachment dictionaries and nested structures,
+    and applies MIME decoding to any filenames.
+
+    Args:
+        attachment_dict: Dictionary containing attachment data
+
+    Returns:
+        List[Dict[str, Any]]: Normalized list of attachments
+    """
+    logger.debug(
+        f"Parsing attachments from dictionary with {len(attachment_dict)} keys"
+    )
+    return _process_attachment_dict(attachment_dict)
+
+
+def _process_attachment_list(
+    attachment_list: List[Any],
+) -> List[Dict[str, Any]]:
+    """Process a list of attachments to ensure all items are dictionaries.
+
+    This function handles list inputs to the _normalize_attachments function.
+    It ensures all items are dictionaries and applies MIME decoding to any filenames.
+
+    Args:
+        attachment_list: List containing attachment data
+
+    Returns:
+        List[Dict[str, Any]]: Normalized list of attachments
+    """
+    logger.debug(f"Processing attachment list with {len(attachment_list)} items")
+
+    # Filter to only include dictionary items
+    if all(isinstance(item, dict) for item in attachment_list):
+        _decode_filenames_in_attachments(attachment_list)
+        return attachment_list
+    else:
+        # If the list contains non-dictionary items, return as is
+        # This preserves the existing behavior seen in tests
+        return attachment_list
+
+
 def _normalize_attachments(
     attachments: Union[List[Dict[str, Any]], Dict[str, Any], str, Any],
 ) -> List[Dict[str, Any]]:
     """Normalize attachments to ensure they are in the expected format.
 
+    This function handles the various formats that Mandrill might send attachment data in:
+    - List of attachment dictionaries (ideal case)
+    - Single attachment dictionary
+    - JSON string containing attachment data
+    - Other unexpected formats
+
+    For each format, appropriate parsing and normalization is applied, including:
+    - MIME decoding of attachment filenames
+    - Ensuring consistent structure
+    - Basic validation of attachment data
+
+    The function delegates to specialized helpers (_process_attachment_list,
+    _parse_attachments_from_string, _parse_attachments_from_dict) based on input type.
+
     Args:
-        attachments: Raw attachments data from Mandrill
+        attachments: Raw attachments data from Mandrill, which could be in various formats
 
     Returns:
-        List[Dict[str, Any]]: Normalized attachments list
+        List[Dict[str, Any]]: Normalized list of attachment dictionaries, or empty list if
+                              attachments were invalid or empty
     """
     # Log the raw attachment data for debugging
     logger.debug(f"Raw attachments data type: {type(attachments).__name__}")
@@ -439,22 +679,19 @@ def _normalize_attachments(
     if not attachments:
         return []
 
-    # Handle list of dictionaries (normal case)
-    if isinstance(attachments, list) and all(
-        isinstance(item, dict) for item in attachments
-    ):
-        _decode_filenames_in_attachments(attachments)
-        return attachments
+    # Handle list input
+    if isinstance(attachments, list):
+        return _process_attachment_list(attachments)
 
     logger.debug(f"Converting attachments from {type(attachments).__name__} format")
 
     # Handle JSON string
     if isinstance(attachments, str):
-        return _parse_attachment_string(attachments)
+        return _parse_attachments_from_string(attachments)
 
     # Handle dictionary
     elif isinstance(attachments, dict):
-        return _process_attachment_dict(attachments)
+        return _parse_attachments_from_dict(attachments)
 
     # Handle unsupported types
     else:
@@ -466,14 +703,43 @@ def _format_event(
 ) -> Optional[Dict[str, Any]]:
     """Format a Mandrill event into our standard webhook format.
 
+    This function transforms the raw Mandrill event structure into our application's
+    standardized webhook format. It:
+
+    1. Extracts key data from the Mandrill event
+    2. Normalizes attachments using _normalize_attachments
+    3. Processes headers to ensure consistent format
+    4. Extracts or generates a message_id
+    5. Structures the data into our standard format with metadata, content, and details sections
+
+    The returned structure follows this format:
+    ```
+    {
+        "event": <event_type>,
+        "webhook_id": <event_id>,
+        "timestamp": <timestamp>,
+        "data": {
+            "message_id": <message_id>,
+            "from_email": <from_email>,
+            "from_name": <from_name>,
+            "to_email": <to_email>,
+            "subject": <subject>,
+            "body_plain": <text>,
+            "body_html": <html>,
+            "headers": <processed_headers>,
+            "attachments": <normalized_attachments>
+        }
+    }
+    ```
+
     Args:
-        event: The raw Mandrill event
-        event_index: Index of the event in the batch
-        event_type: The event type
-        event_id: The event ID
+        event: The raw Mandrill event dictionary
+        event_index: Index of the event in the batch (for logging)
+        event_type: The event type (e.g., "inbound", "delivered")
+        event_id: The event ID for tracking
 
     Returns:
-        Dict[str, Any]: Formatted event or None if the event can't be processed
+        Dict[str, Any]: Formatted event dictionary or None if the event is missing required data
     """
     if "msg" not in event:
         logger.warning(
@@ -508,21 +774,41 @@ def _format_event(
         if not message_id:
             logger.warning("No message ID found in headers or Mandrill data")
 
-    # Format the event for processing
-    formatted_event = {
+    # Create event metadata
+    event_metadata = {
         "event": event_type,
         "webhook_id": event_id,
         "timestamp": event.get("ts", ""),
+    }
+
+    # Create message content
+    message_content = {
+        "message_id": message_id,
+        "from_email": from_email,
+        "from_name": msg.get("from_name", ""),
+        "to_email": msg.get("email", ""),
+        "subject": subject,
+    }
+
+    # Create message body
+    message_body = {
+        "body_plain": msg.get("text", ""),
+        "body_html": msg.get("html", ""),
+    }
+
+    # Create message attachments and headers
+    message_details = {
+        "headers": processed_headers,
+        "attachments": normalized_attachments,
+    }
+
+    # Combine all components into the final formatted event
+    formatted_event = {
+        **event_metadata,
         "data": {
-            "message_id": message_id,
-            "from_email": from_email,
-            "from_name": msg.get("from_name", ""),
-            "to_email": msg.get("email", ""),
-            "subject": subject,
-            "body_plain": msg.get("text", ""),
-            "body_html": msg.get("html", ""),
-            "headers": processed_headers,
-            "attachments": normalized_attachments,
+            **message_content,
+            **message_body,
+            **message_details,
         },
     }
 
@@ -638,8 +924,17 @@ async def _prepare_webhook_body(
 ]:
     """Extract and prepare the webhook body from a request.
 
+    This function serves as the first step in the webhook processing pipeline. It:
+
+    1. Determines the request content type (form data vs. direct JSON)
+    2. Delegates to specialized parsers (_handle_form_data or _handle_json_body)
+    3. Returns both the parsed body and any error response
+
+    This separation of concerns allows the main endpoint function to focus on
+    orchestration rather than parsing details.
+
     Args:
-        request: The FastAPI request object
+        request: The FastAPI request object containing the raw webhook data
 
     Returns:
         Tuple containing:
@@ -671,6 +966,74 @@ async def _prepare_webhook_body(
     else:
         logger.debug("Processing as direct JSON")
         return await _handle_json_body(request)
+
+
+async def _handle_event_list(
+    body: List[Dict[str, Any]], client: WebhookClient, email_service: EmailService
+) -> JSONResponse:
+    """Handle processing for a list of Mandrill events.
+
+    This function processes a batch of Mandrill events by:
+
+    1. Delegating to _process_event_batch for parallel processing of all events
+    2. Tracking the count of successfully processed and skipped events
+    3. Generating an appropriate response with summary information
+
+    It maintains Mandrill's expectation of receiving a 200-level response
+    even if some events failed to process, to prevent unnecessary retries.
+
+    Args:
+        body: List of event dictionaries
+        client: Webhook client for parsing events
+        email_service: Email service for database operations
+
+    Returns:
+        JSONResponse: Response with processing results summary and appropriate status code
+    """
+    processed_count, skipped_count = await _process_event_batch(
+        client, email_service, body
+    )
+
+    # Return summary of processing
+    if processed_count > 0:
+        message = f"Processed {processed_count} events successfully"
+        if skipped_count > 0:
+            message = f"{message} ({skipped_count} skipped)"
+
+        return JSONResponse(
+            content={"status": "success", "message": message},
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+    else:
+        return JSONResponse(
+            content={
+                "status": "error",
+                "message": f"Failed to process any events ({skipped_count} skipped)",
+            },
+            status_code=status.HTTP_200_OK,  # Use 200 for Mandrill to avoid retries
+        )
+
+
+async def _handle_single_event_dict(
+    body: Dict[str, Any], client: WebhookClient, email_service: EmailService
+) -> JSONResponse:
+    """Handle processing for a single Mandrill event in dictionary format.
+
+    This function processes a single Mandrill event that was received as a
+    dictionary rather than within an array. This is an uncommon but supported format.
+
+    The function delegates to _process_non_list_event which handles the actual processing
+    and returns an appropriate response.
+
+    Args:
+        body: Event dictionary to process
+        client: Webhook client for parsing the event
+        email_service: Email service for database operations
+
+    Returns:
+        JSONResponse: Response with processing result and 202 Accepted status code
+    """
+    return await _process_non_list_event(client, email_service, body)
 
 
 @router.post(
@@ -716,11 +1079,21 @@ async def receive_mandrill_webhook(
     email_service: EmailService = get_email_handler,
     client: WebhookClient = get_webhook,
 ) -> JSONResponse:
-    """Handle Mandrill email webhook.
+    """Handle Mandrill email webhook requests.
 
-    This endpoint receives webhooks from Mandrill containing email data.
-    Mandrill typically sends data as form data with a field named 'mandrill_events'
-    containing a JSON string with an array of events.
+    This endpoint serves as the main entry point for receiving webhook data from Mandrill.
+    It orchestrates the complete webhook processing flow:
+    1. Parses and validates the incoming request (both JSON and form-encoded formats)
+    2. Handles special cases like ping events for webhook validation
+    3. Processes event data (single events or batches)
+    4. Delegates to specialized handlers based on payload format
+    5. Returns appropriate responses with status information
+
+    Mandrill typically sends data in one of these formats:
+    - Form data with a 'mandrill_events' field containing a JSON string array of events
+    - Direct JSON body with an array of event objects
+    - Direct JSON body with a single event object
+    - Simple ping object for webhook validation
 
     Args:
         request: The FastAPI request object containing the webhook payload
@@ -729,10 +1102,10 @@ async def receive_mandrill_webhook(
         client: Webhook client for webhook parsing
 
     Returns:
-        JSONResponse: Success response with appropriate status code:
-            - 200 OK for ping events during webhook registration
-            - 202 ACCEPTED for regular webhook events
-            - 500 INTERNAL SERVER ERROR for processing errors
+        JSONResponse: Response with appropriate status code:
+            - 200 OK for ping events or when returning errors (to prevent Mandrill retries)
+            - 202 ACCEPTED for successfully processed webhook events
+            - 400 BAD REQUEST for parsing/validation errors
     """
     try:
         # Prepare the webhook body
@@ -754,7 +1127,7 @@ async def receive_mandrill_webhook(
             )
 
         # Check if this is just an empty event array
-        if isinstance(body, list) and len(body) == 0:
+        if _is_empty_event_list(body):
             logger.info("Received empty events list")
             return JSONResponse(
                 content={"status": "error", "message": "No parseable body found"},
@@ -762,10 +1135,7 @@ async def receive_mandrill_webhook(
             )
 
         # Check if this is a ping event for webhook validation
-        is_ping = isinstance(body, dict) and (
-            body.get("type") == "ping" or body.get("event") == "ping"
-        )
-        if is_ping:
+        if _is_ping_event(body):
             logger.info("Received webhook validation ping")
             return JSONResponse(
                 content={
@@ -775,33 +1145,11 @@ async def receive_mandrill_webhook(
                 status_code=status.HTTP_200_OK,
             )
 
-        # Handle Mandrill's array-based format (standard format)
+        # Handle based on body type (list or dict)
         if isinstance(body, list):
-            processed_count, skipped_count = await _process_event_batch(
-                client, email_service, body
-            )
-
-            # Return summary of processing
-            if processed_count > 0:
-                message = f"Processed {processed_count} events successfully"
-                if skipped_count > 0:
-                    message = f"{message} ({skipped_count} skipped)"
-
-                return JSONResponse(
-                    content={"status": "success", "message": message},
-                    status_code=status.HTTP_202_ACCEPTED,
-                )
-            else:
-                return JSONResponse(
-                    content={
-                        "status": "error",
-                        "message": f"Failed to process any events ({skipped_count} skipped)",
-                    },
-                    status_code=status.HTTP_200_OK,  # Use 200 for Mandrill to avoid retries
-                )
+            return await _handle_event_list(body, client, email_service)
         else:
-            # Handle non-list format (unusual for Mandrill but handle it anyway)
-            return await _process_non_list_event(client, email_service, body)
+            return await _handle_single_event_dict(body, client, email_service)
     except Exception as e:
         logger.error(f"Error processing webhook: {str(e)}")
         # Return 200 OK even for errors as Mandrill expects 2xx responses
