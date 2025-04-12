@@ -1110,7 +1110,7 @@ async def test_process_non_list_event_failure() -> None:
 async def test_receive_mandrill_webhook_full_integration() -> None:
     """Test the full receive_mandrill_webhook endpoint with a list of events."""
     # Local import to avoid redefinition issues
-    from app.api.endpoints.email_webhooks import receive_mandrill_webhook
+    from app.api.endpoints.webhooks.mandrill.router import receive_mandrill_webhook
 
     # Create a mock request
     mock_request = MagicMock(spec=Request)
@@ -1165,7 +1165,7 @@ async def test_receive_mandrill_webhook_full_integration() -> None:
 async def test_receive_mandrill_webhook_ping_event() -> None:
     """Test the endpoint when receiving a ping event."""
     # Local import to avoid redefinition issues
-    from app.api.endpoints.email_webhooks import receive_mandrill_webhook
+    from app.api.endpoints.webhooks.mandrill.router import receive_mandrill_webhook
 
     # Create a mock request
     mock_request = MagicMock(spec=Request)
@@ -1204,7 +1204,7 @@ async def test_receive_mandrill_webhook_ping_event() -> None:
 async def test_receive_mandrill_webhook_exception_handling() -> None:
     """Test the exception handling in the webhook endpoint."""
     # Local import to avoid redefinition issues
-    from app.api.endpoints.email_webhooks import receive_mandrill_webhook
+    from app.api.endpoints.webhooks.mandrill.router import receive_mandrill_webhook
 
     # Create a mock request
     mock_request = MagicMock(spec=Request)
@@ -1243,7 +1243,7 @@ async def test_receive_mandrill_webhook_exception_handling() -> None:
 async def test_receive_mandrill_webhook_empty_list() -> None:
     """Test the endpoint with an empty list of events."""
     # Local import to avoid redefinition issues
-    from app.api.endpoints.email_webhooks import receive_mandrill_webhook
+    from app.api.endpoints.webhooks.mandrill.router import receive_mandrill_webhook
 
     # Create a mock request
     mock_request = MagicMock(spec=Request)

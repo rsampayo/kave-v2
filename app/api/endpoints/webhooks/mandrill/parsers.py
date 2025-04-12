@@ -1,6 +1,18 @@
 """Mandrill webhook parsers module.
 
 Contains functions for parsing and validating webhook events from Mandrill.
+This module handles the extraction and validation of webhook data from various formats
+that Mandrill might send, including JSON and form-encoded requests.
+
+Key capabilities:
+1. Parse webhook payloads from multiple formats (JSON body, form data)
+2. Handle special event types (ping events, empty events)
+3. Validate webhook structure and content
+4. Create appropriate responses for various parsing scenarios
+5. Extract and normalize event data to prepare for processing
+
+All functions are prefixed with underscore as they are intended for internal use within
+the Mandrill webhook processing system.
 """
 
 import json

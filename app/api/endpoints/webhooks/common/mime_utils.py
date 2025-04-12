@@ -1,4 +1,17 @@
-"""MIME utility functions for webhook processing."""
+"""MIME utility functions for webhook processing.
+
+This module provides utilities for handling MIME-encoded text commonly found in email headers.
+Its primary purpose is to decode and normalize these values for better readability within
+the application. MIME encoding is often used for non-ASCII characters in email headers.
+
+Features:
+1. Decode MIME-encoded header values with proper charset handling
+2. Fallback strategies for handling decoding errors
+3. Support for multiple MIME encoding formats
+
+All functions are prefixed with underscore as they are intended for internal use within
+the webhook processing system.
+"""
 
 import email.header
 import logging

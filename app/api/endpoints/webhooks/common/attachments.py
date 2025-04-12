@@ -1,6 +1,14 @@
 """Webhook attachments processing module.
 
-Contains functions for normalizing and processing email attachments.
+Contains functions for normalizing and processing email attachments from webhook payloads.
+This module provides utilities for handling attachments in various formats, including:
+
+1. Normalizing attachments from different sources (JSON strings, lists, dictionaries)
+2. Decoding MIME-encoded filenames for improved readability
+3. Converting attachment structures to a standardized format for consistent processing
+
+All functions are prefixed with underscore as they are intended for internal use within
+the webhook processing system.
 """
 
 import json
