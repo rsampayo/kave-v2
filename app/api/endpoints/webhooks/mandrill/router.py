@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_db, get_email_service, get_webhook_client
 from app.api.endpoints.webhooks.mandrill.parsers import (
     _is_empty_event_list,
     _is_ping_event,
@@ -26,10 +27,9 @@ from app.api.endpoints.webhooks.mandrill.processors import (
     _handle_event_list,
     _handle_single_event_dict,
 )
-from app.db.session import get_db
-from app.integrations.email.client import WebhookClient, get_webhook_client
+from app.integrations.email.client import WebhookClient
 from app.schemas.webhook_schemas import WebhookResponse
-from app.services.email_service import EmailService, get_email_service
+from app.services.email_service import EmailService
 
 # Set up logging
 logger = logging.getLogger(__name__)

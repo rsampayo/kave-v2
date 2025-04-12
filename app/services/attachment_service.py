@@ -9,10 +9,12 @@ import uuid
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
+# Fix circular import by importing directly from specific modules
+from app.api.deps.database import get_db
+from app.api.deps.storage import get_storage_service
 from app.models.email_data import Attachment
 from app.schemas.webhook_schemas import EmailAttachment
-from app.services.storage_service import StorageService, get_storage_service
+from app.services.storage_service import StorageService
 
 logger = logging.getLogger(__name__)
 
