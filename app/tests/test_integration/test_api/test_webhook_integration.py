@@ -358,5 +358,5 @@ async def test_webhook_endpoint_ping(
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == {
         "status": "success",
-        "message": "Webhook validation successful",
+        "message": "Ping acknowledged",
     }

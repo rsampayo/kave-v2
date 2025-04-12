@@ -9,7 +9,7 @@ This document outlines a step-by-step plan to refactor the `app/api/endpoints/em
 1. **Small Steps**: Each refactoring iteration should be as small as possible
 2. **Continuous Testing**: Run pytest after each change to ensure functionality is preserved
 3. **Code Quality**: Check linting and other quality metrics after each step
-4. **Backward Compatibility**: Maintain the same API and behavior throughout the refactoring
+4. **Complete Replacement**: After each phase, remove old functionality entirely
 
 ## Phase 1: Initial Setup
 
@@ -24,6 +24,11 @@ This document outlines a step-by-step plan to refactor the `app/api/endpoints/em
 - Create `app/api/endpoints/webhooks/common/mime_utils.py`
 - Move MIME-related functions (`_decode_mime_header`)
 - Update imports in email_webhooks.py to use new location
+- Run tests and fix any issues
+- Run linter and fix any issues
+
+### Step 1.3: Remove Old Utils Functions
+- Remove old utility functions from email_webhooks.py
 - Run tests and fix any issues
 - Run linter and fix any issues
 
@@ -42,6 +47,11 @@ This document outlines a step-by-step plan to refactor the `app/api/endpoints/em
 - Run tests and fix any issues
 - Run linter and fix any issues
 
+### Step 2.2: Remove Old Attachment Functions
+- Remove old attachment functions from email_webhooks.py
+- Run tests and fix any issues
+- Run linter and fix any issues
+
 ## Phase 3: Extract Parsing Logic
 
 ### Step 3.1: Extract Form Data Parsing
@@ -50,7 +60,7 @@ This document outlines a step-by-step plan to refactor the `app/api/endpoints/em
   - `_handle_form_data`
   - `_parse_form_field`
   - `_check_alternate_form_fields`
-- Update imports in email_webhooks.py
+- Update imports to use new module
 - Run tests and fix any issues
 - Run linter and fix any issues
 
@@ -63,7 +73,7 @@ This document outlines a step-by-step plan to refactor the `app/api/endpoints/em
   - `_create_json_error_response`
   - `_handle_json_body`
   - `_parse_json_body`
-- Update imports in email_webhooks.py
+- Update imports to use new module
 - Run tests and fix any issues
 - Run linter and fix any issues
 
@@ -74,7 +84,12 @@ This document outlines a step-by-step plan to refactor the `app/api/endpoints/em
   - `_is_empty_event_list`
   - `_handle_empty_events`
   - `_handle_ping_event`
-- Update imports in email_webhooks.py
+- Update imports to use new module
+- Run tests and fix any issues
+- Run linter and fix any issues
+
+### Step 3.4: Remove Old Parsing Functions
+- Remove all old parsing functions from email_webhooks.py
 - Run tests and fix any issues
 - Run linter and fix any issues
 
@@ -88,7 +103,7 @@ This document outlines a step-by-step plan to refactor the `app/api/endpoints/em
   - `_process_non_list_event`
   - `_handle_event_list`
   - `_handle_single_event_dict`
-- Update imports in email_webhooks.py
+- Update imports to use new module
 - Run tests and fix any issues
 - Run linter and fix any issues
 
@@ -98,7 +113,12 @@ This document outlines a step-by-step plan to refactor the `app/api/endpoints/em
   - `_format_event`
   - `_process_mandrill_headers`
   - `_parse_message_id`
-- Update imports in email_webhooks.py
+- Update imports to use new module
+- Run tests and fix any issues
+- Run linter and fix any issues
+
+### Step 4.3: Remove Old Processing Functions
+- Remove old processing and formatting functions from email_webhooks.py
 - Run tests and fix any issues
 - Run linter and fix any issues
 
@@ -113,8 +133,7 @@ This document outlines a step-by-step plan to refactor the `app/api/endpoints/em
 - Run linter and fix any issues
 
 ### Step 5.2: Update Main Webhooks Router
-- Update `app/api/endpoints/email_webhooks.py` to import and include the Mandrill router
-- Make sure the same API is maintained
+- Replace the content in `app/api/endpoints/email_webhooks.py` to import and use the new router
 - Run tests and fix any issues
 - Run linter and fix any issues
 
@@ -147,7 +166,7 @@ This document outlines a step-by-step plan to refactor the `app/api/endpoints/em
 ## Conclusion
 
 By following this step-by-step plan, we will have:
-1. Safely refactored the monolithic email_webhooks.py file into a modular structure
-2. Maintained backward compatibility throughout the process
+1. Completely refactored the monolithic email_webhooks.py file into a modular structure
+2. Removed old functionality after each phase is completed
 3. Ensured code quality at each step
 4. Created a maintainable architecture that can easily accommodate future webhook providers like Twilio 

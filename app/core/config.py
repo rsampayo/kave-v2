@@ -1,3 +1,9 @@
+"""Configuration settings module for Kave application.
+
+This module defines the application settings and configuration options
+using Pydantic's BaseSettings for environment variable loading.
+"""
+
 from pathlib import Path
 
 from pydantic import field_validator

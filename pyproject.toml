@@ -28,14 +28,10 @@ warn_return_any = true
 warn_unreachable = false
 disallow_untyped_calls = true
 warn_unused_configs = true
-
 # Allow disabling specific error codes (from mypy.ini)
 disable_error_code = "attr-defined, call-arg, assignment, unreachable"
-
 # Plugin configurations (from .mypy.ini)
 plugins = ["sqlalchemy.ext.mypy.plugin", "pydantic.mypy"]
-
-# These modules no longer need ignore_missing_imports as no errors are detected without it
 
 [[tool.mypy.overrides]]
 module = ["tests.*", "app.tests.*"]
@@ -56,11 +52,8 @@ module = ["app.core.config"]
 disallow_untyped_calls = false
 disallow_untyped_defs = false
 
-# The sqlalchemy module is now type checked by its native plugin
-# No need for ignore_missing_imports override
-
 [tool.pytest.ini_options]
 testpaths = ["app/tests"]
 python_files = "test_*.py"
 python_functions = "test_*"
-python_classes = "Test*" 
+python_classes = "Test*"
