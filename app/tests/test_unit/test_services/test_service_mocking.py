@@ -5,7 +5,7 @@ for external services in the application. These patterns should be followed
 throughout the test suite to ensure consistency and maintainability.
 """
 
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -156,7 +156,7 @@ async def test_settings_mocking() -> None:
         def get_settings() -> Settings:
             return imported_settings
 
-        def test_endpoint(settings: Settings = Depends(get_settings)) -> Dict[str, str]:
+        def test_endpoint(settings: Settings = Depends(get_settings)) -> dict[str, str]:
             return {"project": settings.PROJECT_NAME}
 
         # Create endpoint settings argument by calling the function directly

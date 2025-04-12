@@ -2,8 +2,9 @@
 
 import json
 import os
+from collections.abc import AsyncGenerator, Callable
 from datetime import datetime
-from typing import Any, AsyncGenerator, Callable, Type
+from typing import Any
 from unittest import mock
 
 import httpx
@@ -180,7 +181,7 @@ async def mock_mailchimp_client() -> AsyncGenerator[mock.AsyncMock, None]:
 
 
 @pytest.fixture
-def json_encoder() -> Type[json.JSONEncoder]:
+def json_encoder() -> type[json.JSONEncoder]:
     """Return a custom JSON encoder that can handle datetime objects."""
     return CustomJSONEncoder
 

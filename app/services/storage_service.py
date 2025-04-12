@@ -1,5 +1,6 @@
+"""Module providing Storage Service functionality for the services."""
+
 import logging
-from typing import Dict, Optional
 
 import aioboto3  # type: ignore
 import aiofiles
@@ -16,7 +17,7 @@ class StorageService:
     Can work with local filesystem or S3 depending on configuration.
     """
 
-    def __init__(self, aws_credentials: Optional[Dict[str, str]] = None) -> None:
+    def __init__(self, aws_credentials: dict[str, str] | None = None) -> None:
         """Initialize the storage service.
 
         Args:
@@ -32,7 +33,7 @@ class StorageService:
         }
 
     async def save_file(
-        self, file_data: bytes, object_key: str, content_type: Optional[str] = None
+        self, file_data: bytes, object_key: str, content_type: str | None = None
     ) -> str:
         """Save a file to storage (either S3 or local filesystem).
 
@@ -46,11 +47,10 @@ class StorageService:
         """
         if self.use_s3:
             return await self._save_to_s3(file_data, object_key, content_type)
-        else:
-            return await self._save_to_filesystem(file_data, object_key)
+        return await self._save_to_filesystem(file_data, object_key)
 
     async def _save_to_s3(
-        self, file_data: bytes, object_key: str, content_type: Optional[str] = None
+        self, file_data: bytes, object_key: str, content_type: str | None = None
     ) -> str:
         """Save a file to S3.
 
@@ -79,7 +79,7 @@ class StorageService:
 
             return f"s3://{self.bucket_name}/{object_key}"
         except ClientError as e:
-            logger.error(f"Error uploading to S3: {str(e)}")
+            logger.error("Error uploading to S3: %s", str(e))
             raise
 
     async def _save_to_filesystem(self, file_data: bytes, relative_path: str) -> str:
@@ -103,7 +103,7 @@ class StorageService:
 
         return f"file://{full_path.absolute()}"
 
-    async def get_file(self, uri: str) -> Optional[bytes]:
+    async def get_file(self, uri: str) -> bytes | None:
         """Get file content from either S3 or filesystem.
 
         Args:
@@ -114,13 +114,12 @@ class StorageService:
         """
         if uri.startswith("s3://"):
             return await self._get_from_s3(uri)
-        elif uri.startswith("file://"):
+        if uri.startswith("file://"):
             return await self._get_from_filesystem(uri)
-        else:
-            logger.error(f"Unsupported URI scheme: {uri}")
-            return None
+        logger.error("Unsupported URI scheme: %s", uri)
+        return None
 
-    async def _get_from_s3(self, uri: str) -> Optional[bytes]:
+    async def _get_from_s3(self, uri: str) -> bytes | None:
         """Get file content from S3.
 
         Args:
@@ -147,12 +146,12 @@ class StorageService:
 
         except ClientError as e:
             if e.response["Error"]["Code"] == "NoSuchKey":
-                logger.warning(f"File not found in S3: {uri}")
+                logger.warning("File not found in S3: %s", uri)
                 return None
-            logger.error(f"Error retrieving from S3: {str(e)}")
+            logger.error("Error retrieving from S3: %s", str(e))
             raise
 
-    async def _get_from_filesystem(self, uri: str) -> Optional[bytes]:
+    async def _get_from_filesystem(self, uri: str) -> bytes | None:
         """Get file content from the filesystem.
 
         Args:
@@ -170,10 +169,10 @@ class StorageService:
             async with aiofiles.open(uri, "rb") as f:
                 return await f.read()
         except FileNotFoundError:
-            logger.warning(f"File not found: {uri}")
+            logger.warning("File not found: %s", uri)
             return None
         except Exception as e:
-            logger.error(f"Error reading file: {str(e)}")
+            logger.error("Error reading file: %s", str(e))
             raise
 
 

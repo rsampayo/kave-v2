@@ -1,5 +1,7 @@
+"""Module providing Client functionality for the integrations email."""
+
 import logging
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 from fastapi import HTTPException, Request, status
 
@@ -10,14 +12,14 @@ from app.schemas.webhook_schemas import WebhookData
 logger = logging.getLogger(__name__)
 
 # Define a type for webhook request
-WebhookRequestType = Union[Request, Dict[str, Any], str, None]
+WebhookRequestType = Any
 
 
 class WebhookClient:
     """Client for interacting with Email API and webhooks."""
 
     def __init__(
-        self, api_key: str, webhook_secret: str, server_prefix: Optional[str] = None
+        self, api_key: str, webhook_secret: str, server_prefix: str | None = None
     ):
         """Initialize the Webhook client.
 
@@ -59,7 +61,7 @@ class WebhookClient:
             return api_key.split("-")[-1]
         return "us1"  # Default to us1 if no prefix found in API key
 
-    async def _validate_webhook_data(self, data: Dict[str, Any]) -> None:
+    async def _validate_webhook_data(self, data: dict[str, Any]) -> None:
         """Validate webhook data structure.
 
         Args:
@@ -92,8 +94,8 @@ class WebhookClient:
                     )
 
     async def _handle_test_cases(
-        self, request: Dict[str, Any]
-    ) -> Optional[MailchimpWebhookModel]:
+        self, request: dict[str, Any]
+    ) -> MailchimpWebhookModel | None:
         """Handle special test case validation.
 
         Args:
@@ -127,9 +129,7 @@ class WebhookClient:
 
         return None
 
-    async def parse_webhook(
-        self, request: Union[Request, Dict[str, Any]]
-    ) -> WebhookData:
+    async def parse_webhook(self, request: Request | dict[str, Any]) -> WebhookData:
         """Parse and validate a webhook.
 
         Args:
@@ -183,13 +183,13 @@ class WebhookClient:
             # Re-raise HTTP exceptions
             raise
         except Exception as e:
-            logger.error(f"Failed to parse webhook: {str(e)}")
+            logger.error("Failed to parse webhook: %s", str(e))
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid webhook payload: {str(e)}",
             ) from e
 
-    def _validate_attachment(self, attachment: Dict[str, Any]) -> bool:
+    def _validate_attachment(self, attachment: dict[str, Any]) -> bool:
         """Validate attachment data.
 
         Args:

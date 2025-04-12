@@ -1,3 +1,5 @@
+"""Module providing Test Email Service functionality for the tests test unit test services."""
+
 import uuid
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch

@@ -1,5 +1,6 @@
-from datetime import datetime
-from typing import List, Optional
+"""Module providing Email Data functionality for the models."""
+
+import datetime
 
 from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -29,7 +30,7 @@ class Email(Base):
     from_email: Mapped[str] = mapped_column(
         String(255), index=True, comment="Email address of the sender"
     )
-    from_name: Mapped[Optional[str]] = mapped_column(
+    from_name: Mapped[str | None] = mapped_column(
         String(255), nullable=True, comment="Display name of the sender, may be null"
     )
     to_email: Mapped[str] = mapped_column(
@@ -38,46 +39,46 @@ class Email(Base):
     subject: Mapped[str] = mapped_column(
         String(255), comment="Subject line of the email"
     )
-    body_text: Mapped[Optional[str]] = mapped_column(
+    body_text: Mapped[str | None] = mapped_column(
         Text, nullable=True, comment="Plain text content of the email"
     )
-    body_html: Mapped[Optional[str]] = mapped_column(
+    body_html: Mapped[str | None] = mapped_column(
         Text, nullable=True, comment="HTML content of the email, if available"
     )
-    received_at: Mapped[datetime] = mapped_column(
+    received_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        default=datetime.datetime.utcnow,
         comment="Timestamp when the email was received",
     )
 
     # Webhook metadata
-    webhook_id: Mapped[Optional[str]] = mapped_column(
+    webhook_id: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
         comment="ID of the webhook that delivered this email",
     )
-    webhook_event: Mapped[Optional[str]] = mapped_column(
+    webhook_event: Mapped[str | None] = mapped_column(
         String(50),
         nullable=True,
         comment="Type of webhook event (e.g., 'inbound_email')",
     )
 
     # Test column for migration example
-    test_column: Mapped[Optional[str]] = mapped_column(
+    test_column: Mapped[str | None] = mapped_column(
         String(100),
         nullable=True,
         comment="Test column for Alembic migration example",
     )
 
     # Second test column for Alembic functionality testing
-    test_column_two: Mapped[Optional[str]] = mapped_column(
+    test_column_two: Mapped[str | None] = mapped_column(
         String(100),
         nullable=True,
         comment="Second test column for Alembic migration testing",
     )
 
     # Relationships - List of attachments associated with this email
-    attachments: Mapped[List["Attachment"]] = relationship(
+    attachments: Mapped[list["Attachment"]] = relationship(
         "Attachment", back_populates="email", cascade="all, delete-orphan"
     )
 
@@ -107,22 +108,22 @@ class Attachment(Base):
     content_type: Mapped[str] = mapped_column(
         String(100), comment="MIME type of the attachment"
     )
-    content_id: Mapped[Optional[str]] = mapped_column(
+    content_id: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
         comment="Content-ID for referencing in HTML (e.g., for inline images)",
     )
-    size: Mapped[Optional[int]] = mapped_column(
+    size: Mapped[int | None] = mapped_column(
         nullable=True, comment="Size of the attachment in bytes"
     )
 
     # Storage information
-    file_path: Mapped[Optional[str]] = mapped_column(
+    file_path: Mapped[str | None] = mapped_column(
         String(512),
         nullable=True,
         comment="Path to the stored file on disk (deprecated)",
     )
-    content: Mapped[Optional[bytes]] = mapped_column(
+    content: Mapped[bytes | None] = mapped_column(
         nullable=True,
         comment=(
             "Raw binary content of the attachment. "
@@ -130,7 +131,7 @@ class Attachment(Base):
             "referenced by storage_uri. This field is kept for backward compatibility."
         ),
     )
-    storage_uri: Mapped[Optional[str]] = mapped_column(
+    storage_uri: Mapped[str | None] = mapped_column(
         String(1024),
         nullable=True,
         comment="URI for the stored file (s3:// or file:// scheme)",
@@ -156,8 +157,8 @@ class EmailAttachment:
         name: str,
         type: str,
         content: str,
-        content_id: Optional[str] = None,
-        size: Optional[int] = None,
+        content_id: str | None = None,
+        size: int | None = None,
         base64: bool = True,
     ):
         """Initialize an EmailAttachment instance.

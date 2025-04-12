@@ -1,6 +1,7 @@
+"""Module providing Email Service functionality for the services."""
+
 import logging
 from datetime import datetime
-from typing import Optional
 
 from fastapi import Depends
 from sqlalchemy import select
@@ -55,7 +56,7 @@ class EmailService:
             return email
         except Exception as e:
             await self.db.rollback()
-            logger.error(f"Failed to process webhook: {str(e)}")
+            logger.error("Failed to process webhook: %s", str(e))
             raise ValueError(f"Email processing failed: {str(e)}") from e
 
     async def store_email(
@@ -74,7 +75,9 @@ class EmailService:
         # Check if email already exists (by message_id)
         existing_email = await self.get_email_by_message_id(email_data.message_id)
         if existing_email:
-            logger.info(f"Email with message ID {email_data.message_id} already exists")
+            logger.info(
+                "Email with message ID %s already exists", email_data.message_id
+            )
             return existing_email
 
         # Truncate subject if it's too long (database column limit)
@@ -102,7 +105,7 @@ class EmailService:
 
         return email
 
-    async def get_email_by_message_id(self, message_id: str) -> Optional[Email]:
+    async def get_email_by_message_id(self, message_id: str) -> Email | None:
         """Get an email by its message ID.
 
         Args:

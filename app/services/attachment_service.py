@@ -1,9 +1,10 @@
+"""Module providing Attachment Service functionality for the services."""
+
 import base64
 import email.header
 import logging
 import mimetypes
 import uuid
-from typing import List
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,8 +31,8 @@ class AttachmentService:
         self.storage = storage
 
     async def process_attachments(
-        self, email_id: int, attachments: List[EmailAttachment]
-    ) -> List[Attachment]:
+        self, email_id: int, attachments: list[EmailAttachment]
+    ) -> list[Attachment]:
         """Process and store email attachments.
 
         Args:
@@ -156,7 +157,7 @@ class AttachmentService:
 
             return result
         except Exception as e:
-            logger.warning(f"Failed to decode MIME header: {str(e)}")
+            logger.warning("Failed to decode MIME header: %s", str(e))
             return header_value
 
 

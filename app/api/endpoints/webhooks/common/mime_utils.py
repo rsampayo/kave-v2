@@ -2,13 +2,12 @@
 
 import email.header
 import logging
-from typing import Optional
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
 
-def _decode_mime_header(value: Optional[str]) -> Optional[str]:  # noqa: C901
+def _decode_mime_header(value: str | None) -> str | None:  # noqa: C901
     """Decode a MIME-encoded header value.
 
     Args:
@@ -53,5 +52,5 @@ def _decode_mime_header(value: Optional[str]) -> Optional[str]:  # noqa: C901
         return value
     except Exception as e:
         # If any error occurs during decoding, return the original value
-        logger.warning(f"Error decoding MIME header: {e}")
+        logger.warning("Error decoding MIME header: %s", e)
         return value

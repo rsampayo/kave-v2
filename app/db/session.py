@@ -1,4 +1,7 @@
-from typing import Any, AsyncGenerator
+"""Module providing Session functionality for the db."""
+
+from collections.abc import AsyncGenerator
+from typing import Any
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,

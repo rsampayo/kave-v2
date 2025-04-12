@@ -1,7 +1,7 @@
 """Integration tests for application lifecycle management."""
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 import pytest
 from fastapi import FastAPI

@@ -5,7 +5,7 @@ Contains functions for normalizing and processing email attachments.
 
 import json
 import logging
-from typing import Any, Dict, List, Union
+from typing import Any
 
 from app.api.endpoints.webhooks.common.mime_utils import _decode_mime_header
 
@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 def _normalize_attachments(
-    attachments: Union[List[Dict[str, Any]], Dict[str, Any], str, None],
-) -> List[Dict[str, Any]]:
+    attachments: list[dict[str, Any]] | dict[str, Any] | str | None,
+) -> list[dict[str, Any]]:
     """Normalize attachment data to a consistent format.
 
     Handles multiple input formats:
@@ -51,11 +51,11 @@ def _normalize_attachments(
         return _parse_attachments_from_dict(attachments)
 
     # Any other format, log warning and return empty list
-    logger.warning(f"Unsupported attachment format: {type(attachments)}")
+    logger.warning("Unsupported attachment format: %s", type(attachments))
     return []
 
 
-def _process_attachment_list(attachments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _process_attachment_list(attachments: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Process a list of attachment dictionaries.
 
     Args:
@@ -81,7 +81,7 @@ def _process_attachment_list(attachments: List[Dict[str, Any]]) -> List[Dict[str
     return normalized
 
 
-def _parse_attachment_string(attachment_string: str) -> List[Dict[str, Any]]:
+def _parse_attachment_string(attachment_string: str) -> list[dict[str, Any]]:
     """Parse a JSON attachment string.
 
     Args:
@@ -94,17 +94,16 @@ def _parse_attachment_string(attachment_string: str) -> List[Dict[str, Any]]:
         parsed = json.loads(attachment_string)
         if isinstance(parsed, list):
             return _process_attachment_list(parsed)
-        elif isinstance(parsed, dict):
+        if isinstance(parsed, dict):
             return _parse_attachments_from_dict(parsed)
-        else:
-            logger.warning(f"Parsed JSON is neither list nor dict: {type(parsed)}")
-            return []
+        logger.warning("Parsed JSON is neither list nor dict: %s", type(parsed))
+        return []
     except json.JSONDecodeError as e:
-        logger.warning(f"Failed to parse attachment JSON: {str(e)}")
+        logger.warning("Failed to parse attachment JSON: %s", str(e))
         return []
 
 
-def _parse_attachments_from_string(attachment_string: str) -> List[Dict[str, Any]]:
+def _parse_attachments_from_string(attachment_string: str) -> list[dict[str, Any]]:
     """Parse attachments from a JSON string.
 
     Args:
@@ -116,13 +115,13 @@ def _parse_attachments_from_string(attachment_string: str) -> List[Dict[str, Any
     try:
         return _parse_attachment_string(attachment_string)
     except Exception as e:
-        logger.warning(f"Error parsing attachment string: {str(e)}")
+        logger.warning("Error parsing attachment string: %s", str(e))
         return []
 
 
 def _parse_attachments_from_dict(
-    attachment_dict: Dict[str, Any],
-) -> List[Dict[str, Any]]:
+    attachment_dict: dict[str, Any],
+) -> list[dict[str, Any]]:
     """Parse attachments from a dictionary structure.
 
     This handles two cases:
@@ -159,8 +158,8 @@ def _parse_attachments_from_dict(
 
 
 def _decode_filenames_in_attachments(
-    attachments: List[Dict[str, Any]],
-) -> List[Dict[str, Any]]:
+    attachments: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     """Decode MIME-encoded filenames in a list of attachments.
 
     Args:

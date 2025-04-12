@@ -1,9 +1,10 @@
+"""Module providing Email Processing Service functionality for the services."""
+
 import base64
 import logging
 import mimetypes
 import uuid
 from datetime import datetime
-from typing import List, Optional
 
 from fastapi import Depends
 from sqlalchemy import select
@@ -46,8 +47,8 @@ def _schema_to_model_attachment(
 
 
 def _schema_to_model_attachments(
-    schema_attachments: List[SchemaEmailAttachment],
-) -> List[EmailAttachment]:
+    schema_attachments: list[SchemaEmailAttachment],
+) -> list[EmailAttachment]:
     """Convert list of schema attachments to model attachments.
 
     Args:
@@ -101,7 +102,7 @@ class EmailProcessingService:
             return email
         except Exception as e:
             await self.db.rollback()
-            logger.error(f"Failed to process webhook: {str(e)}")
+            logger.error("Failed to process webhook: %s", str(e))
             raise ValueError(f"Email processing failed: {str(e)}") from e
 
     async def store_email(
@@ -120,7 +121,9 @@ class EmailProcessingService:
         # Check if email already exists (by message_id)
         existing_email = await self.get_email_by_message_id(email_data.message_id)
         if existing_email:
-            logger.info(f"Email with message ID {email_data.message_id} already exists")
+            logger.info(
+                "Email with message ID %s already exists", email_data.message_id
+            )
             return existing_email
 
         # Truncate subject if it's too long (database column limit)
@@ -149,8 +152,8 @@ class EmailProcessingService:
         return email
 
     async def process_attachments(
-        self, email_id: int, attachments: List[EmailAttachment]
-    ) -> List[Attachment]:
+        self, email_id: int, attachments: list[EmailAttachment]
+    ) -> list[Attachment]:
         """Process and store email attachments.
 
         Args:
@@ -245,7 +248,7 @@ class EmailProcessingService:
 
         return result
 
-    async def get_email_by_message_id(self, message_id: str) -> Optional[Email]:
+    async def get_email_by_message_id(self, message_id: str) -> Email | None:
         """Get an email by its message ID.
 
         Args:

@@ -75,7 +75,7 @@ async def upgrade(engine: AsyncEngine) -> None:
                 await conn.commit()
                 logger.info("Successfully updated content column to be nullable")
     except Exception as e:
-        logger.error(f"Error during migration: {str(e)}")
+        logger.error("Error during migration: %s", str(e))
         raise
 
 

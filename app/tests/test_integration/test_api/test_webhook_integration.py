@@ -4,7 +4,7 @@ import base64
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 from unittest import mock
 
 import httpx
@@ -27,12 +27,12 @@ from app.services.storage_service import StorageService
 EMAIL_SERVICE_PATH = "app.services.email_service.EmailService"
 
 
-def create_test_webhook_payload(with_attachment: bool = False) -> Dict[str, Any]:
+def create_test_webhook_payload(with_attachment: bool = False) -> dict[str, Any]:
     """Create a test webhook payload."""
     message_id = f"test_{uuid.uuid4()}@example.com"
     webhook_id = f"test_webhook_{uuid.uuid4()}"
 
-    data: Dict[str, Any] = {
+    data: dict[str, Any] = {
         "message_id": message_id,
         "from_email": "sender@example.com",
         "from_name": "Test Sender",
@@ -67,7 +67,7 @@ def create_test_webhook_payload(with_attachment: bool = False) -> Dict[str, Any]
     }
 
 
-def create_ping_event() -> Dict[str, Any]:
+def create_ping_event() -> dict[str, Any]:
     """Create a test ping event payload for webhook registration."""
     return {
         "type": "ping",

@@ -2,7 +2,7 @@
 
 import base64
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from fastapi import HTTPException
@@ -19,7 +19,7 @@ def webhook_client() -> WebhookClient:
 
 
 @pytest.fixture
-def webhook_payload() -> Dict[str, Any]:
+def webhook_payload() -> dict[str, Any]:
     """Create a test webhook payload."""
     return {
         "webhook_id": "test-webhook-123",
@@ -47,7 +47,7 @@ def webhook_payload() -> Dict[str, Any]:
 
 @pytest.mark.asyncio
 async def test_validate_webhook_data_valid(
-    webhook_client: WebhookClient, webhook_payload: Dict[str, Any]
+    webhook_client: WebhookClient, webhook_payload: dict[str, Any]
 ) -> None:
     """Test validating a valid webhook payload."""
     # When we validate the payload
@@ -59,7 +59,7 @@ async def test_validate_webhook_data_valid(
 
 @pytest.mark.asyncio
 async def test_validate_webhook_data_invalid_event(
-    webhook_client: WebhookClient, webhook_payload: Dict[str, Any]
+    webhook_client: WebhookClient, webhook_payload: dict[str, Any]
 ) -> None:
     """Test validating a webhook with an invalid event type."""
     # Given an invalid event type
@@ -76,7 +76,7 @@ async def test_validate_webhook_data_invalid_event(
 
 @pytest.mark.asyncio
 async def test_validate_webhook_data_missing_data(
-    webhook_client: WebhookClient, webhook_payload: Dict[str, Any]
+    webhook_client: WebhookClient, webhook_payload: dict[str, Any]
 ) -> None:
     """Test validating a webhook without a data field."""
     # Given a payload without the data field
@@ -125,7 +125,7 @@ async def test_validate_attachment_invalid(webhook_client: WebhookClient) -> Non
 
 @pytest.mark.asyncio
 async def test_parse_webhook_valid(
-    webhook_client: WebhookClient, webhook_payload: Dict[str, Any]
+    webhook_client: WebhookClient, webhook_payload: dict[str, Any]
 ) -> None:
     """Test parsing a valid webhook payload."""
     # When we parse the webhook
@@ -141,7 +141,7 @@ async def test_parse_webhook_valid(
 
 @pytest.mark.asyncio
 async def test_parse_webhook_invalid_event(
-    webhook_client: WebhookClient, webhook_payload: Dict[str, Any]
+    webhook_client: WebhookClient, webhook_payload: dict[str, Any]
 ) -> None:
     """Test parsing a webhook with invalid event type."""
     # Given an invalid event type
@@ -159,7 +159,7 @@ async def test_parse_webhook_invalid_event(
 
 @pytest.mark.asyncio
 async def test_parse_webhook_missing_data(
-    webhook_client: WebhookClient, webhook_payload: Dict[str, Any]
+    webhook_client: WebhookClient, webhook_payload: dict[str, Any]
 ) -> None:
     """Test parsing a webhook with missing data."""
     # Given missing required data
@@ -177,7 +177,7 @@ async def test_parse_webhook_missing_data(
 
 @pytest.mark.asyncio
 async def test_parse_webhook_with_attachments(
-    webhook_client: WebhookClient, webhook_payload: Dict[str, Any]
+    webhook_client: WebhookClient, webhook_payload: dict[str, Any]
 ) -> None:
     """Test parsing a webhook with attachments."""
     # Given a webhook with attachments

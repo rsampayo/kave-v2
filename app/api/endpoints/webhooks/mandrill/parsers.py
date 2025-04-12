@@ -1,11 +1,11 @@
 """Mandrill webhook parsers module.
 
-Contains functions for parsing webhook requests from Mandrill in various formats.
+Contains functions for parsing and validating webhook events from Mandrill.
 """
 
 import json
 import logging
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
@@ -16,9 +16,7 @@ logger = logging.getLogger(__name__)
 
 async def _handle_form_data(
     request: Request,
-) -> Tuple[
-    Optional[Union[Dict[str, Any], List[Dict[str, Any]]]], Optional[JSONResponse]
-]:
+) -> tuple[dict[str, Any] | list[dict[str, Any]] | None, JSONResponse | None]:
     """Parse and handle form data from a Mandrill webhook request.
 
     Args:
@@ -31,28 +29,27 @@ async def _handle_form_data(
     """
     try:
         form_data = await request.form()
-        logger.debug(f"Received Mandrill form data with {len(form_data)} keys")
+        logger.debug("Received Mandrill form data with %s keys", len(form_data))
 
         if "mandrill_events" in form_data:
             # This is the standard Mandrill format
             return _parse_form_field(form_data, "mandrill_events")
-        else:
-            # Try alternate field names that Mandrill might use
-            body, error = _check_alternate_form_fields(form_data)
-            if body is not None or error is not None:
-                return body, error
+        # Try alternate field names that Mandrill might use
+        body, error = _check_alternate_form_fields(form_data)
+        if body is not None or error is not None:
+            return body, error
 
-            # If we get here, no valid fields were found
-            logger.warning("Missing 'mandrill_events' field in form data")
-            return None, JSONResponse(
-                content={
-                    "status": "error",
-                    "message": "Missing 'mandrill_events' field in form data",
-                },
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
+        # If we get here, no valid fields were found
+        logger.warning("Missing 'mandrill_events' field in form data")
+        return None, JSONResponse(
+            content={
+                "status": "error",
+                "message": "Missing 'mandrill_events' field in form data",
+            },
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
     except Exception as form_err:
-        logger.error(f"Error processing form data: {str(form_err)}")
+        logger.error("Error processing form data: %s", str(form_err))
         return None, JSONResponse(
             content={
                 "status": "error",
@@ -64,9 +61,7 @@ async def _handle_form_data(
 
 def _parse_form_field(
     form_data: Any, field_name: str
-) -> Tuple[
-    Optional[Union[Dict[str, Any], List[Dict[str, Any]]]], Optional[JSONResponse]
-]:
+) -> tuple[dict[str, Any] | list[dict[str, Any]] | None, JSONResponse | None]:
     """Parse a form field as JSON.
 
     Args:
@@ -96,7 +91,7 @@ def _parse_form_field(
             )
         return body, None
     except Exception as err:
-        logger.error(f"Failed to parse {field_name}: {str(err)}")
+        logger.error("Failed to parse %s: %s", field_name, str(err))
         # Log a sample of the content that failed to parse
         if field_name in form_data:
             sample = (
@@ -104,7 +99,7 @@ def _parse_form_field(
                 if len(str(form_data[field_name])) > 100
                 else str(form_data[field_name])
             )
-            logger.error(f"Sample of unparseable content: {sample}")
+            logger.error("Sample of unparseable content: %s", sample)
         return None, JSONResponse(
             content={
                 "status": "error",
@@ -116,9 +111,7 @@ def _parse_form_field(
 
 def _check_alternate_form_fields(
     form_data: Any,
-) -> Tuple[
-    Optional[Union[Dict[str, Any], List[Dict[str, Any]]]], Optional[JSONResponse]
-]:
+) -> tuple[dict[str, Any] | list[dict[str, Any]] | None, JSONResponse | None]:
     """Check alternate field names that Mandrill might use.
 
     Args:
@@ -195,11 +188,11 @@ def _log_parsed_body_info(body: Any) -> None:
         body: The parsed JSON body
     """
     if isinstance(body, list):
-        logger.debug(f"Parsed JSON body: list with {len(body)} items")
+        logger.debug("Parsed JSON body: list with %s items", len(body))
     elif isinstance(body, dict):
-        logger.debug(f"Parsed JSON body: dict with {len(body.keys())} keys")
+        logger.debug("Parsed JSON body: dict with %s keys", len(body.keys()))
     else:
-        logger.debug(f"Parsed JSON body of type: {type(body)}")
+        logger.debug("Parsed JSON body of type: %s", type(body))
 
 
 def _create_json_error_response(error_message: str) -> JSONResponse:
@@ -222,9 +215,7 @@ def _create_json_error_response(error_message: str) -> JSONResponse:
 
 async def _parse_json_body(
     request: Request,
-) -> Tuple[
-    Optional[Union[Dict[str, Any], List[Dict[str, Any]]]], Optional[JSONResponse]
-]:
+) -> tuple[dict[str, Any] | list[dict[str, Any]] | None, JSONResponse | None]:
     """Parse and validate JSON body from various request formats.
 
     Args:
@@ -241,7 +232,9 @@ async def _parse_json_body(
         _log_parsed_body_info(body)
         return body, None
     except Exception as e:
-        logger.debug(f"Standard JSON parsing failed: {str(e)}, trying raw body methods")
+        logger.debug(
+            "Standard JSON parsing failed: %s, trying raw body methods", str(e)
+        )
         try:
             # If that fails, try to get the raw body and parse it manually
             raw_body = await request.body()
@@ -261,7 +254,7 @@ async def _parse_json_body(
                 _log_parsed_body_info(body)
                 return body, None
             except Exception as bytes_err:
-                logger.debug(f"Failed to parse raw bytes: {str(bytes_err)}")
+                logger.debug("Failed to parse raw bytes: %s", str(bytes_err))
 
                 # Try parsing as string
                 try:
@@ -269,7 +262,7 @@ async def _parse_json_body(
                     _log_parsed_body_info(body)
                     return body, None
                 except Exception as string_err:
-                    logger.error(f"All JSON parsing methods failed: {str(string_err)}")
+                    logger.error("All JSON parsing methods failed: %s", str(string_err))
                     return None, JSONResponse(
                         content={
                             "status": "error",
@@ -281,7 +274,7 @@ async def _parse_json_body(
                         status_code=status.HTTP_400_BAD_REQUEST,
                     )
         except Exception as raw_err:
-            logger.error(f"Error accessing raw request body: {str(raw_err)}")
+            logger.error("Error accessing raw request body: %s", str(raw_err))
             return None, JSONResponse(
                 content={
                     "status": "error",
@@ -293,9 +286,7 @@ async def _parse_json_body(
 
 async def _handle_json_body(
     request: Request,
-) -> Tuple[
-    Optional[Union[Dict[str, Any], List[Dict[str, Any]]]], Optional[JSONResponse]
-]:
+) -> tuple[dict[str, Any] | list[dict[str, Any]] | None, JSONResponse | None]:
     """Parse and handle a JSON body from a Mandrill webhook request.
 
     Args:
@@ -313,7 +304,7 @@ async def _handle_json_body(
 
         # Validate that the body is correctly formatted
         if not isinstance(body, (dict, list)):
-            logger.warning(f"Expected dict or list, got {type(body)}")
+            logger.warning("Expected dict or list, got %s", type(body))
             return None, JSONResponse(
                 content={
                     "status": "error",
@@ -327,7 +318,7 @@ async def _handle_json_body(
 
         return body, None
     except Exception as json_err:
-        logger.error(f"Error processing JSON body: {str(json_err)}")
+        logger.error("Error processing JSON body: %s", str(json_err))
         return None, JSONResponse(
             content={
                 "status": "error",
@@ -337,7 +328,7 @@ async def _handle_json_body(
         )
 
 
-def _is_ping_event(body: Union[Dict[str, Any], List[Dict[str, Any]]]) -> bool:
+def _is_ping_event(body: dict[str, Any] | list[dict[str, Any]]) -> bool:
     """Check if the request is a ping event.
 
     Args:
@@ -348,7 +339,7 @@ def _is_ping_event(body: Union[Dict[str, Any], List[Dict[str, Any]]]) -> bool:
     """
     if isinstance(body, dict):
         return body.get("type") == "ping" or body.get("event") == "ping"
-    elif isinstance(body, list) and body:
+    if isinstance(body, list) and body:
         first_event = body[0]
         if isinstance(first_event, dict):
             return (
@@ -357,7 +348,7 @@ def _is_ping_event(body: Union[Dict[str, Any], List[Dict[str, Any]]]) -> bool:
     return False
 
 
-def _is_empty_event_list(body: Union[Dict[str, Any], List[Dict[str, Any]]]) -> bool:
+def _is_empty_event_list(body: dict[str, Any] | list[dict[str, Any]]) -> bool:
     """Check if the request body is an empty event list.
 
     Args:
@@ -372,8 +363,8 @@ def _is_empty_event_list(body: Union[Dict[str, Any], List[Dict[str, Any]]]) -> b
 
 
 def _handle_empty_events(
-    body: Union[Dict[str, Any], List[Dict[str, Any]]],
-) -> Optional[JSONResponse]:
+    body: dict[str, Any] | list[dict[str, Any]],
+) -> JSONResponse | None:
     """Handle case when the body is an empty list of events.
 
     Args:
@@ -395,8 +386,8 @@ def _handle_empty_events(
 
 
 def _handle_ping_event(
-    body: Union[Dict[str, Any], List[Dict[str, Any]]],
-) -> Optional[JSONResponse]:
+    body: dict[str, Any] | list[dict[str, Any]],
+) -> JSONResponse | None:
     """Handle ping event from Mandrill.
 
     Args:
@@ -419,9 +410,7 @@ def _handle_ping_event(
 
 async def _prepare_webhook_body(
     request: Request,
-) -> Tuple[
-    Optional[Union[Dict[str, Any], List[Dict[str, Any]]]], Optional[JSONResponse]
-]:
+) -> tuple[dict[str, Any] | list[dict[str, Any]] | None, JSONResponse | None]:
     """Parse and validate the webhook body from the request.
 
     This function handles both form data and JSON requests, and performs
@@ -437,7 +426,7 @@ async def _prepare_webhook_body(
     """
     try:
         content_type = request.headers.get("content-type", "")
-        logger.info(f"Processing webhook with content type: {content_type}")
+        logger.info("Processing webhook with content type: %s", content_type)
 
         if (
             "multipart/form-data" in content_type
@@ -473,7 +462,7 @@ async def _prepare_webhook_body(
 
         return body, None
     except Exception as e:
-        logger.error(f"Error in _prepare_webhook_body: {str(e)}")
+        logger.error("Error in _prepare_webhook_body: %s", str(e))
         return None, JSONResponse(
             content={
                 "status": "error",

@@ -1,7 +1,7 @@
 """Unit tests for database migration scripts."""
 
 import base64
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, call, patch
 
 import pytest
@@ -186,7 +186,7 @@ class AsyncContextManagerMock:
         return self.mock_obj
 
     async def __aexit__(
-        self, exc_type: Optional[type], exc_val: Optional[Exception], exc_tb: Any
+        self, exc_type: type | None, exc_val: Exception | None, exc_tb: Any
     ) -> None:
         pass
 

@@ -1,3 +1,5 @@
+"""Tests for EmailProcessingService with storage integration."""
+
 import base64
 from unittest.mock import AsyncMock, MagicMock
 

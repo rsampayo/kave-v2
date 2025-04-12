@@ -164,11 +164,10 @@ async def receive_mandrill_webhook(
         # Handle based on body type (list or dict)
         if isinstance(body, list):
             return await _handle_event_list(body, client, email_service)
-        else:
-            return await _handle_single_event_dict(body, client, email_service)
+        return await _handle_single_event_dict(body, client, email_service)
     except Exception as e:
         # Log the error for debugging
-        logger.error(f"Error processing webhook: {str(e)}")
+        logger.error("Error processing webhook: %s", str(e))
 
         # Return 200 OK even for errors as Mandrill expects 2xx responses
         # to avoid retry attempts

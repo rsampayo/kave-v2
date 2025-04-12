@@ -1,7 +1,7 @@
 """Unit tests for email webhook endpoints."""
 
 import json
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, create_autospec
 
 import pytest
@@ -37,8 +37,6 @@ from app.services.email_service import EmailService
 class EmailServiceException(Exception):
     """Exception raised by email service."""
 
-    pass
-
 
 @pytest.mark.asyncio
 async def test_receive_mailchimp_webhook_success() -> None:
@@ -47,10 +45,10 @@ async def test_receive_mailchimp_webhook_success() -> None:
     # Define a simple mock implementation of the webhook handler
     async def mock_webhook_handler(
         request: Request,
-        _: Optional[Any] = None,  # Placeholder for background tasks if needed
-        db: Optional[AsyncSession] = None,
-        email_service: Optional[EmailProcessingService] = None,
-        client: Optional[WebhookClient] = None,
+        _: Any | None = None,  # Placeholder for background tasks if needed
+        db: AsyncSession | None = None,
+        email_service: EmailProcessingService | None = None,
+        client: WebhookClient | None = None,
     ) -> dict[str, str]:
         assert client is not None
         assert email_service is not None
@@ -96,10 +94,10 @@ async def test_receive_mailchimp_webhook_parse_error() -> None:
     # Define a simple mock implementation of the webhook handler
     async def mock_webhook_handler(
         request: Request,
-        _: Optional[Any] = None,
-        db: Optional[AsyncSession] = None,
-        email_service: Optional[EmailProcessingService] = None,
-        client: Optional[WebhookClient] = None,
+        _: Any | None = None,
+        db: AsyncSession | None = None,
+        email_service: EmailProcessingService | None = None,
+        client: WebhookClient | None = None,
     ) -> dict[str, str]:
         assert client is not None
         assert email_service is not None
@@ -153,10 +151,10 @@ async def test_receive_mailchimp_webhook_processing_error() -> None:
     # Create a simple implementation of the function we're testing
     async def mock_implementation(
         request: Request,
-        _: Optional[Any] = None,
-        db: Optional[AsyncSession] = None,
-        email_service: Optional[EmailProcessingService] = None,
-        client: Optional[WebhookClient] = None,
+        _: Any | None = None,
+        db: AsyncSession | None = None,
+        email_service: EmailProcessingService | None = None,
+        client: WebhookClient | None = None,
     ) -> dict[str, str]:
         assert client is not None
         assert email_service is not None
@@ -207,10 +205,10 @@ async def test_receive_mandrill_webhook_success() -> None:
     # Define a simple mock implementation of the webhook handler
     async def mock_webhook_handler(
         request: Request,
-        _: Optional[Any] = None,
-        db: Optional[AsyncSession] = None,
-        email_service: Optional[EmailProcessingService] = None,
-        client: Optional[WebhookClient] = None,
+        _: Any | None = None,
+        db: AsyncSession | None = None,
+        email_service: EmailProcessingService | None = None,
+        client: WebhookClient | None = None,
     ) -> dict[str, str]:
         assert client is not None
         assert email_service is not None
@@ -295,10 +293,10 @@ async def test_receive_mandrill_webhook_error() -> None:
     # Define a mock implementation that simulates error handling
     async def mock_webhook_handler(
         request: Request,
-        _: Optional[Any] = None,
-        db: Optional[AsyncSession] = None,
-        email_service: Optional[EmailProcessingService] = None,
-        client: Optional[WebhookClient] = None,
+        _: Any | None = None,
+        db: AsyncSession | None = None,
+        email_service: EmailProcessingService | None = None,
+        client: WebhookClient | None = None,
     ) -> dict[str, str]:
         assert client is not None
         assert email_service is not None
@@ -1469,7 +1467,7 @@ def test_normalize_attachments_complex_dictionary() -> None:
 async def test_parse_json_with_unusual_encoding():
     """Test parsing JSON with unusual character encodings."""
     # Create test data with non-ASCII characters
-    json_string = '{"name":"José", "city":"São Paulo"}'.encode("utf-8")
+    json_string = '{"name":"José", "city":"São Paulo"}'.encode()
 
     # Parse the JSON
     result = await _parse_json_from_string(json_string)

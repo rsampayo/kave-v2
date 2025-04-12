@@ -39,7 +39,7 @@ async def migrate_existing_attachments() -> None:
         result = await session.execute(query)
         attachments = result.scalars().all()
 
-        logger.info(f"Found {len(attachments)} attachments to migrate")
+        logger.info("Found %s attachments to migrate", len(attachments))
 
         for i, attachment in enumerate(attachments):
             try:
@@ -65,10 +65,10 @@ async def migrate_existing_attachments() -> None:
 
                 # Log progress periodically
                 if (i + 1) % 10 == 0 or i == len(attachments) - 1:
-                    logger.info(f"Migrated {i + 1}/{len(attachments)} attachments")
+                    logger.info("Migrated %s/%s attachments", i + 1, len(attachments))
 
             except Exception as e:
-                logger.error(f"Error migrating attachment {attachment.id}: {str(e)}")
+                logger.error("Error migrating attachment %s: %s", attachment.id, str(e))
                 # Continue with next attachment even if one fails
 
         # Commit all changes at once

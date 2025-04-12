@@ -5,7 +5,7 @@ standardized format.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from app.api.endpoints.webhooks.common.attachments import _normalize_attachments
 
@@ -13,7 +13,7 @@ from app.api.endpoints.webhooks.common.attachments import _normalize_attachments
 logger = logging.getLogger(__name__)
 
 
-def _process_mandrill_headers(headers: Dict[str, Any]) -> Dict[str, str]:
+def _process_mandrill_headers(headers: dict[str, Any]) -> dict[str, str]:
     """Process Mandrill headers to ensure they're all strings.
 
     Mandrill may send headers as lists of strings, but our schema expects Dict[str, str].
@@ -38,7 +38,7 @@ def _process_mandrill_headers(headers: Dict[str, Any]) -> Dict[str, str]:
     return processed_headers
 
 
-def _parse_message_id(headers: Dict[str, Any]) -> str:
+def _parse_message_id(headers: dict[str, Any]) -> str:
     """Parse the message ID from headers or generate a fallback.
 
     Args:
@@ -67,13 +67,12 @@ def _parse_message_id(headers: Dict[str, Any]) -> str:
     # Finally, fallback to 'id' field if present, or return empty string
     if "id" in headers and headers["id"]:
         return str(headers["id"]).strip()
-    else:
-        return ""
+    return ""
 
 
 def _format_event(
-    event: Dict[str, Any], event_index: int, event_type: str, event_id: str
-) -> Optional[Dict[str, Any]]:
+    event: dict[str, Any], event_index: int, event_type: str, event_id: str
+) -> dict[str, Any] | None:
     """Format a Mandrill event into our standard webhook format.
 
     This function transforms the raw Mandrill event structure into our application's
@@ -128,7 +127,7 @@ def _format_event(
     msg = event.get("msg", {})
     subject = msg.get("subject", "")[:50]  # Limit long subjects
     from_email = msg.get("from_email", "")
-    logger.info(f"Processing email: {from_email}, Subject: {subject}")
+    logger.info("Processing email: %s, Subject: %s", from_email, subject)
 
     # Process attachments
     attachments = msg.get("attachments", [])

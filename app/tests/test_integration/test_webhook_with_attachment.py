@@ -1,3 +1,5 @@
+"""Module providing Test Webhook With Attachment functionality for the tests test integration."""
+
 import asyncio
 import json
 import os
@@ -25,7 +27,7 @@ async def test_webhook_with_attachment() -> None:
     Uses the email processing service directly to process a webhook with attachment.
     """  # noqa: W293
     # Load the mock webhook data
-    with open("app/tests/test_data/mock_webhook_with_attachment.json", "r") as f:
+    with open("app/tests/test_data/mock_webhook_with_attachment.json") as f:
         webhook_data = json.load(f)
 
     # Convert to proper webhook schema objects

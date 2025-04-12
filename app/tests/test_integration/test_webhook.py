@@ -1,3 +1,5 @@
+"""Module providing Test Webhook functionality for the tests test integration."""
+
 import asyncio
 import json
 from datetime import datetime
@@ -18,7 +20,7 @@ from app.services.storage_service import StorageService
 async def test_webhook() -> None:
     """Test processing a webhook directly using the email processing service."""
     # Load the mock webhook data
-    with open("app/tests/test_data/mock_webhook.json", "r") as f:
+    with open("app/tests/test_data/mock_webhook.json") as f:
         webhook_data = json.load(f)
 
     # Convert to proper webhook schema objects

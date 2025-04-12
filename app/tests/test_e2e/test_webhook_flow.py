@@ -4,7 +4,7 @@ import base64
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 from unittest import mock
 
 import pytest
@@ -15,7 +15,7 @@ from httpx import ASGITransport, AsyncClient
 from app.main import create_application
 
 
-def create_test_webhook_payload() -> Dict[str, Any]:
+def create_test_webhook_payload() -> dict[str, Any]:
     """Create a test webhook payload with an attachment."""
     # Create a test attachment
     test_content = "This is a test attachment"

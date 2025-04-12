@@ -1,3 +1,5 @@
+"""Module providing Attachments functionality for the api endpoints."""
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession

@@ -1,3 +1,5 @@
+"""Module providing Test Email Models functionality for the tests test unit test integrations."""
+
 from datetime import datetime
 
 from app.integrations.email.models import (
