@@ -176,7 +176,7 @@ def test_create_json_error_response() -> None:
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     response_data = json.loads(response.body.decode())
     assert response_data["status"] == "error"
-    assert response_data["message"] == "Test error"
+    assert response_data["message"] == "Failed to process webhook: Test error"
 
 
 def test_is_ping_event() -> None:

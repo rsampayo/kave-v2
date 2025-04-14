@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     MAILCHIMP_API_KEY: str
     MAILCHIMP_WEBHOOK_SECRET: str
 
+    # Default Organization (for backwards compatibility)
+    DEFAULT_ORGANIZATION_NAME: str = "Default Organization"
+    DEFAULT_ORGANIZATION_EMAIL: str = "webhooks@example.com"
+
     # File Storage
     ATTACHMENTS_BASE_DIR: Path = Path("data/attachments")
 

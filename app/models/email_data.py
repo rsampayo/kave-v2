@@ -1,11 +1,17 @@
 """Module providing Email Data functionality for the models."""
 
+from __future__ import annotations
+
 import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
+
+if TYPE_CHECKING:
+    from app.models.organization import Organization  # Import only for type checking
 
 
 class Email(Base):
@@ -77,9 +83,23 @@ class Email(Base):
         comment="Second test column for Alembic migration testing",
     )
 
-    # Relationships - List of attachments associated with this email
+    # Organization relationship
+    organization_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Foreign key to the organization that sent this email",
+    )
+
+    # Relationships
+    # List of attachments associated with this email
     attachments: Mapped[list["Attachment"]] = relationship(
         "Attachment", back_populates="email", cascade="all, delete-orphan"
+    )
+
+    # Reference to the organization
+    organization: Mapped["Organization"] = relationship(
+        "Organization", back_populates="emails"
     )
 
 

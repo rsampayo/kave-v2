@@ -42,25 +42,31 @@ async def _handle_form_data(
     try:
         # Log raw body first - with hex dump for byte-level inspection
         raw_body = await request.body()
-        logger.info(f"RAW WEBHOOK BODY (length {len(raw_body)} bytes): {raw_body.decode('utf-8', errors='replace')}")
+        logger.info(
+            f"RAW WEBHOOK BODY (length {len(raw_body)} bytes): "
+            f"{raw_body.decode('utf-8', errors='replace')}"
+        )
         logger.info(f"RAW WEBHOOK BODY (hex): {raw_body.hex()}")
         logger.info(f"RAW WEBHOOK BODY (repr): {repr(raw_body)}")
-        
+
         # Try to URL decode manually to verify
         import urllib.parse
+
         try:
-            url_decoded = urllib.parse.unquote(raw_body.decode('utf-8'))
+            url_decoded = urllib.parse.unquote(raw_body.decode("utf-8"))
             logger.info(f"URL DECODED MANUALLY: {url_decoded}")
         except Exception as e:
             logger.error(f"Manual URL decoding failed: {str(e)}")
-        
+
         form_data = await request.form()
         logger.info(f"FORM KEYS: {list(form_data.keys())}")
         logger.debug("Received Mandrill form data with %s keys", len(form_data))
-        
+
         # Dump all form data for debugging with more detail
         for key, value in form_data.items():
-            logger.info(f"FORM KEY: {key}, VALUE TYPE: {type(value)}, VALUE: {str(value)[:200]}...")
+            logger.info(
+                f"FORM KEY: {key}, VALUE TYPE: {type(value)}, VALUE: {str(value)[:200]}..."
+            )
             logger.info(f"FORM VALUE REPR: {repr(value)[:200]}...")
 
         if "mandrill_events" in form_data:
@@ -84,6 +90,7 @@ async def _handle_form_data(
     except Exception as form_err:
         logger.error("Error processing form data: %s", str(form_err))
         import traceback
+
         logger.error(f"Form data processing traceback: {traceback.format_exc()}")
         return None, JSONResponse(
             content={
@@ -112,29 +119,30 @@ def _parse_form_field(
         field_value = form_data[field_name]
         logger.info(f"Form field value type before conversion: {type(field_value)}")
         logger.info(f"Form field value dir: {dir(field_value)}")
-        
+
         # If it's a special form data type, check its methods and content
-        if hasattr(field_value, 'content_type'):
+        if hasattr(field_value, "content_type"):
             logger.info(f"Content type: {field_value.content_type}")
-        if hasattr(field_value, 'filename'):
+        if hasattr(field_value, "filename"):
             logger.info(f"Filename: {field_value.filename}")
-        if hasattr(field_value, 'read'):
+        if hasattr(field_value, "read"):
             try:
                 content = field_value.read()
                 logger.info(f"Content from read(): {content}")
             except Exception as e:
                 logger.error(f"Error reading content: {str(e)}")
-        
+
         field_value_str = (
             str(field_value)
             if not isinstance(field_value, (str, bytes, bytearray))
             else field_value
         )
         logger.info(f"Field value after conversion to string: {repr(field_value_str)}")
-        
+
         # Try to manually parse as JSON for debugging
         try:
             import json
+
             # Clean the string first to help with debugging
             cleaned_value = field_value_str.strip()
             logger.info(f"Cleaned value: {repr(cleaned_value)}")
@@ -143,7 +151,7 @@ def _parse_form_field(
             logger.info(f"Direct JSON parsing result: {repr(direct_parsed)}")
         except Exception as e:
             logger.error(f"Manual JSON parsing attempt failed: {str(e)}")
-        
+
         body = json.loads(field_value_str)
         if field_name == "mandrill_events":
             logger.info(
@@ -158,6 +166,7 @@ def _parse_form_field(
     except Exception as err:
         logger.error("Failed to parse %s: %s", field_name, str(err))
         import traceback
+
         logger.error(f"JSON parsing traceback: {traceback.format_exc()}")
         # Log a sample of the content that failed to parse
         if field_name in form_data:
@@ -274,7 +283,7 @@ def _create_json_error_response(error_message: str) -> JSONResponse:
     return JSONResponse(
         content={
             "status": "error",
-            "message": error_message,
+            "message": f"Failed to process webhook: {error_message}",
         },
         status_code=status.HTTP_400_BAD_REQUEST,
     )
@@ -308,7 +317,7 @@ async def _parse_json_body(
         try:
             raw_body = await request.body()
             logger.info(f"Raw body length: {len(raw_body)} bytes")
-            
+
             # Try parsing the raw body as JSON directly
             try:
                 body = await _parse_json_from_bytes(raw_body)
@@ -317,7 +326,7 @@ async def _parse_json_body(
                 logger.warning("Failed to parse bytes directly: %s", str(bytes_err))
                 # Sample for debugging
                 sample_bytes = raw_body[:100] if len(raw_body) > 100 else raw_body
-                logger.info(f"Sample raw bytes: {sample_bytes}")
+                logger.info(f"Sample raw bytes: {sample_bytes!r}")
 
                 # Try decoding the bytes to a string first
                 try:
@@ -327,11 +336,13 @@ async def _parse_json_body(
                     logger.warning("Failed to parse from string: %s", str(string_err))
                     # Try to see what the string looks like
                     try:
-                        sample_string = raw_body.decode('utf-8', errors='replace')[:100]
+                        sample_string = raw_body.decode("utf-8", errors="replace")[:100]
                         logger.info(f"Sample string from bytes: {sample_string}")
                     except Exception as decode_err:
-                        logger.warning("Failed to decode bytes to string: %s", str(decode_err))
-            
+                        logger.warning(
+                            "Failed to decode bytes to string: %s", str(decode_err)
+                        )
+
         except Exception as body_err:
             logger.error("Failed to read request body: %s", str(body_err))
 
@@ -503,7 +514,10 @@ async def _prepare_webhook_body(
             body, error_response = await _handle_json_body(request)
 
         if error_response:
-            logger.info(f"Error response generated: {error_response.body.decode('utf-8')}")
+            logger.info(
+                f"Error response generated: "
+                f"{error_response.body.decode('utf-8')}"
+            )
             return None, error_response
 
         if not body:
@@ -514,7 +528,7 @@ async def _prepare_webhook_body(
                 logger.info("Detected Mandrill test webhook with empty body, accepting")
                 # Accept empty bodies from Mandrill for testing purposes
                 return [], None
-            
+
             return None, JSONResponse(
                 content={
                     "status": "error",
@@ -527,7 +541,10 @@ async def _prepare_webhook_body(
         if isinstance(body, list):
             logger.info(f"Body is a list with {len(body)} items")
             if body:
-                logger.info(f"First item keys: {list(body[0].keys()) if isinstance(body[0], dict) else 'Not a dict'}")
+                logger.info(
+                    "First item keys: "
+                    f"{list(body[0].keys()) if isinstance(body[0], dict) else 'Not a dict'}"
+                )
         elif isinstance(body, dict):
             logger.info(f"Body is a dict with keys: {list(body.keys())}")
         else:
@@ -546,6 +563,7 @@ async def _prepare_webhook_body(
     except Exception as e:
         logger.error("Error in _prepare_webhook_body: %s", str(e))
         import traceback
+
         logger.error(f"Exception traceback: {traceback.format_exc()}")
         return None, JSONResponse(
             content={

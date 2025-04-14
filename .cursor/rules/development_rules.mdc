@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 ---
 description: Development guidelines for a FastAPI project emphasizing TDD, iterative code quality, CI/CD, and environment-aware testing, including specific tool configurations.

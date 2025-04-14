@@ -9,7 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import api_v1_router
 from app.core.config import settings
-from app.db.session import engine
+from app.db.session import engine, get_session
+from app.services.initialization_service import InitializationService
+from app.services.organization_service import OrganizationService
 
 # Set up logging
 logging.basicConfig(
@@ -29,6 +31,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
     # Startup
     logger.info("Application starting up")
+
+    # Initialize default data
+    try:
+        logger.info("Initializing default organization")
+        db = get_session()
+        org_service = OrganizationService(db)
+        init_service = InitializationService(db, org_service)
+        await init_service.init_default_organization()
+        await db.close()
+        logger.info("Default data initialization completed")
+    except Exception as e:
+        logger.error(f"Failed to initialize default data: {str(e)}")
 
     # App runs here
     yield

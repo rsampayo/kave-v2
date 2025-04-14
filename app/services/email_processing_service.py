@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_db, get_storage_service
 from app.models.email_data import Attachment, Email, EmailAttachment
+from app.models.organization import Organization
 from app.schemas.webhook_schemas import EmailAttachment as SchemaEmailAttachment
 from app.schemas.webhook_schemas import InboundEmailData, MailchimpWebhook
 from app.services.storage_service import StorageService
@@ -86,9 +87,12 @@ class EmailProcessingService:
             ValueError: If email processing fails
         """
         try:
+            # Identify the organization from the webhook email
+            organization = await self._identify_organization(webhook.data.from_email)
+
             # Create the email model
             email = await self.store_email(
-                webhook.data, webhook.webhook_id, webhook.event
+                webhook.data, webhook.webhook_id, webhook.event, organization
             )
 
             # Process and store any attachments
@@ -105,8 +109,29 @@ class EmailProcessingService:
             logger.error("Failed to process webhook: %s", str(e))
             raise ValueError(f"Email processing failed: {str(e)}") from e
 
+    async def _identify_organization(self, from_email: str) -> Organization | None:
+        """Identify the organization based on the sender's email.
+
+        Args:
+            from_email: Email address of the sender
+
+        Returns:
+            Optional[Organization]: The organization if found, None otherwise
+        """
+        # Try to find the organization by email
+        query = select(Organization).where(
+            Organization.webhook_email == from_email,
+            Organization.is_active == True,  # noqa: E712
+        )
+        result = await self.db.execute(query)
+        return result.scalar_one_or_none()
+
     async def store_email(
-        self, email_data: InboundEmailData, webhook_id: str, event: str
+        self,
+        email_data: InboundEmailData,
+        webhook_id: str,
+        event: str,
+        organization: Organization | None = None,
     ) -> Email:
         """Store an email in the database.
 
@@ -114,6 +139,7 @@ class EmailProcessingService:
             email_data: The parsed email data
             webhook_id: ID of the webhook
             event: Type of webhook event
+            organization: The organization that sent the email (optional)
 
         Returns:
             Email: The created email model
@@ -124,6 +150,12 @@ class EmailProcessingService:
             logger.info(
                 "Email with message ID %s already exists", email_data.message_id
             )
+
+            # Update organization if needed
+            if organization and not existing_email.organization_id:
+                existing_email.organization_id = organization.id
+                await self.db.flush()
+
             return existing_email
 
         # Truncate subject if it's too long (database column limit)
@@ -143,6 +175,7 @@ class EmailProcessingService:
             webhook_id=webhook_id,
             webhook_event=event,
             received_at=datetime.utcnow(),
+            organization_id=organization.id if organization else None,
         )
 
         self.db.add(email)  # This is synchronous in SQLAlchemy 2.0+

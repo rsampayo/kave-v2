@@ -137,7 +137,10 @@ async def receive_mandrill_webhook(
         if _is_empty_event_list(body):
             logger.info("Received empty events list - accepting for testing purposes")
             return JSONResponse(
-                content={"status": "success", "message": "Empty events list acknowledged"},
+                content={
+                    "status": "success",
+                    "message": "Empty events list acknowledged",
+                },
                 status_code=status.HTTP_200_OK,
             )
 
