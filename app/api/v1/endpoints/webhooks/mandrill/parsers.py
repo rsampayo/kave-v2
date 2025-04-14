@@ -40,20 +40,32 @@ async def _handle_form_data(
         - An error response or None if successful
     """
     try:
-        # Log raw body first
+        # Log raw body first - with hex dump for byte-level inspection
         raw_body = await request.body()
-        logger.info(f"RAW WEBHOOK BODY: {raw_body.decode('utf-8', errors='replace')}")
+        logger.info(f"RAW WEBHOOK BODY (length {len(raw_body)} bytes): {raw_body.decode('utf-8', errors='replace')}")
+        logger.info(f"RAW WEBHOOK BODY (hex): {raw_body.hex()}")
+        logger.info(f"RAW WEBHOOK BODY (repr): {repr(raw_body)}")
+        
+        # Try to URL decode manually to verify
+        import urllib.parse
+        try:
+            url_decoded = urllib.parse.unquote(raw_body.decode('utf-8'))
+            logger.info(f"URL DECODED MANUALLY: {url_decoded}")
+        except Exception as e:
+            logger.error(f"Manual URL decoding failed: {str(e)}")
         
         form_data = await request.form()
         logger.info(f"FORM KEYS: {list(form_data.keys())}")
         logger.debug("Received Mandrill form data with %s keys", len(form_data))
         
-        # Dump all form data for debugging
+        # Dump all form data for debugging with more detail
         for key, value in form_data.items():
-            logger.info(f"FORM KEY: {key}, VALUE: {str(value)[:200]}...")
+            logger.info(f"FORM KEY: {key}, VALUE TYPE: {type(value)}, VALUE: {str(value)[:200]}...")
+            logger.info(f"FORM VALUE REPR: {repr(value)[:200]}...")
 
         if "mandrill_events" in form_data:
             # This is the standard Mandrill format
+            logger.info("Found 'mandrill_events' field, attempting to parse")
             return _parse_form_field(form_data, "mandrill_events")
         # Try alternate field names that Mandrill might use
         body, error = _check_alternate_form_fields(form_data)
@@ -71,6 +83,8 @@ async def _handle_form_data(
         )
     except Exception as form_err:
         logger.error("Error processing form data: %s", str(form_err))
+        import traceback
+        logger.error(f"Form data processing traceback: {traceback.format_exc()}")
         return None, JSONResponse(
             content={
                 "status": "error",
@@ -96,16 +110,46 @@ def _parse_form_field(
     """
     try:
         field_value = form_data[field_name]
+        logger.info(f"Form field value type before conversion: {type(field_value)}")
+        logger.info(f"Form field value dir: {dir(field_value)}")
+        
+        # If it's a special form data type, check its methods and content
+        if hasattr(field_value, 'content_type'):
+            logger.info(f"Content type: {field_value.content_type}")
+        if hasattr(field_value, 'filename'):
+            logger.info(f"Filename: {field_value.filename}")
+        if hasattr(field_value, 'read'):
+            try:
+                content = field_value.read()
+                logger.info(f"Content from read(): {content}")
+            except Exception as e:
+                logger.error(f"Error reading content: {str(e)}")
+        
         field_value_str = (
             str(field_value)
             if not isinstance(field_value, (str, bytes, bytearray))
             else field_value
         )
+        logger.info(f"Field value after conversion to string: {repr(field_value_str)}")
+        
+        # Try to manually parse as JSON for debugging
+        try:
+            import json
+            # Clean the string first to help with debugging
+            cleaned_value = field_value_str.strip()
+            logger.info(f"Cleaned value: {repr(cleaned_value)}")
+            # Directly parse to confirm if it's valid JSON
+            direct_parsed = json.loads(cleaned_value)
+            logger.info(f"Direct JSON parsing result: {repr(direct_parsed)}")
+        except Exception as e:
+            logger.error(f"Manual JSON parsing attempt failed: {str(e)}")
+        
         body = json.loads(field_value_str)
         if field_name == "mandrill_events":
             logger.info(
                 f"Parsed Mandrill events. Count: {len(body) if isinstance(body, list) else 1}"
             )
+            logger.info(f"Parsed body type: {type(body)}, content: {repr(body)}")
         else:
             logger.info(
                 f"Using alternate field {field_name!r} instead of 'mandrill_events'"
@@ -113,6 +157,8 @@ def _parse_form_field(
         return body, None
     except Exception as err:
         logger.error("Failed to parse %s: %s", field_name, str(err))
+        import traceback
+        logger.error(f"JSON parsing traceback: {traceback.format_exc()}")
         # Log a sample of the content that failed to parse
         if field_name in form_data:
             sample = (
@@ -385,11 +431,13 @@ def _handle_empty_events(
         A response to send, or None to continue processing
     """
     if _is_empty_event_list(body):
-        logger.info("Received empty event list from Mandrill - treating as test webhook")
+        logger.info("Received empty event list from Mandrill")
+        # Return a success response for empty event lists
+        # This allows Mandrill to test webhooks with empty payloads
         return JSONResponse(
             content={
                 "status": "success",
-                "message": "Empty events array acknowledged - webhook configured correctly",
+                "message": "Acknowledged empty event list",
             },
             status_code=status.HTTP_200_OK,
         )
@@ -458,6 +506,23 @@ async def _prepare_webhook_body(
             logger.info(f"Error response generated: {error_response.body.decode('utf-8')}")
             return None, error_response
 
+        if not body:
+            logger.warning("Empty webhook body after parsing")
+            # Check if this is a Mandrill request by inspecting the user agent
+            user_agent = request.headers.get("user-agent", "")
+            if "Mandrill" in user_agent:
+                logger.info("Detected Mandrill test webhook with empty body, accepting")
+                # Accept empty bodies from Mandrill for testing purposes
+                return [], None
+            
+            return None, JSONResponse(
+                content={
+                    "status": "error",
+                    "message": "Empty webhook body",
+                },
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
         # Log the body structure
         if isinstance(body, list):
             logger.info(f"Body is a list with {len(body)} items")
@@ -473,20 +538,9 @@ async def _prepare_webhook_body(
         if ping_response:
             return None, ping_response
 
-        # Handle empty event lists - must check before general empty body check
         empty_response = _handle_empty_events(body)
         if empty_response:
             return None, empty_response
-
-        if not body:
-            logger.warning("Empty webhook body after parsing")
-            return None, JSONResponse(
-                content={
-                    "status": "error",
-                    "message": "Empty webhook body",
-                },
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
 
         return body, None
     except Exception as e:
