@@ -1241,7 +1241,7 @@ async def test_receive_mandrill_webhook_exception_handling() -> None:
 
 @pytest.mark.asyncio
 async def test_receive_mandrill_webhook_empty_list() -> None:
-    """Test the endpoint with an empty list of events."""
+    """Test the endpoint with an empty list of events in JSON format."""
     # Local import to avoid redefinition issues
     from app.api.v1.endpoints.webhooks.mandrill.router import receive_mandrill_webhook
 
@@ -1253,9 +1253,12 @@ async def test_receive_mandrill_webhook_empty_list() -> None:
     mock_request.body = AsyncMock(return_value=mock_body)
     mock_request.json = AsyncMock(return_value=[])
 
-    # Mock headers
+    # Mock headers - add the User-Agent with Mandrill identifier
     type(mock_request).headers = PropertyMock(
-        return_value={"content-type": "application/json"}
+        return_value={
+            "content-type": "application/json",
+            "user-agent": "Mandrill-Webhook/1.0"
+        }
     )
 
     # Setup dependencies
@@ -1271,11 +1274,15 @@ async def test_receive_mandrill_webhook_empty_list() -> None:
         client=mock_client,
     )
 
-    # Verify the response - 400 Bad Request for empty or unparseable body
-    assert response.status_code == 400
+    # Verify the response - 200 OK since we now accept empty arrays as valid
+    assert response.status_code == 200
     response_data = json.loads(response.body.decode())
-    assert response_data["status"] == "error"
-    assert "Empty webhook body" in response_data["message"]
+    assert response_data["status"] == "success"
+    assert "Empty events list acknowledged" in response_data["message"]
+    
+    # Verify that no webhook processing was attempted
+    mock_client.parse_webhook.assert_not_called()
+    mock_email_service.process_webhook.assert_not_called()
 
 
 def test_normalize_attachments_dict_single() -> None:
@@ -1475,3 +1482,54 @@ async def test_parse_json_with_unusual_encoding():
     # Verify results
     assert result["name"] == "José"
     assert result["city"] == "São Paulo"
+
+
+@pytest.mark.asyncio
+async def test_receive_mandrill_webhook_empty_form_array() -> None:
+    """Test the endpoint with an empty array in mandrill_events form field.
+    
+    This tests the specific scenario where Mandrill sends a valid 'mandrill_events=[]'
+    field in the form data for webhook testing purposes.
+    """
+    # Local import to avoid redefinition issues
+    from app.api.v1.endpoints.webhooks.mandrill.router import receive_mandrill_webhook
+
+    # Create a mock request
+    mock_request = MagicMock(spec=Request)
+
+    # Configure request body and form data to simulate the exact scenario we fixed
+    # 'mandrill_events=[]' in application/x-www-form-urlencoded format
+    mock_body = b'mandrill_events=%5B%5D'
+    mock_request.body = AsyncMock(return_value=mock_body)
+    mock_request.form = AsyncMock(return_value={"mandrill_events": "[]"})
+    
+    # Simulate the User-Agent header from Mandrill
+    type(mock_request).headers = PropertyMock(
+        return_value={
+            "content-type": "application/x-www-form-urlencoded",
+            "user-agent": "Mandrill-Webhook/1.0"
+        }
+    )
+
+    # Setup dependencies
+    mock_db = AsyncMock(spec=AsyncSession)
+    mock_email_service = AsyncMock()
+    mock_client = AsyncMock(spec=WebhookClient)
+
+    # Call the endpoint
+    response = await receive_mandrill_webhook(
+        request=mock_request,
+        db=mock_db,
+        email_service=mock_email_service,
+        client=mock_client,
+    )
+
+    # Verify the response - Should be 200 OK for empty array as a test
+    assert response.status_code == 200
+    response_data = json.loads(response.body.decode())
+    assert response_data["status"] == "success"
+    assert "Empty events list acknowledged" in response_data["message"]
+
+    # Verify that no webhook processing was attempted
+    mock_client.parse_webhook.assert_not_called()
+    mock_email_service.process_webhook.assert_not_called()

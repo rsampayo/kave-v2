@@ -112,3 +112,26 @@ async def test_webhook_endpoint_processing_error(
         "processing" in response_json["message"].lower()
         or "Test processing error" in response_json["message"]
     )
+
+
+@pytest.mark.asyncio
+async def test_webhook_endpoint_empty_array(
+    async_client: httpx.AsyncClient
+) -> None:
+    """Test webhook endpoint with empty array - simulating Mandrill webhook testing."""
+    # Send the webhook request with an empty array as Mandrill would for testing
+    response = await async_client.post(
+        "/v1/webhooks/mandrill",
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "Mandrill-Webhook/1.0"
+        },
+        data={"mandrill_events": "[]"}
+    )
+
+    # Verify the response is 200 OK and properly acknowledges the empty array
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == {
+        "status": "success",
+        "message": "Empty events list acknowledged",
+    }
