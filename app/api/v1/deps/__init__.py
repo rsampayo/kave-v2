@@ -1,17 +1,17 @@
 """API dependency injection modules."""
 
-from app.api.deps.auth import (
+from app.api.v1.deps.auth import (
     get_current_active_user,
     get_current_user,
     get_optional_user,
 )
-from app.api.deps.database import get_db
-from app.api.deps.email import (
+from app.api.v1.deps.database import get_db
+from app.api.v1.deps.email import (
     get_attachment_service,
     get_email_service,
     get_webhook_client,
 )
-from app.api.deps.storage import get_storage_service
+from app.api.v1.deps.storage import get_storage_service
 
 __all__ = [
     "get_db",

@@ -3,8 +3,8 @@
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps.database import get_db
-from app.api.deps.storage import get_storage_service
+from app.api.v1.deps.database import get_db
+from app.api.v1.deps.storage import get_storage_service
 from app.core.config import settings
 from app.integrations.email.client import WebhookClient
 from app.services.attachment_service import AttachmentService

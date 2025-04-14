@@ -36,11 +36,11 @@ def test_app_creation_and_structure() -> None:
             break
     assert found_cors, "CORSMiddleware not found in user_middleware"
 
-    # Verify the email_webhooks router is included
+    # Verify the email_webhooks router is included under the v1 path
     route_found = False
     for route in test_app.routes:
         if isinstance(route, fastapi.routing.APIRoute) and route.path.startswith(
-            "/webhooks"
+            "/v1/webhooks"
         ):
             route_found = True
             break

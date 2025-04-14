@@ -6,7 +6,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps.database import get_db
+from app.api.v1.deps.database import get_db
 
 __all__ = ["get_current_user", "get_optional_user", "get_current_active_user"]
 

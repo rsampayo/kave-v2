@@ -7,7 +7,7 @@ standardized format.
 import logging
 from typing import Any
 
-from app.api.endpoints.webhooks.common.attachments import _normalize_attachments
+from app.api.v1.endpoints.webhooks.common.attachments import _normalize_attachments
 
 # Set up logging
 logger = logging.getLogger(__name__)

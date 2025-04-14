@@ -10,7 +10,7 @@ from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db, get_storage_service
+from app.api.v1.deps import get_db, get_storage_service
 from app.models.email_data import Attachment, Email, EmailAttachment
 from app.schemas.webhook_schemas import EmailAttachment as SchemaEmailAttachment
 from app.schemas.webhook_schemas import InboundEmailData, MailchimpWebhook

@@ -10,19 +10,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Import from the correct refactored locations
 # Note: receive_mandrill_webhook is imported locally in tests to avoid redefinition issues
-from app.api.endpoints.webhooks.common.attachments import _normalize_attachments
-from app.api.endpoints.webhooks.mandrill.formatters import (
+from app.api.v1.endpoints.webhooks.common.attachments import _normalize_attachments
+from app.api.v1.endpoints.webhooks.mandrill.formatters import (
     _format_event,
     _parse_message_id,
     _process_mandrill_headers,
 )
-from app.api.endpoints.webhooks.mandrill.parsers import (
+from app.api.v1.endpoints.webhooks.mandrill.parsers import (
     _handle_form_data,
     _handle_json_body,
     _parse_json_from_string,
     _prepare_webhook_body,
 )
-from app.api.endpoints.webhooks.mandrill.processors import (
+from app.api.v1.endpoints.webhooks.mandrill.processors import (
     _process_event_batch,
     _process_non_list_event,
     _process_single_event,
@@ -620,7 +620,7 @@ def test_normalize_attachments_string_json() -> None:
 
 def test_normalize_attachments_invalid_json_string() -> None:
     """Test normalizing attachments when input is an invalid JSON string."""
-    from app.api.endpoints.webhooks.common.attachments import _normalize_attachments
+    from app.api.v1.endpoints.webhooks.common.attachments import _normalize_attachments
 
     # Create an invalid JSON string
     invalid_json = "This is not valid JSON"
@@ -1110,7 +1110,7 @@ async def test_process_non_list_event_failure() -> None:
 async def test_receive_mandrill_webhook_full_integration() -> None:
     """Test the full receive_mandrill_webhook endpoint with a list of events."""
     # Local import to avoid redefinition issues
-    from app.api.endpoints.webhooks.mandrill.router import receive_mandrill_webhook
+    from app.api.v1.endpoints.webhooks.mandrill.router import receive_mandrill_webhook
 
     # Create a mock request
     mock_request = MagicMock(spec=Request)
@@ -1165,7 +1165,7 @@ async def test_receive_mandrill_webhook_full_integration() -> None:
 async def test_receive_mandrill_webhook_ping_event() -> None:
     """Test the endpoint when receiving a ping event."""
     # Local import to avoid redefinition issues
-    from app.api.endpoints.webhooks.mandrill.router import receive_mandrill_webhook
+    from app.api.v1.endpoints.webhooks.mandrill.router import receive_mandrill_webhook
 
     # Create a mock request
     mock_request = MagicMock(spec=Request)
@@ -1204,7 +1204,7 @@ async def test_receive_mandrill_webhook_ping_event() -> None:
 async def test_receive_mandrill_webhook_exception_handling() -> None:
     """Test the exception handling in the webhook endpoint."""
     # Local import to avoid redefinition issues
-    from app.api.endpoints.webhooks.mandrill.router import receive_mandrill_webhook
+    from app.api.v1.endpoints.webhooks.mandrill.router import receive_mandrill_webhook
 
     # Create a mock request
     mock_request = MagicMock(spec=Request)
@@ -1243,7 +1243,7 @@ async def test_receive_mandrill_webhook_exception_handling() -> None:
 async def test_receive_mandrill_webhook_empty_list() -> None:
     """Test the endpoint with an empty list of events."""
     # Local import to avoid redefinition issues
-    from app.api.endpoints.webhooks.mandrill.router import receive_mandrill_webhook
+    from app.api.v1.endpoints.webhooks.mandrill.router import receive_mandrill_webhook
 
     # Create a mock request
     mock_request = MagicMock(spec=Request)

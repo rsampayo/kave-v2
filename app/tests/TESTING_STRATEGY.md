@@ -90,7 +90,7 @@ For testing FastAPI dependencies:
 
 ```python
 # Mock a dependency
-with patch("app.api.deps.get_db", return_value=mock_db):
+with patch("app.api.v1.deps.get_db", return_value=mock_db):
     # Test code that uses the dependency
 ```
 

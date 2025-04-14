@@ -489,7 +489,7 @@
       "from app.main import app",
       "from app.db.base import Base",
       "from app.core.config import settings",
-      "from app.api.deps import get_db",
+      "from app.api.v1.deps import get_db",
       "",
       "# Create test database engine",
       "test_engine = create_async_engine(settings.TEST_DATABASE_URI, echo=False)",

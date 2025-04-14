@@ -6,7 +6,7 @@ import pytest
 from fastapi import HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.endpoints.attachments import get_attachment
+from app.api.v1.endpoints.attachments import get_attachment
 from app.models.email_data import Attachment
 from app.services.storage_service import StorageService
 

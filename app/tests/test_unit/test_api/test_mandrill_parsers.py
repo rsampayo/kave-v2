@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi import Request, status
 
-from app.api.endpoints.webhooks.mandrill.parsers import (
+from app.api.v1.endpoints.webhooks.mandrill.parsers import (
     _create_json_error_response,
     _handle_empty_events,
     _handle_form_data,

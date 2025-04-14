@@ -15,7 +15,7 @@ import json
 import logging
 from typing import Any
 
-from app.api.endpoints.webhooks.common.mime_utils import _decode_mime_header
+from app.api.v1.endpoints.webhooks.common.mime_utils import _decode_mime_header
 
 # Set up logging
 logger = logging.getLogger(__name__)

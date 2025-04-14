@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.endpoints import attachments, email_webhooks
+from app.api.v1 import api_v1_router
 from app.core.config import settings
 from app.db.session import engine
 
@@ -60,9 +60,8 @@ def create_application() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Include API routers
-    app.include_router(email_webhooks.router)
-    app.include_router(attachments.router, prefix="/attachments", tags=["attachments"])
+    # Include API v1 router
+    app.include_router(api_v1_router)
 
     return app
 

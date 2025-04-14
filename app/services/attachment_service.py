@@ -10,8 +10,8 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Fix circular import by importing directly from specific modules
-from app.api.deps.database import get_db
-from app.api.deps.storage import get_storage_service
+from app.api.v1.deps.database import get_db
+from app.api.v1.deps.storage import get_storage_service
 from app.models.email_data import Attachment
 from app.schemas.webhook_schemas import EmailAttachment
 from app.services.storage_service import StorageService

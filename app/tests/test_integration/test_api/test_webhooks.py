@@ -65,7 +65,7 @@ async def test_webhook_endpoint_successful(
 
         # Send the webhook request
         response = await async_client.post(
-            "/webhooks/mandrill",
+            "/v1/webhooks/mandrill",
             headers={"X-Mailchimp-Signature": "test-signature"},
             content=json.dumps(WEBHOOK_PAYLOAD),
         )
@@ -99,7 +99,7 @@ async def test_webhook_endpoint_processing_error(
 
         # Send the webhook request
         response = await async_client.post(
-            "/webhooks/mandrill",
+            "/v1/webhooks/mandrill",
             headers={"X-Mailchimp-Signature": "test-signature"},
             content=json.dumps(WEBHOOK_PAYLOAD),
         )

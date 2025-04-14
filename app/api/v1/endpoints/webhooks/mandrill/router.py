@@ -17,13 +17,13 @@ from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db, get_email_service, get_webhook_client
-from app.api.endpoints.webhooks.mandrill.parsers import (
+from app.api.v1.deps import get_db, get_email_service, get_webhook_client
+from app.api.v1.endpoints.webhooks.mandrill.parsers import (
     _is_empty_event_list,
     _is_ping_event,
     _prepare_webhook_body,
 )
-from app.api.endpoints.webhooks.mandrill.processors import (
+from app.api.v1.endpoints.webhooks.mandrill.processors import (
     _handle_event_list,
     _handle_single_event_dict,
 )

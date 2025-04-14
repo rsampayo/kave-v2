@@ -12,7 +12,7 @@ import logging
 
 from fastapi import APIRouter
 
-from app.api.endpoints.webhooks.mandrill.router import router as mandrill_router
+from app.api.v1.endpoints.webhooks.mandrill.router import router as mandrill_router
 
 # Set up logging
 logger = logging.getLogger(__name__)

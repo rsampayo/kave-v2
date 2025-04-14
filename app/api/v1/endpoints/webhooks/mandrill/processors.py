@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import status
 from fastapi.responses import JSONResponse
 
-from app.api.endpoints.webhooks.mandrill.formatters import (
+from app.api.v1.endpoints.webhooks.mandrill.formatters import (
     _format_event,
     _process_mandrill_headers,
 )
