@@ -385,11 +385,11 @@ def _handle_empty_events(
         A response to send, or None to continue processing
     """
     if _is_empty_event_list(body):
-        logger.info("Received empty event list from Mandrill")
+        logger.info("Received empty event list from Mandrill - treating as test webhook")
         return JSONResponse(
             content={
                 "status": "success",
-                "message": "Acknowledged empty event list",
+                "message": "Empty events array acknowledged - webhook configured correctly",
             },
             status_code=status.HTTP_200_OK,
         )
@@ -458,16 +458,6 @@ async def _prepare_webhook_body(
             logger.info(f"Error response generated: {error_response.body.decode('utf-8')}")
             return None, error_response
 
-        if not body:
-            logger.warning("Empty webhook body after parsing")
-            return None, JSONResponse(
-                content={
-                    "status": "error",
-                    "message": "Empty webhook body",
-                },
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-
         # Log the body structure
         if isinstance(body, list):
             logger.info(f"Body is a list with {len(body)} items")
@@ -483,9 +473,20 @@ async def _prepare_webhook_body(
         if ping_response:
             return None, ping_response
 
+        # Handle empty event lists - must check before general empty body check
         empty_response = _handle_empty_events(body)
         if empty_response:
             return None, empty_response
+
+        if not body:
+            logger.warning("Empty webhook body after parsing")
+            return None, JSONResponse(
+                content={
+                    "status": "error",
+                    "message": "Empty webhook body",
+                },
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         return body, None
     except Exception as e:
