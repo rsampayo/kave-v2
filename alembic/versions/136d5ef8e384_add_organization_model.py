@@ -32,7 +32,7 @@ def upgrade() -> None:
         sa.Column("mandrill_api_key", sa.String(length=255), nullable=False),
         sa.Column("mandrill_webhook_secret", sa.String(length=255), nullable=False),
         sa.Column(
-            "is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")
+            "is_active", sa.Boolean(), nullable=False, server_default=sa.text("TRUE")
         ),
         sa.PrimaryKeyConstraint("id"),
     )
