@@ -87,8 +87,8 @@ class EmailProcessingService:
             ValueError: If email processing fails
         """
         try:
-            # Identify the organization from the webhook email
-            organization = await self._identify_organization(webhook.data.from_email)
+            # Identify the organization from the recipient's email rather than the sender
+            organization = await self._identify_organization(webhook.data.to_email)
 
             # Create the email model
             email = await self.store_email(
@@ -109,18 +109,18 @@ class EmailProcessingService:
             logger.error("Failed to process webhook: %s", str(e))
             raise ValueError(f"Email processing failed: {str(e)}") from e
 
-    async def _identify_organization(self, from_email: str) -> Organization | None:
-        """Identify the organization based on the sender's email.
+    async def _identify_organization(self, to_email: str) -> Organization | None:
+        """Identify the organization based on the recipient's email.
 
         Args:
-            from_email: Email address of the sender
+            to_email: Email address of the recipient
 
         Returns:
             Optional[Organization]: The organization if found, None otherwise
         """
         # Try to find the organization by email
         query = select(Organization).where(
-            Organization.webhook_email == from_email,
+            Organization.webhook_email == to_email,
             Organization.is_active == True,  # noqa: E712
         )
         result = await self.db.execute(query)
