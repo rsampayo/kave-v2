@@ -40,8 +40,17 @@ async def _handle_form_data(
         - An error response or None if successful
     """
     try:
+        # Log raw body first
+        raw_body = await request.body()
+        logger.info(f"RAW WEBHOOK BODY: {raw_body.decode('utf-8', errors='replace')}")
+        
         form_data = await request.form()
+        logger.info(f"FORM KEYS: {list(form_data.keys())}")
         logger.debug("Received Mandrill form data with %s keys", len(form_data))
+        
+        # Dump all form data for debugging
+        for key, value in form_data.items():
+            logger.info(f"FORM KEY: {key}, VALUE: {str(value)[:200]}...")
 
         if "mandrill_events" in form_data:
             # This is the standard Mandrill format
@@ -228,72 +237,62 @@ def _create_json_error_response(error_message: str) -> JSONResponse:
 async def _parse_json_body(
     request: Request,
 ) -> tuple[dict[str, Any] | list[dict[str, Any]] | None, JSONResponse | None]:
-    """Parse and validate JSON body from various request formats.
+    """Parse the JSON body from a request.
+
+    This function attempts multiple strategies to parse the JSON body
+    from a FastAPI request.
 
     Args:
         request: The FastAPI request object
 
     Returns:
         Tuple containing:
-        - The parsed JSON body (dict or list) or None if parsing failed
+        - The parsed JSON body or None if parsing failed
         - An error response or None if successful
     """
     try:
-        # First try using the standard FastAPI JSON parsing
+        # First try the cleaner request.json() method
         body = await _parse_json_from_request(request)
-        _log_parsed_body_info(body)
         return body, None
-    except Exception as e:
-        logger.debug(
-            "Standard JSON parsing failed: %s, trying raw body methods", str(e)
-        )
-        try:
-            # If that fails, try to get the raw body and parse it manually
-            raw_body = await request.body()
-            if not raw_body:
-                logger.warning("Empty request body")
-                return None, JSONResponse(
-                    content={
-                        "status": "error",
-                        "message": "Empty request body",
-                    },
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                )
+    except Exception as request_json_err:
+        # Log the specific error
+        logger.warning("Failed to parse with request.json(): %s", str(request_json_err))
 
-            # Try parsing raw bytes directly
+        # Fall back to reading the raw body
+        try:
+            raw_body = await request.body()
+            logger.info(f"Raw body length: {len(raw_body)} bytes")
+            
+            # Try parsing the raw body as JSON directly
             try:
                 body = await _parse_json_from_bytes(raw_body)
-                _log_parsed_body_info(body)
                 return body, None
-            except Exception as bytes_err:
-                logger.debug("Failed to parse raw bytes: %s", str(bytes_err))
+            except json.JSONDecodeError as bytes_err:
+                logger.warning("Failed to parse bytes directly: %s", str(bytes_err))
+                # Sample for debugging
+                sample_bytes = raw_body[:100] if len(raw_body) > 100 else raw_body
+                logger.info(f"Sample raw bytes: {sample_bytes}")
 
-                # Try parsing as string
+                # Try decoding the bytes to a string first
                 try:
                     body = await _parse_json_from_string(raw_body)
-                    _log_parsed_body_info(body)
                     return body, None
                 except Exception as string_err:
-                    logger.error("All JSON parsing methods failed: %s", str(string_err))
-                    return None, JSONResponse(
-                        content={
-                            "status": "error",
-                            "message": (
-                                f"Failed to process webhook but acknowledged: "
-                                f"{str(string_err)}"
-                            ),
-                        },
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                    )
-        except Exception as raw_err:
-            logger.error("Error accessing raw request body: %s", str(raw_err))
-            return None, JSONResponse(
-                content={
-                    "status": "error",
-                    "message": f"Failed to process webhook but acknowledged: {str(raw_err)}",
-                },
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
+                    logger.warning("Failed to parse from string: %s", str(string_err))
+                    # Try to see what the string looks like
+                    try:
+                        sample_string = raw_body.decode('utf-8', errors='replace')[:100]
+                        logger.info(f"Sample string from bytes: {sample_string}")
+                    except Exception as decode_err:
+                        logger.warning("Failed to decode bytes to string: %s", str(decode_err))
+            
+        except Exception as body_err:
+            logger.error("Failed to read request body: %s", str(body_err))
+
+        # If all parsing methods failed, return an error
+        error_message = f"Invalid JSON format: {str(request_json_err)}"
+        logger.error("All JSON parsing methods failed: %s", error_message)
+        return None, _create_json_error_response(error_message)
 
 
 async def _handle_json_body(
@@ -439,18 +438,24 @@ async def _prepare_webhook_body(
     try:
         content_type = request.headers.get("content-type", "")
         logger.info("Processing webhook with content type: %s", content_type)
+        logger.info(f"REQUEST HEADERS: {dict(request.headers.items())}")
 
         if (
             "multipart/form-data" in content_type
             or "application/x-www-form-urlencoded" in content_type
         ):
             # Handle form data
+            logger.info("Handling as form data")
             body, error_response = await _handle_form_data(request)
         else:
             # Handle JSON data (default)
+            logger.info("Handling as JSON data")
+            raw_body = await request.body()
+            logger.info(f"RAW JSON BODY: {raw_body.decode('utf-8', errors='replace')}")
             body, error_response = await _handle_json_body(request)
 
         if error_response:
+            logger.info(f"Error response generated: {error_response.body.decode('utf-8')}")
             return None, error_response
 
         if not body:
@@ -462,6 +467,16 @@ async def _prepare_webhook_body(
                 },
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
+
+        # Log the body structure
+        if isinstance(body, list):
+            logger.info(f"Body is a list with {len(body)} items")
+            if body:
+                logger.info(f"First item keys: {list(body[0].keys()) if isinstance(body[0], dict) else 'Not a dict'}")
+        elif isinstance(body, dict):
+            logger.info(f"Body is a dict with keys: {list(body.keys())}")
+        else:
+            logger.info(f"Body is of type: {type(body)}")
 
         # Handle special cases
         ping_response = _handle_ping_event(body)
@@ -475,6 +490,8 @@ async def _prepare_webhook_body(
         return body, None
     except Exception as e:
         logger.error("Error in _prepare_webhook_body: %s", str(e))
+        import traceback
+        logger.error(f"Exception traceback: {traceback.format_exc()}")
         return None, JSONResponse(
             content={
                 "status": "error",
