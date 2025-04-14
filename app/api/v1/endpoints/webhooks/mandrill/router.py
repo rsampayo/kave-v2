@@ -123,8 +123,8 @@ async def receive_mandrill_webhook(
             return error_response
 
         # Verify we have a body to process
-        if not body:
-            logger.info("Empty webhook body received")
+        if body is None:
+            logger.info("Missing webhook body received")
             return JSONResponse(
                 content={
                     "status": "error",
