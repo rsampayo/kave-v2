@@ -60,3 +60,79 @@ def test_validate_db_url_unchanged() -> None:
 
     # Verify URL remains unchanged
     assert result == sqlite_url
+
+
+def test_get_webhook_url_property() -> None:
+    """Test the get_webhook_url property returns correct URLs based on environment."""
+    # Test production environment
+    with patch.dict(
+        os.environ,
+        {
+            "SECRET_KEY": "test_secret",
+            "DATABASE_URL": "sqlite:///./test.db",
+            "MAILCHIMP_API_KEY": "test_api_key",
+            "MAILCHIMP_WEBHOOK_SECRET": "test_webhook_secret",
+            "API_ENV": "production",
+            "MAILCHIMP_WEBHOOK_BASE_URL_PRODUCTION": "https://api.example.com",
+            "MAILCHIMP_WEBHOOK_BASE_URL_TESTING": "https://dev.example.com",
+            "WEBHOOK_PATH": "/v1/webhooks/mandrill",
+        },
+    ):
+        settings = Settings()
+        assert (
+            settings.get_webhook_url == "https://api.example.com/v1/webhooks/mandrill"
+        )
+
+    # Test development environment
+    with patch.dict(
+        os.environ,
+        {
+            "SECRET_KEY": "test_secret",
+            "DATABASE_URL": "sqlite:///./test.db",
+            "MAILCHIMP_API_KEY": "test_api_key",
+            "MAILCHIMP_WEBHOOK_SECRET": "test_webhook_secret",
+            "API_ENV": "development",
+            "MAILCHIMP_WEBHOOK_BASE_URL_PRODUCTION": "https://api.example.com",
+            "MAILCHIMP_WEBHOOK_BASE_URL_TESTING": "https://dev.example.com",
+            "WEBHOOK_PATH": "/v1/webhooks/mandrill",
+        },
+    ):
+        settings = Settings()
+        assert (
+            settings.get_webhook_url == "https://dev.example.com/v1/webhooks/mandrill"
+        )
+
+
+def test_should_reject_unverified_property() -> None:
+    """Test the should_reject_unverified property returns correct values based on environment."""
+    # Test production environment with rejection enabled
+    with patch.dict(
+        os.environ,
+        {
+            "SECRET_KEY": "test_secret",
+            "DATABASE_URL": "sqlite:///./test.db",
+            "MAILCHIMP_API_KEY": "test_api_key",
+            "MAILCHIMP_WEBHOOK_SECRET": "test_webhook_secret",
+            "API_ENV": "production",
+            "MAILCHIMP_REJECT_UNVERIFIED_PRODUCTION": "true",
+            "MAILCHIMP_REJECT_UNVERIFIED_TESTING": "false",
+        },
+    ):
+        settings = Settings()
+        assert settings.should_reject_unverified is True
+
+    # Test development environment with rejection disabled
+    with patch.dict(
+        os.environ,
+        {
+            "SECRET_KEY": "test_secret",
+            "DATABASE_URL": "sqlite:///./test.db",
+            "MAILCHIMP_API_KEY": "test_api_key",
+            "MAILCHIMP_WEBHOOK_SECRET": "test_webhook_secret",
+            "API_ENV": "development",
+            "MAILCHIMP_REJECT_UNVERIFIED_PRODUCTION": "true",
+            "MAILCHIMP_REJECT_UNVERIFIED_TESTING": "false",
+        },
+    ):
+        settings = Settings()
+        assert settings.should_reject_unverified is False

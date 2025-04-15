@@ -20,6 +20,26 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Set more specific logging levels for signature verification modules
+logging.getLogger("app.integrations.email.client").setLevel(logging.DEBUG)
+logging.getLogger("app.api.v1.endpoints.webhooks.mandrill.router").setLevel(
+    logging.DEBUG
+)
+logging.getLogger("app.api.v1.endpoints.webhooks.mandrill.processors").setLevel(
+    logging.DEBUG
+)
+
+# Log handler to make signature verification logs stand out
+signature_handler = logging.StreamHandler()
+signature_handler.setFormatter(
+    logging.Formatter(
+        "%(asctime)s - 🔑 SIGNATURE - %(name)s - %(levelname)s - %(message)s"
+    )
+)
+signature_logger = logging.getLogger("app.integrations.email.client")
+signature_logger.addHandler(signature_handler)
+signature_logger.propagate = False  # Prevent duplicate logs
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:

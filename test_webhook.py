@@ -17,9 +17,10 @@ import requests
 def get_webhook_signature(payload_str, secret):
     """Calculate the HMAC signature for the webhook."""
     signature = hmac.new(
-        key=secret.encode(), msg=payload_str.encode(), digestmod=hashlib.sha256
-    ).hexdigest()
-    return signature
+        key=secret.encode(), msg=payload_str.encode(), digestmod=hashlib.sha1
+    ).digest()
+    # Return base64 encoded signature to match the client implementation
+    return base64.b64encode(signature).decode("utf-8")
 
 
 def create_test_payload():
@@ -55,7 +56,7 @@ def send_webhook(url, payload, secret):
     payload_str = json.dumps(payload)
     signature = get_webhook_signature(payload_str, secret)
 
-    headers = {"Content-Type": "application/json", "X-Mailchimp-Signature": signature}
+    headers = {"Content-Type": "application/json", "X-Mandrill-Signature": signature}
 
     print(f"Sending test webhook to {url}")
     response = requests.post(url, headers=headers, data=payload_str)
@@ -66,8 +67,8 @@ def main():
     parser = argparse.ArgumentParser(description="Test webhook sender for Kave app")
     parser.add_argument(
         "--url",
-        default="https://kave-v2-a373f2753df6.herokuapp.com/webhooks/mailchimp",
-        help="The webhook URL (default: Kave v2 Heroku app)",
+        default="https://f0e5-66-68-240-65.ngrok-free.app/v1/webhooks/mandrill",
+        help="The webhook URL (default: Ngrok webhook URL)",
     )
     parser.add_argument(
         "--secret",

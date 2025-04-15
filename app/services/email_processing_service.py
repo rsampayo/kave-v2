@@ -74,11 +74,14 @@ class EmailProcessingService:
         self.db = db
         self.storage = storage
 
-    async def process_webhook(self, webhook: MailchimpWebhook) -> Email:
+    async def process_webhook(
+        self, webhook: MailchimpWebhook, organization: Organization | None = None
+    ) -> Email:
         """Process a webhook containing email data.
 
         Args:
             webhook: The MailChimp webhook data
+            organization: Optional pre-identified organization (e.g., from signature verification)
 
         Returns:
             Email: The created email model
@@ -87,8 +90,9 @@ class EmailProcessingService:
             ValueError: If email processing fails
         """
         try:
-            # Identify the organization from the recipient's email rather than the sender
-            organization = await self._identify_organization(webhook.data.to_email)
+            # If organization is not provided, try to identify it from the email
+            if organization is None:
+                organization = await self._identify_organization(webhook.data.to_email)
 
             # Create the email model
             email = await self.store_email(

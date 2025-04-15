@@ -1,0 +1,226 @@
+{
+  "project": "Mailchimp Webhook Signature Verification",
+  "reference_files": {
+    "implementation_plan": "implement_signature.md",
+    "test_runner": "prompts/runtests.txt"
+  },
+  "current_step": 7,
+  "total_steps": 6,
+  "last_updated": "2025-04-15",
+  "status": "completed",
+  "steps": [
+    {
+      "step_id": 1,
+      "name": "Environment Configuration Updates",
+      "description": "Update environment settings to support separate production and testing webhook URLs",
+      "status": "completed",
+      "sub_tasks": [
+        {
+          "id": 1.1,
+          "name": "Update .env file with new webhook URL configurations",
+          "file_path": ".env",
+          "status": "completed",
+          "tests": []
+        },
+        {
+          "id": 1.2,
+          "name": "Update Settings class in config.py",
+          "file_path": "app/core/config.py",
+          "status": "completed",
+          "tests": [
+            "app/tests/test_unit/test_core/test_config.py::test_get_webhook_url_property"
+          ]
+        },
+        {
+          "id": 1.3,
+          "name": "Add environment detection settings",
+          "file_path": "app/core/config.py",
+          "status": "completed",
+          "tests": []
+        }
+      ]
+    },
+    {
+      "step_id": 2,
+      "name": "WebhookClient Enhancements",
+      "description": "Add signature verification capabilities to the WebhookClient",
+      "status": "completed",
+      "sub_tasks": [
+        {
+          "id": 2.1,
+          "name": "Implement verify_signature method",
+          "file_path": "app/integrations/email/client.py",
+          "status": "completed",
+          "tests": [
+            "app/tests/test_unit/test_integrations/test_email_client.py::test_verify_signature_valid",
+            "app/tests/test_unit/test_integrations/test_email_client.py::test_verify_signature_invalid"
+          ]
+        },
+        {
+          "id": 2.2,
+          "name": "Implement identify_organization_by_signature method",
+          "file_path": "app/integrations/email/client.py",
+          "status": "completed",
+          "tests": [
+            "app/tests/test_unit/test_integrations/test_email_client.py::test_identify_organization_by_signature",
+            "app/tests/test_unit/test_integrations/test_email_client.py::test_identify_organization_by_signature_with_multiple_environments"
+          ]
+        }
+      ]
+    },
+    {
+      "step_id": 3,
+      "name": "Webhook Endpoint Updates",
+      "description": "Update webhook endpoint to extract and verify signatures",
+      "status": "completed",
+      "sub_tasks": [
+        {
+          "id": 3.1,
+          "name": "Update receive_mandrill_webhook to verify signatures",
+          "file_path": "app/api/v1/endpoints/webhooks/mandrill/router.py",
+          "status": "completed",
+          "tests": [
+            "app/tests/test_integration/test_api/test_webhooks.py::test_webhook_signature_validation"
+          ]
+        },
+        {
+          "id": 3.2,
+          "name": "Add environment-aware logging for verification results",
+          "file_path": "app/api/v1/endpoints/webhooks/mandrill/router.py",
+          "status": "completed",
+          "tests": []
+        }
+      ]
+    },
+    {
+      "step_id": 4,
+      "name": "Email Processing Service Updates",
+      "description": "Update email processing services to handle organization information from signatures",
+      "status": "completed",
+      "sub_tasks": [
+        {
+          "id": 4.1,
+          "name": "Update _process_single_event in processors.py",
+          "file_path": "app/api/v1/endpoints/webhooks/mandrill/processors.py",
+          "status": "completed",
+          "tests": []
+        },
+        {
+          "id": 4.2,
+          "name": "Update webhook handlers to pass request",
+          "file_path": "app/api/v1/endpoints/webhooks/mandrill/processors.py",
+          "status": "completed",
+          "tests": []
+        },
+        {
+          "id": 4.3,
+          "name": "Update process_webhook method to handle pre-identified organizations",
+          "file_path": "app/services/email_processing_service.py",
+          "status": "completed",
+          "tests": []
+        }
+      ]
+    },
+    {
+      "step_id": 5,
+      "name": "Router Chain Updates",
+      "description": "Update router chain to pass request object through processing chain",
+      "status": "completed",
+      "sub_tasks": [
+        {
+          "id": 5.1,
+          "name": "Update router function calls to pass request parameter",
+          "file_path": "app/api/v1/endpoints/webhooks/mandrill/router.py",
+          "status": "completed",
+          "tests": []
+        }
+      ]
+    },
+    {
+      "step_id": 6,
+      "name": "Error Handling for Failed Signature Verification",
+      "description": "Add configurable rejection of unverified webhooks based on environment",
+      "status": "completed",
+      "sub_tasks": [
+        {
+          "id": 6.1,
+          "name": "Add environment-aware rejection settings",
+          "file_path": "app/core/config.py",
+          "status": "completed",
+          "tests": [
+            "app/tests/test_unit/test_core/test_config.py::test_should_reject_unverified_property"
+          ]
+        },
+        {
+          "id": 6.2,
+          "name": "Update webhook router with rejection",
+          "file_path": "app/api/v1/endpoints/webhooks/mandrill/router.py",
+          "status": "completed",
+          "tests": [
+            "app/tests/test_integration/test_api/test_webhooks.py::test_webhook_signature_validation_rejection"
+          ]
+        }
+      ]
+    }
+  ],
+  "integration_tests": [
+    {
+      "id": "int-1",
+      "name": "Integration test for webhook signature validation",
+      "file_path": "app/tests/test_integration/test_api/test_webhooks.py",
+      "test_functions": [
+        "test_webhook_signature_validation",
+        "test_webhook_signature_validation_different_environments",
+        "test_webhook_signature_validation_rejection"
+      ],
+      "status": "pending"
+    }
+  ],
+  "end_to_end_tests": [
+    {
+      "id": "e2e-1",
+      "name": "E2E test for webhook flow with signature verification",
+      "file_path": "app/tests/test_e2e/test_webhook_flow.py",
+      "test_functions": [
+        "test_webhook_e2e_with_signature_verification",
+        "test_webhook_e2e_with_environment_specific_urls"
+      ],
+      "status": "pending"
+    }
+  ],
+  "test_script_updates": [
+    {
+      "id": "script-1",
+      "name": "Update webhook test script with environment-specific functions",
+      "file_path": "test_webhook.py",
+      "status": "pending"
+    }
+  ],
+  "instructions": {
+    "implementation_workflow": "For each step in the implementation plan:",
+    "steps": [
+      "1. Update the 'current_step' field at the beginning",
+      "2. Implement each sub-task in order",
+      "3. Update the status of each sub-task to 'in_progress' when starting",
+      "4. Implement the required test(s) for each sub-task",
+      "5. Run tests using the runtests.txt script: `python -m pytest [test_path]`",
+      "6. Fix any issues found by the tests",
+      "7. Run code quality checks: flake8, black, isort, mypy",
+      "8. Fix any code quality issues",
+      "9. Update sub-task status to 'completed' when done",
+      "10. Update step status to 'completed' when all sub-tasks are completed",
+      "11. Move to the next step"
+    ],
+    "testing_commands": {
+      "run_specific_test": "python -m pytest [test_path] -v",
+      "run_all_tests": "python -m pytest",
+      "run_code_quality": {
+        "format_code": "black . && isort .",
+        "check_types": "mypy app",
+        "lint_code": "flake8",
+        "fix_lint_issues": "autopep8 --in-place --aggressive --aggressive [file_path]"
+      }
+    },
+    "run_test_script": "Follow instructions in prompts/runtests.txt after completing each step"
+  }
+}

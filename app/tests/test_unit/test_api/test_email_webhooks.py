@@ -1269,7 +1269,7 @@ async def test_receive_mandrill_webhook_exception_handling() -> None:
     assert response.status_code == 400
     response_data = json.loads(response.body.decode())
     assert response_data["status"] == "error"
-    assert "Error processing form data" in response_data["message"]
+    assert "Failed to parse request" in response_data["message"]
 
 
 @pytest.mark.asyncio

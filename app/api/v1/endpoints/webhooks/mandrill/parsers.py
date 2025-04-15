@@ -17,7 +17,7 @@ the Mandrill webhook processing system.
 
 import json
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
@@ -495,96 +495,117 @@ def _handle_ping_event(
     return None
 
 
-async def _prepare_webhook_body(
-    request: Request,
-) -> tuple[dict[str, Any] | list[dict[str, Any]] | None, JSONResponse | None]:
-    """Parse and validate the webhook body from the request.
-
-    This function handles both form data and JSON requests, and performs
-    basic validation on the parsed body.
+async def _prepare_webhook_body(request: Request) -> tuple[Any, Optional[JSONResponse]]:
+    """Prepare the webhook body for processing.
 
     Args:
         request: The FastAPI request object
 
     Returns:
-        Tuple containing:
-        - The parsed webhook body (dict or list) or None if parsing failed
-        - An error response or None if successful
+        tuple: (body, error_response)
+            - body: The parsed request body
+            - error_response: An error response if parsing failed, None otherwise
     """
+    import json
+    import logging
+
+    logger = logging.getLogger(__name__)
+
     try:
+        # Store the original request body for signature verification
+        # We need to access it twice (once for signature, once for parsing)
+        body_bytes = await request.body()
+        original_body = body_bytes.decode("utf-8")
+        logger.debug(f"Original request body: {original_body[:200]}...")
+
+        # Preserve original body in the request state for signature verification
+        request.state.original_body = original_body
+
+        # Check content type for form data first
         content_type = request.headers.get("content-type", "")
-        logger.info("Processing webhook with content type: %s", content_type)
-        logger.info(f"REQUEST HEADERS: {dict(request.headers.items())}")
-
         if (
-            "multipart/form-data" in content_type
-            or "application/x-www-form-urlencoded" in content_type
+            "application/x-www-form-urlencoded" in content_type.lower()
+            or "multipart/form-data" in content_type.lower()
         ):
-            # Handle form data
-            logger.info("Handling as form data")
-            body, error_response = await _handle_form_data(request)
-        else:
-            # Handle JSON data (default)
-            logger.info("Handling as JSON data")
-            raw_body = await request.body()
-            logger.info(f"RAW JSON BODY: {raw_body.decode('utf-8', errors='replace')}")
-            body, error_response = await _handle_json_body(request)
+            logger.debug("Processing as form-encoded data")
 
-        if error_response:
-            logger.info(
-                f"Error response generated: " f"{error_response.body.decode('utf-8')}"
-            )
-            return None, error_response
+            # Store the raw form data in the request state for signature verification
+            request.state.raw_form_data = original_body
 
-        if not body:
-            logger.warning("Empty webhook body after parsing")
-            # Check if this is a Mandrill request by inspecting the user agent
-            user_agent = request.headers.get("user-agent", "")
-            if "Mandrill" in user_agent:
-                logger.info("Detected Mandrill test webhook with empty body, accepting")
-                # Accept empty bodies from Mandrill for testing purposes
-                return [], None
+            # Parse form data
+            form_data = await request.form()
+            logger.debug(f"Form data keys: {list(form_data.keys())}")
 
-            return None, JSONResponse(
-                content={
-                    "status": "error",
-                    "message": "Empty webhook body",
-                },
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
+            # Handle standard Mandrill format with 'mandrill_events' key
+            if "mandrill_events" in form_data:
+                try:
+                    # Parse the JSON string from the form field
+                    mandrill_events = form_data["mandrill_events"]
+                    preview = str(mandrill_events)[:20]
+                    if len(str(mandrill_events)) > 20:
+                        preview += "..."
+                    logger.debug(f"Raw mandrill_events: {preview}")
 
-        # Log the body structure
-        if isinstance(body, list):
-            logger.info(f"Body is a list with {len(body)} items")
-            if body:
-                logger.info(
-                    "First item keys: "
-                    f"{list(body[0].keys()) if isinstance(body[0], dict) else 'Not a dict'}"
+                    # Handle both string and UploadFile types
+                    if hasattr(mandrill_events, "read"):
+                        # It's an UploadFile object
+                        events_content = await mandrill_events.read()
+                        events = json.loads(events_content)
+                    else:
+                        # It's a string
+                        events = json.loads(str(mandrill_events))
+
+                    logger.debug(f"Parsed mandrill_events: {type(events)}")
+
+                    # Store the actual mandrill_events in state for signature verification
+                    request.state.mandrill_events = mandrill_events
+
+                    return events, None
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.error(f"Failed to parse mandrill_events JSON: {str(e)}")
+                    return None, JSONResponse(
+                        content={
+                            "status": "error",
+                            "message": f"Invalid mandrill_events JSON: {str(e)}",
+                        },
+                        status_code=400,
+                    )
+            else:
+                # Handle empty form with no valid keys
+                logger.warning(
+                    f"Form data missing mandrill_events key. Available keys: {list(form_data.keys())}"
                 )
-        elif isinstance(body, dict):
-            logger.info(f"Body is a dict with keys: {list(body.keys())}")
-        else:
-            logger.info(f"Body is of type: {type(body)}")
+                # Return the raw form as a dict for signature verification
+                form_dict = dict(form_data)
+                return form_dict, None
 
-        # Handle special cases
-        ping_response = _handle_ping_event(body)
-        if ping_response:
-            return None, ping_response
+        # Try to parse as JSON if not form data
+        try:
+            body = json.loads(original_body)
+            logger.debug(f"Parsed JSON body: {type(body)}")
+            return body, None
+        except json.JSONDecodeError:
+            # Not JSON, continue with other processing
+            logger.debug("Request body is not valid JSON")
 
-        empty_response = _handle_empty_events(body)
-        if empty_response:
-            return None, empty_response
+        # If we get here, the request isn't JSON or recognizable form data
+        logger.warning(f"Unrecognized request format with Content-Type: {content_type}")
 
-        return body, None
-    except Exception as e:
-        logger.error("Error in _prepare_webhook_body: %s", str(e))
-        import traceback
-
-        logger.error(f"Exception traceback: {traceback.format_exc()}")
+        # Return an error for unsupported content types instead of the original body
         return None, JSONResponse(
             content={
                 "status": "error",
-                "message": f"Failed to process webhook but acknowledged: {str(e)}",
+                "message": f"Unsupported Content-Type: {content_type}",
             },
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=400,
+        )
+
+    except Exception as e:
+        logger.error(f"Error preparing webhook body: {str(e)}")
+        return None, JSONResponse(
+            content={
+                "status": "error",
+                "message": f"Failed to parse request: {str(e)}",
+            },
+            status_code=400,
         )

@@ -1,3 +1,3 @@
 When I give you this file i want you to first run all of my pytest and fix any issues then run all of my code quality tools and fix any issues, if you have ready run them run them again. 
 The configuration files for flake is @setup.cfg and for the rest they are in @pyproject.toml
-If flake8 finds issues run autopep8 to try to fix them.
+If flake8 finds issues run autopep8 to try to fix them. give me the results with checkmark and x for pass fail

@@ -57,6 +57,57 @@ class Settings(BaseSettings):
     NGROK_LOCAL_PORT: int = 8000
     WEBHOOK_PATH: str = "/v1/webhooks/mandrill"
 
+    # Webhook configuration
+    MAILCHIMP_WEBHOOK_BASE_URL_PRODUCTION: str = ""
+    MAILCHIMP_WEBHOOK_BASE_URL_TESTING: str = ""
+    MAILCHIMP_REJECT_UNVERIFIED_PRODUCTION: bool = False
+    MAILCHIMP_REJECT_UNVERIFIED_TESTING: bool = False
+    MAILCHIMP_WEBHOOK_ENVIRONMENT: str = "testing"  # Options: "production", "testing"
+
+    @property
+    def is_production_environment(self) -> bool:
+        """Determine if we're running in a production environment.
+
+        Returns:
+            bool: True if in production or staging
+        """
+        return self.API_ENV in ("production", "staging")
+
+    @property
+    def should_reject_unverified(self) -> bool:
+        """Determine if unverified webhooks should be rejected.
+
+        Returns:
+            bool: True if unverified webhooks should be rejected
+        """
+        if self.is_production_environment:
+            return self.MAILCHIMP_REJECT_UNVERIFIED_PRODUCTION
+        return self.MAILCHIMP_REJECT_UNVERIFIED_TESTING
+
+    @property
+    def get_webhook_url(self) -> str:
+        """Get the full webhook URL for the current environment.
+
+        Returns:
+            str: The complete webhook URL for the current environment
+        """
+        base_url = (
+            self.MAILCHIMP_WEBHOOK_BASE_URL_PRODUCTION
+            if self.is_production_environment
+            else self.MAILCHIMP_WEBHOOK_BASE_URL_TESTING
+        )
+
+        # Check if the base URL already includes the webhook path
+        path = self.WEBHOOK_PATH
+        if not path.startswith("/"):
+            path = f"/{path}"
+
+        # If the base URL already includes the path, don't append it again
+        if base_url.endswith(path):
+            return base_url
+
+        return f"{base_url}{path}"
+
     @classmethod
     @field_validator("DATABASE_URL")
     def validate_db_url(cls, v: str) -> str:

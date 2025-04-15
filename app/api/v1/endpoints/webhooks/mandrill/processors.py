@@ -6,7 +6,7 @@ Contains functions for processing webhook events from Mandrill.
 import logging
 from typing import Any
 
-from fastapi import status
+from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
 from app.api.v1.endpoints.webhooks.mandrill.formatters import (
@@ -25,6 +25,7 @@ async def _process_single_event(
     email_service: EmailService,
     event: dict[str, Any],
     event_index: int,
+    request: Request | None = None,
 ) -> bool:
     """Process a single Mandrill event.
 
@@ -33,6 +34,7 @@ async def _process_single_event(
         email_service: Email service for processing
         event: The event to process
         event_index: Index of the event in the batch
+        request: Optional request object containing state
 
     Returns:
         bool: True if processing succeeded, False otherwise
@@ -50,9 +52,50 @@ async def _process_single_event(
         if not formatted_event:
             return False
 
-        # Process the webhook data
+        # Get organization from request state if available
+        organization = None
+        is_verified = False
+
+        if request and hasattr(request.state, "organization"):
+            organization = request.state.organization
+            is_verified = getattr(request.state, "is_verified", False)
+
+            if organization:
+                org_name = getattr(organization, "name", "Unknown")
+                logger.info(
+                    f"Using organization from signature verification: {org_name} "
+                    f"(ID: {organization.id}, Verified: {is_verified})"
+                )
+            else:
+                logger.debug(
+                    "No organization from signature verification, will attempt to identify from email"
+                )
+
+        # Process the webhook data with organization context
         webhook_data = await client.parse_webhook(formatted_event)
-        await email_service.process_webhook(webhook_data)
+
+        # Log the email being processed
+        to_email = (
+            webhook_data.data.to_email if hasattr(webhook_data, "data") else "unknown"
+        )
+        from_email = (
+            webhook_data.data.from_email if hasattr(webhook_data, "data") else "unknown"
+        )
+        subject = (
+            webhook_data.data.subject if hasattr(webhook_data, "data") else "unknown"
+        )
+
+        logger.info(
+            f"Processing email: from={from_email}, to={to_email}, subject={subject}, "
+            f"organization={organization.name if organization else 'Unknown'}"
+        )
+
+        # Process the webhook
+        email = await email_service.process_webhook(
+            webhook_data, organization=organization
+        )
+
+        logger.info(f"Successfully processed email ID: {email.id}")
         return True
     except Exception as event_err:
         logger.error("Error processing event %s: %s", event_index + 1, str(event_err))
@@ -63,6 +106,7 @@ async def _process_event_batch(
     client: WebhookClient,
     email_service: EmailService,
     events: list[dict[str, Any]],
+    request: Request | None = None,
 ) -> tuple[int, int]:
     """Process a batch of Mandrill events.
 
@@ -70,6 +114,7 @@ async def _process_event_batch(
         client: Webhook client for parsing
         email_service: Email service for processing
         events: List of events to process
+        request: Optional request object containing state
 
     Returns:
         Tuple[int, int]: Count of processed and skipped events
@@ -80,7 +125,9 @@ async def _process_event_batch(
     skipped_count = 0
 
     for event_index, event in enumerate(events):
-        success = await _process_single_event(client, email_service, event, event_index)
+        success = await _process_single_event(
+            client, email_service, event, event_index, request
+        )
         if success:
             processed_count += 1
         else:
@@ -90,7 +137,10 @@ async def _process_event_batch(
 
 
 async def _process_non_list_event(
-    client: WebhookClient, email_service: EmailService, body: dict[str, Any]
+    client: WebhookClient,
+    email_service: EmailService,
+    body: dict[str, Any],
+    request: Request | None = None,
 ) -> JSONResponse:
     """Process a single non-list format Mandrill event.
 
@@ -98,6 +148,7 @@ async def _process_non_list_event(
         client: Webhook client for parsing
         email_service: Email service for processing
         body: The event body to process
+        request: Optional request object containing state
 
     Returns:
         JSONResponse: Response to return to the client
@@ -110,8 +161,13 @@ async def _process_non_list_event(
     if isinstance(body, dict) and "data" in body and "headers" in body["data"]:
         body["data"]["headers"] = _process_mandrill_headers(body["data"]["headers"])
 
+    # Get organization from request state if available
+    organization = None
+    if request and hasattr(request.state, "organization"):
+        organization = request.state.organization
+
     webhook_data = await client.parse_webhook(body)
-    await email_service.process_webhook(webhook_data)
+    await email_service.process_webhook(webhook_data, organization=organization)
 
     return JSONResponse(
         content={
@@ -123,7 +179,10 @@ async def _process_non_list_event(
 
 
 async def _handle_event_list(
-    body: list[dict[str, Any]], client: WebhookClient, email_service: EmailService
+    body: list[dict[str, Any]],
+    client: WebhookClient,
+    email_service: EmailService,
+    request: Request | None = None,
 ) -> JSONResponse:
     """Handle processing for a list of Mandrill events.
 
@@ -140,12 +199,13 @@ async def _handle_event_list(
         body: List of event dictionaries
         client: Webhook client for parsing events
         email_service: Email service for database operations
+        request: Optional request object containing state
 
     Returns:
         JSONResponse: Response with processing results summary and appropriate status code
     """
     processed_count, skipped_count = await _process_event_batch(
-        client, email_service, body
+        client, email_service, body, request
     )
 
     # Return summary of processing
@@ -169,7 +229,10 @@ async def _handle_event_list(
 
 
 async def _handle_single_event_dict(
-    body: dict[str, Any], client: WebhookClient, email_service: EmailService
+    body: dict[str, Any],
+    client: WebhookClient,
+    email_service: EmailService,
+    request: Request | None = None,
 ) -> JSONResponse:
     """Handle processing for a single Mandrill event in dictionary format.
 
@@ -183,8 +246,9 @@ async def _handle_single_event_dict(
         body: Event dictionary to process
         client: Webhook client for parsing the event
         email_service: Email service for database operations
+        request: Optional request object containing state
 
     Returns:
         JSONResponse: Response with processing result and 202 Accepted status code
     """
-    return await _process_non_list_event(client, email_service, body)
+    return await _process_non_list_event(client, email_service, body, request)
