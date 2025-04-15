@@ -17,3 +17,6 @@ aioboto3>=12.3.0,<13.0.0
 aiofiles>=24.1.0,<25.0.0
 types-aiofiles>=24.1.0.20250326,<25.0.0
 psycopg2-binary>=2.9.9,<3.0.0  # PostgreSQL adapter for Heroku 
+python-jose>=3.3.0,<4.0.0  # JWT token handling 
+passlib>=1.7.4,<2.0.0  # Password hashing
+bcrypt>=4.0.1,<5.0.0  # For password hashing with passlib 
