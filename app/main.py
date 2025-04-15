@@ -4,8 +4,10 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 
 from app.api.v1 import api_v1_router
 from app.core.config import settings
@@ -93,6 +95,41 @@ def create_application() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Add global exception handlers
+    @app.exception_handler(IntegrityError)
+    async def integrity_error_handler(
+        request: Request, exc: IntegrityError
+    ) -> JSONResponse:
+        """Handle database integrity errors.
+
+        This provides user-friendly error messages for constraint violations.
+        """
+        logger.error(f"Database integrity error: {str(exc)}")
+
+        error_msg = str(exc)
+        detail = "Database constraint violation occurred"
+        status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+        # Check for specific constraint violations
+        if (
+            "uq_organizations_mandrill_webhook_secret" in error_msg
+            or "mandrill_webhook_secret" in error_msg
+        ):
+            detail = "Organization with the same webhook secret already exists. "
+            detail += "This is a security risk."
+            status_code = status.HTTP_409_CONFLICT
+        elif "ix_organizations_name" in error_msg:
+            detail = "Organization with the same name already exists"
+            status_code = status.HTTP_409_CONFLICT
+        elif "unique constraint" in error_msg.lower():
+            detail = "A record with the same unique values already exists"
+            status_code = status.HTTP_409_CONFLICT
+
+        return JSONResponse(
+            status_code=status_code,
+            content={"detail": detail},
+        )
 
     # Include API v1 router
     app.include_router(api_v1_router)
