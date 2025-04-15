@@ -2,16 +2,12 @@
 
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 
 from app.db.session import Base, engine, get_session
-from app.schemas.webhook_schemas import (
-    EmailAttachment,
-    InboundEmailData,
-    MailchimpWebhook,
-)
+from app.schemas.webhook_schemas import InboundEmailData, MailchimpWebhook
 from app.services.email_processing_service import EmailProcessingService
 from app.services.storage_service import StorageService
 
@@ -23,27 +19,36 @@ async def test_webhook() -> None:
     with open("app/tests/test_data/mock_webhook.json") as f:
         webhook_data = json.load(f)
 
-    # Convert to proper webhook schema objects
+    mandrill_event = webhook_data["mandrill_events"][0]
+    message = mandrill_event["msg"]
+
+    # Convert Mandrill headers format (which can have lists) to our expected format (simple dict)
+    headers = {}
+    for key, value in message["headers"].items():
+        # If header value is a list, join it with commas
+        if isinstance(value, list):
+            headers[key] = ", ".join(value)
+        else:
+            headers[key] = value
+
+    # Convert Mandrill format to our internal schema
     inbound_data = InboundEmailData(
-        message_id=webhook_data["data"]["message_id"],
-        from_email=webhook_data["data"]["from_email"],
-        from_name=webhook_data["data"]["from_name"],
-        to_email=webhook_data["data"]["to_email"],
-        subject=webhook_data["data"]["subject"],
-        body_plain=webhook_data["data"]["body_plain"],
-        body_html=webhook_data["data"]["body_html"],
-        headers=webhook_data["data"]["headers"],
-        attachments=[
-            EmailAttachment(**a) for a in webhook_data["data"].get("attachments", [])
-        ],
+        message_id=message["_id"],
+        from_email=message["from_email"],
+        from_name=message["from_name"],
+        to_email=message["email"],
+        subject=message["subject"],
+        body_plain=message["text"],
+        body_html=message["html"],
+        headers=headers,
+        attachments=[],  # No attachments in this test
     )
 
+    # Create a webhook object with the converted data
     webhook = MailchimpWebhook(
-        webhook_id=webhook_data["webhook_id"],
-        event=webhook_data["event"],
-        timestamp=datetime.fromisoformat(
-            webhook_data["timestamp"].replace("Z", "+00:00")
-        ),
+        webhook_id=message["_id"],
+        event=mandrill_event["event"],
+        timestamp=datetime.fromtimestamp(mandrill_event["ts"], tz=timezone.utc),
         data=inbound_data,
     )
 

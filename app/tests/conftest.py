@@ -75,7 +75,7 @@ TestSessionLocal = sessionmaker(
 )  # type: ignore[call-overload]
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session", autouse=True)
 async def setup_db() -> AsyncGenerator[None, None]:
     """Set up the test database, creating all tables."""
     async with test_engine.begin() as conn:
@@ -97,6 +97,10 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 
     Each test gets its own session that is rolled back afterward.
     """
+    # Create database tables to ensure they exist
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
     # Create a new session for each test
     session = TestSessionLocal()
 
@@ -147,7 +151,19 @@ async def isolated_db() -> AsyncGenerator[AsyncSession, None]:
 def app() -> FastAPI:
     """Create a minimal test FastAPI application."""
     # Import create_application here to avoid issues if it was mocked globally
-    return create_application()
+    app = create_application()
+
+    # Run async setup in sync context (initialize tables)
+    import asyncio
+
+    async def setup_tables() -> None:
+        async with test_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+    # Use asyncio to run the async function in the sync context
+    asyncio.run(setup_tables())
+
+    return app
 
 
 @pytest.fixture
@@ -157,8 +173,16 @@ def client(app: FastAPI) -> TestClient:
 
 
 @pytest_asyncio.fixture
-async def async_client(app: FastAPI) -> AsyncGenerator[httpx.AsyncClient, None]:
+async def async_client(
+    app: FastAPI, setup_db
+) -> AsyncGenerator[httpx.AsyncClient, None]:
     """Provide an AsyncClient instance for async endpoint testing."""
+    # Initialize database tables
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)  # Ensure clean state
+        await conn.run_sync(Base.metadata.create_all)
+
+    # Create the client
     async with httpx.AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as ac:

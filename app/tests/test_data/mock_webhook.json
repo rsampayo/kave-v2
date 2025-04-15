@@ -1,1 +1,41 @@
-{"webhook_id":"test-webhook-123","event":"inbound_email","timestamp":"2023-04-07T12:00:00Z","data":{"message_id":"mock-test-email-123@example.com","from_email":"sender@example.com","from_name":"Test Sender","to_email":"recipient@kave.com","subject":"Test Email from Mock Webhook","body_plain":"This is a test email content sent via a mock webhook.","body_html":"<html><body><p>This is a test email content sent via a mock webhook.</p></body></html>","headers":{"From":"Test Sender <sender@example.com>","To":"recipient@kave.com","Subject":"Test Email from Mock Webhook"},"attachments":[]}} 
+{
+  "mandrill_events": [
+    {
+      "event": "inbound",
+      "msg": {
+        "raw_msg": "Content-Type: multipart/alternative;",
+        "headers": {
+          "Received": ["from mail.example.com"],
+          "From": "sender@example.com",
+          "To": "webhook@test.com",
+          "Subject": "Test Email Subject",
+          "Date": "Fri, 10 Jan 2023 12:00:00 +0000"
+        },
+        "text": "This is a test email body",
+        "html": "<p>This is a test email body</p>",
+        "from_email": "sender@example.com",
+        "from_name": "Test Sender",
+        "to": [
+          ["webhook@test.com", "Test Recipient"]
+        ],
+        "subject": "Test Email Subject",
+        "spam_report": {
+          "score": 0.1
+        },
+        "spf": {
+          "result": "pass"
+        },
+        "dkim": {
+          "signed": true,
+          "valid": true
+        },
+        "email": "webhook@test.com",
+        "tags": [],
+        "sender": "sender@example.com",
+        "_id": "mock-id-123456",
+        "ts": 1673352000
+      },
+      "ts": 1673352000
+    }
+  ]
+} 
