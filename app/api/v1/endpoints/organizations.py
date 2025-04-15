@@ -74,7 +74,7 @@ async def create_organization(
                 "This is a security risk.",
             )
         raise e
-        
+
     # Convert to response model
     return OrganizationResponse.model_validate(organization)
 
@@ -206,7 +206,7 @@ async def update_organization(
                 "This is a security risk.",
             )
         raise e
-        
+
     # Convert to response model
     return OrganizationResponse.model_validate(updated_org)
 
@@ -275,7 +275,7 @@ async def patch_organization(
                 "This is a security risk.",
             )
         raise e
-        
+
     # Convert to response model
     return OrganizationResponse.model_validate(updated_org)
 

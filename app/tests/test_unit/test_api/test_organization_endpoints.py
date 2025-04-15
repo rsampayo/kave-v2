@@ -1,13 +1,13 @@
 """Tests for organization endpoints."""
 
 import uuid
+from unittest import mock
 
 import pytest
 from fastapi import status
 from httpx import AsyncClient
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from unittest import mock
 
 pytestmark = pytest.mark.asyncio
 
@@ -86,7 +86,10 @@ async def test_create_organization_duplicate_webhook_secret(
         error = IntegrityError(
             statement="INSERT INTO organizations ...",
             params={},
-            orig=Exception('duplicate key value violates unique constraint "uq_organizations_mandrill_webhook_secret"')
+            orig=Exception(
+                "duplicate key value violates unique constraint "
+                '"uq_organizations_mandrill_webhook_secret"'
+            ),
         )
         raise error
 
@@ -141,7 +144,10 @@ async def test_update_organization_duplicate_webhook_secret(
         error = IntegrityError(
             statement="UPDATE organizations SET mandrill_webhook_secret=... WHERE id=...",
             params={},
-            orig=Exception('duplicate key value violates unique constraint "uq_organizations_mandrill_webhook_secret"')
+            orig=Exception(
+                "duplicate key value violates unique constraint "
+                '"uq_organizations_mandrill_webhook_secret"'
+            ),
         )
         raise error
 
