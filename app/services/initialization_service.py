@@ -1,10 +1,10 @@
 """Service for initializing application data."""
 
 import logging
-import os
 from typing import Optional
 
 from fastapi import Depends
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps.database import get_db
@@ -132,60 +132,66 @@ class InitializationService:
             await self.db.rollback()
             logger.error("Failed to create first superuser: %s", str(e))
 
-    async def _create_default_admin_user(self, db: AsyncSession) -> User:
+    async def _create_default_admin_user(self) -> User:
         """Create the default admin user if it doesn't exist.
-
-        Args:
-            db: Database session
 
         Returns:
             User: The admin user
         """
-        logger.info("Checking for default admin user")
+        logger.info("Creating default admin user")
 
-        # Use environment variables or fall back to default values
-        admin_username = os.environ.get("ADMIN_USERNAME", "admin")
-        admin_password = os.environ.get("ADMIN_PASSWORD", "admin")
-        admin_email = os.environ.get("ADMIN_EMAIL", "admin@example.com")
-
-        # Use a default username if environment variable is not set
-        if not admin_username:
-            admin_username = "admin"
-
-        # Ensure admin_username is treated as a string
-        admin_username_str: str = str(admin_username)
-
-        # Check if default admin exists
-        user_service = UserService(db=db)
-        existing_user = await user_service.get_user_by_username(admin_username_str)  # type: ignore
-
-        if existing_user:
-            logger.info(f"Default admin user '{admin_username_str}' already exists")
-            return existing_user
+        # Use default values for admin user
+        admin_username = "admin"
+        admin_password = "admin"
+        admin_email = "admin@example.com"
 
         # Create admin user
-        logger.info(f"Creating default admin user '{admin_username_str}'")
+        logger.info(f"Creating default admin user '{admin_username}'")
         user_data = UserCreate(
-            username=admin_username_str,
+            username=admin_username,
             email=admin_email,
             password=admin_password,
             full_name="System Administrator",
             is_active=True,
             is_superuser=True,
         )
-        admin_user = await user_service.create_user(user_data)
-        logger.info(f"Created default admin user with ID {admin_user.id}")
 
-        return admin_user
+        try:
+            admin_user = await self.user_service.create_user(user_data)
+            await self.db.commit()
+            logger.info(f"Created default admin user with ID {admin_user.id}")
+            return admin_user
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Failed to create default admin user: {str(e)}")
+            raise
 
     async def initialize(self) -> None:
         """Run all initialization functions.
 
         This is the main method to call during application startup.
         """
+        # First, create the default organization
         await self.initialize_default_organization()
+
+        # Try to create a superuser from settings
         await self.initialize_first_superuser()
-        await self._create_default_admin_user(self.db)
+
+        # Check if any users exist
+        from app.models.user import User
+
+        # Count users
+        result = await self.db.execute(select(func.count()).select_from(User))
+        user_count = result.scalar()
+
+        # If no users exist at all, create a default admin user
+        if not user_count:
+            logger.info("No users found in database. Creating default admin user.")
+            await self._create_default_admin_user()
+        else:
+            logger.info(
+                f"Found {user_count} users in database. Skipping default admin creation."
+            )
 
 
 async def get_initialization_service(

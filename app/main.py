@@ -55,9 +55,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Initialize default data
     try:
         logger.info("Initializing application data")
-        init_service = InitializationService()
-        await init_service.initialize_database()
-        logger.info("Application data initialization completed")
+        # Get a database session
+        from app.db.session import async_session
+
+        async with async_session() as db:
+            init_service = InitializationService(db)
+            await init_service.initialize()
+            logger.info("Application data initialization completed")
     except Exception as e:
         logger.error(f"Failed to initialize application data: {str(e)}")
 
