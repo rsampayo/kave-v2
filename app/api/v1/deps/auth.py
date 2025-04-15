@@ -16,7 +16,7 @@ from app.services.user_service import UserService, get_user_service
 __all__ = ["get_current_user", "get_optional_user", "get_current_active_user"]
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token", auto_error=True)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/token", auto_error=True)
 
 
 async def get_current_user(
