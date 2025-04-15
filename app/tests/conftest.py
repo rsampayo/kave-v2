@@ -208,8 +208,25 @@ def client(app: FastAPI) -> TestClient:
     return TestClient(app)
 
 
+@pytest.fixture
+def mock_current_user() -> Any:
+    """Create a mock user for authentication testing."""
+    from app.models.user import User
+
+    # Create a user with superuser rights for full access
+    user = mock.MagicMock(spec=User)
+    user.id = 1
+    user.username = "testuser"
+    user.email = "test@example.com"
+    user.is_active = True
+    user.is_superuser = True
+    return user
+
+
 @pytest_asyncio.fixture
-async def async_client(app: FastAPI) -> AsyncGenerator[httpx.AsyncClient, None]:
+async def async_client(
+    app: FastAPI, mock_current_user: Any
+) -> AsyncGenerator[httpx.AsyncClient, None]:
     """Provide an AsyncClient instance for async endpoint testing."""
     # Create an in-memory SQLite database for maximum isolation
     memory_db_url = "sqlite+aiosqlite:///:memory:"
@@ -228,6 +245,12 @@ async def async_client(app: FastAPI) -> AsyncGenerator[httpx.AsyncClient, None]:
 
     # Override the get_db dependency to use our test session
     original_get_db = app.dependency_overrides.get(get_db)
+
+    # Override the authentication dependency
+    from app.api.v1.deps.auth import get_current_active_user
+
+    original_get_current_user = app.dependency_overrides.get(get_current_active_user)
+    app.dependency_overrides[get_current_active_user] = lambda: mock_current_user
 
     # Track session for cleanup
     test_session = None
@@ -285,6 +308,14 @@ async def async_client(app: FastAPI) -> AsyncGenerator[httpx.AsyncClient, None]:
             app.dependency_overrides[get_db] = original_get_db
         else:
             del app.dependency_overrides[get_db]
+
+        # Restore original user dependency
+        if original_get_current_user:
+            app.dependency_overrides[get_current_active_user] = (
+                original_get_current_user
+            )
+        else:
+            del app.dependency_overrides[get_current_active_user]
 
         # Restore original database URL
         settings.DATABASE_URL = original_db_url

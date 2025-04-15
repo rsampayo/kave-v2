@@ -87,6 +87,7 @@ async def get_attachment_service(
 async def get_email_service(
     db: AsyncSession = Depends(get_db),
     attachment_service: AttachmentService = Depends(get_attachment_service),
+    storage: StorageService = Depends(get_storage_service),
 ) -> EmailService:
     """Dependency function to get the email service.
 
@@ -96,6 +97,7 @@ async def get_email_service(
     Args:
         db: Database session for persistence operations
         attachment_service: Service for handling email attachments
+        storage: Storage service for file operations
 
     Returns:
         EmailService: A configured EmailService instance
@@ -117,4 +119,4 @@ async def get_email_service(
             return {"status": "success", "email_id": email.id}
         ```
     """
-    return EmailService(db=db, attachment_service=attachment_service)
+    return EmailService(db=db, attachment_service=attachment_service, storage=storage)

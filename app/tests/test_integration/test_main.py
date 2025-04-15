@@ -70,7 +70,10 @@ async def test_lifespan_events() -> None:
     mock_base.metadata.create_all = MagicMock()
 
     # Apply mocks with patches
-    with patch("app.main.engine", mock_engine), patch("app.db.session.Base", mock_base):
+    with (
+        patch("app.db.session.engine", mock_engine),
+        patch("app.db.session.Base", mock_base),
+    ):
         # Create a dummy FastAPI app
         dummy_app = MagicMock()
 

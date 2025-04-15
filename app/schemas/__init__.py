@@ -1,20 +1,35 @@
-"""Pydantic schemas for request/response validation."""
+"""Schema definitions for API request and response models."""
 
+from app.schemas.auth_schemas import (
+    Token,
+    TokenData,
+    UserCreate,
+    UserResponse,
+    UserUpdate,
+)
 from app.schemas.organization_schemas import (
-    OrganizationBase,
     OrganizationCreate,
-    OrganizationInDB,
     OrganizationResponse,
     OrganizationUpdate,
 )
-from app.schemas.webhook_schemas import InboundEmailData, MailchimpWebhook
+from app.schemas.webhook_schemas import (
+    EmailAttachment,
+    InboundEmailData,
+    MailchimpWebhook,
+    WebhookResponse,
+)
 
 __all__ = [
-    "MailchimpWebhook",
+    "EmailAttachment",
     "InboundEmailData",
-    "OrganizationBase",
+    "MailchimpWebhook",
+    "WebhookResponse",
     "OrganizationCreate",
-    "OrganizationInDB",
     "OrganizationResponse",
     "OrganizationUpdate",
+    "Token",
+    "TokenData",
+    "UserCreate",
+    "UserResponse",
+    "UserUpdate",
 ]

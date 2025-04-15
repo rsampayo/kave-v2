@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.deps import get_db
+from app.api.v1.deps import get_current_active_user, get_db
+from app.models.user import User
 from app.schemas.organization_schemas import (
     OrganizationCreate,
     OrganizationResponse,
@@ -28,6 +29,7 @@ async def create_organization(
     data: OrganizationCreate,
     db: AsyncSession = Depends(get_db),
     service: OrganizationService = Depends(get_organization_service),
+    current_user: User = Depends(get_current_active_user),
 ) -> OrganizationResponse:
     """Create a new organization.
 
@@ -35,6 +37,7 @@ async def create_organization(
         data: Organization data
         db: Database session
         service: Organization service
+        current_user: Current authenticated user
 
     Returns:
         OrganizationResponse: The created organization
@@ -86,11 +89,13 @@ async def create_organization(
 )
 async def get_organizations(
     service: OrganizationService = Depends(get_organization_service),
+    current_user: User = Depends(get_current_active_user),
 ) -> list[OrganizationResponse]:
     """Get all organizations.
 
     Args:
         service: Organization service
+        current_user: Current authenticated user
 
     Returns:
         List[OrganizationResponse]: List of all organizations
@@ -110,12 +115,14 @@ async def get_organizations(
 async def get_organization(
     organization_id: str,
     service: OrganizationService = Depends(get_organization_service),
+    current_user: User = Depends(get_current_active_user),
 ) -> OrganizationResponse:
     """Get an organization by ID.
 
     Args:
         organization_id: Organization ID (integer or UUID)
         service: Organization service
+        current_user: Current authenticated user
 
     Returns:
         OrganizationResponse: The requested organization
@@ -152,6 +159,7 @@ async def update_organization(
     data: OrganizationUpdate,
     db: AsyncSession = Depends(get_db),
     service: OrganizationService = Depends(get_organization_service),
+    current_user: User = Depends(get_current_active_user),
 ) -> OrganizationResponse:
     """Update an organization.
 
@@ -160,6 +168,7 @@ async def update_organization(
         data: Updated organization data
         db: Database session
         service: Organization service
+        current_user: Current authenticated user
 
     Returns:
         OrganizationResponse: The updated organization
@@ -202,12 +211,10 @@ async def update_organization(
         if "mandrill_webhook_secret" in str(e):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Organization with the same webhook secret already exists. "
-                "This is a security risk.",
+                detail="Organization with the same webhook secret already exists.",
             )
         raise e
 
-    # Convert to response model
     return OrganizationResponse.model_validate(updated_org)
 
 
@@ -221,6 +228,7 @@ async def patch_organization(
     data: OrganizationUpdate,
     db: AsyncSession = Depends(get_db),
     service: OrganizationService = Depends(get_organization_service),
+    current_user: User = Depends(get_current_active_user),
 ) -> OrganizationResponse:
     """Update an organization partially.
 
@@ -229,6 +237,7 @@ async def patch_organization(
         data: Updated organization data
         db: Database session
         service: Organization service
+        current_user: Current authenticated user
 
     Returns:
         OrganizationResponse: The updated organization
@@ -271,12 +280,10 @@ async def patch_organization(
         if "mandrill_webhook_secret" in str(e):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Organization with the same webhook secret already exists. "
-                "This is a security risk.",
+                detail="Organization with the same webhook secret already exists.",
             )
         raise e
 
-    # Convert to response model
     return OrganizationResponse.model_validate(updated_org)
 
 
@@ -289,6 +296,7 @@ async def delete_organization(
     organization_id: int,
     db: AsyncSession = Depends(get_db),
     service: OrganizationService = Depends(get_organization_service),
+    current_user: User = Depends(get_current_active_user),
 ) -> None:
     """Delete an organization.
 
@@ -296,6 +304,7 @@ async def delete_organization(
         organization_id: Organization ID
         db: Database session
         service: Organization service
+        current_user: Current authenticated user
 
     Raises:
         HTTPException: If the organization is not found

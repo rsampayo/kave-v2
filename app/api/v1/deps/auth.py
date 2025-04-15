@@ -1,42 +1,48 @@
 """Authentication and authorization dependencies for dependency injection."""
 
-from typing import Any, Dict, Optional
+from typing import Annotated, Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps.database import get_db
+from app.core.config import settings
+from app.models.user import User
+from app.schemas.auth_schemas import TokenData
+from app.services.user_service import UserService, get_user_service
 
 __all__ = ["get_current_user", "get_optional_user", "get_current_active_user"]
 
-
-# These are placeholder functions that will be implemented in the future.
-# Currently they just provide the structure for future authentication system.
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token", auto_error=False)
 
 
 async def get_current_user(
     db: AsyncSession = Depends(get_db),
-    token: str = Depends(oauth2_scheme),
-) -> Dict[str, Any]:
+    token: Optional[str] = Depends(oauth2_scheme),
+    user_service: UserService = Depends(get_user_service),
+) -> User:
     """Get the current authenticated user.
-
-    This is a placeholder that will be implemented later.
-    Currently returns a dummy user for structure.
 
     Args:
         db: Database session
         token: JWT token from OAuth2 scheme
+        user_service: User service
 
     Returns:
-        Dict[str, Any]: User information
+        User: The authenticated user
 
     Raises:
         HTTPException: If authentication fails
     """
-    # Placeholder for future implementation
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -44,53 +50,95 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Future implementation will validate the token and get the user from DB
-    return {"id": 1, "username": "placeholder", "is_active": True}
+    try:
+        # Decode the JWT token
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+
+        # Extract username from token
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+
+        # Create token data object
+        token_data = TokenData(username=username)
+    except JWTError:
+        raise credentials_exception
+
+    # Get the user from the database
+    # username is guaranteed to be a string by this point
+    username_str: str = token_data.username  # type: ignore
+    user = await user_service.get_user_by_username(username_str)
+    if user is None:
+        raise credentials_exception
+
+    return user
 
 
 async def get_optional_user(
     db: AsyncSession = Depends(get_db),
     token: Optional[str] = Depends(oauth2_scheme),
-) -> Optional[Dict[str, Any]]:
+    user_service: UserService = Depends(get_user_service),
+) -> Optional[User]:
     """Get the current user if authenticated, None otherwise.
-
-    This is a placeholder that will be implemented later.
 
     Args:
         db: Database session
         token: Optional JWT token from OAuth2 scheme
+        user_service: User service
 
     Returns:
-        Optional[Dict[str, Any]]: User information or None if not authenticated
+        Optional[User]: User information or None if not authenticated
     """
     if not token:
         return None
 
     try:
-        # Future implementation will validate the token and get the user from DB
-        return {"id": 1, "username": "placeholder", "is_active": True}
+        # Try to get the current user
+        return await get_current_user(db, token, user_service)
     except HTTPException:
         return None
 
 
 async def get_current_active_user(
-    current_user: Dict[str, Any] = Depends(get_current_user),
-) -> Dict[str, Any]:
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> User:
     """Get the current active user.
-
-    This is a placeholder that will be implemented later.
 
     Args:
         current_user: Current authenticated user
 
     Returns:
-        Dict[str, Any]: Active user information
+        User: Active user information
 
     Raises:
         HTTPException: If the user is inactive
     """
-    if not current_user.get("is_active", False):
+    if not current_user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user"
+        )
+    return current_user
+
+
+async def get_current_superuser(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> User:
+    """Get the current superuser.
+
+    Args:
+        current_user: Current active user
+
+    Returns:
+        User: Superuser information
+
+    Raises:
+        HTTPException: If the user is not a superuser
+    """
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The user doesn't have enough privileges",
         )
     return current_user

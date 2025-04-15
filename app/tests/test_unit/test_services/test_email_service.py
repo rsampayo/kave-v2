@@ -15,6 +15,16 @@ from app.schemas.webhook_schemas import (
 )
 from app.services.attachment_service import AttachmentService
 from app.services.email_service import EmailService
+from app.services.storage_service import StorageService
+
+
+@pytest.fixture
+def mock_storage_service() -> AsyncMock:
+    """Create a mock storage service."""
+    service = AsyncMock(spec=StorageService)
+    service.save_file.return_value = "s3://test-bucket/test.txt"
+    service.get_file.return_value = b"test content"
+    return service
 
 
 @pytest.fixture
@@ -96,6 +106,7 @@ class TestEmailService:
         self,
         mock_db_session: AsyncMock,
         mock_attachment_service: AsyncMock,
+        mock_storage_service: AsyncMock,
         sample_email_data: InboundEmailData,
         sample_email: Email,
     ) -> None:
@@ -104,7 +115,9 @@ class TestEmailService:
         mock_db_session.execute.return_value.scalar_one_or_none.return_value = None
 
         service = EmailService(
-            db=mock_db_session, attachment_service=mock_attachment_service
+            db=mock_db_session,
+            attachment_service=mock_attachment_service,
+            storage=mock_storage_service,
         )
 
         webhook_id = "test-webhook-id"
@@ -148,13 +161,16 @@ class TestEmailService:
         self,
         mock_db_session: AsyncMock,
         mock_attachment_service: AsyncMock,
+        mock_storage_service: AsyncMock,
         sample_email_data: InboundEmailData,
         sample_email: Email,
     ) -> None:
         """Test storing an email that already exists."""
         # Arrange
         service = EmailService(
-            db=mock_db_session, attachment_service=mock_attachment_service
+            db=mock_db_session,
+            attachment_service=mock_attachment_service,
+            storage=mock_storage_service,
         )
 
         # Mock get_email_by_message_id to return an existing email
@@ -179,13 +195,16 @@ class TestEmailService:
         self,
         mock_db_session: AsyncMock,
         mock_attachment_service: AsyncMock,
+        mock_storage_service: AsyncMock,
         sample_webhook: MailchimpWebhook,
         sample_email: Email,
     ) -> None:
         """Test processing a webhook without attachments."""
         # Arrange
         service = EmailService(
-            db=mock_db_session, attachment_service=mock_attachment_service
+            db=mock_db_session,
+            attachment_service=mock_attachment_service,
+            storage=mock_storage_service,
         )
 
         # Create a patch to control Email creation
@@ -205,6 +224,7 @@ class TestEmailService:
         self,
         mock_db_session: AsyncMock,
         mock_attachment_service: AsyncMock,
+        mock_storage_service: AsyncMock,
         sample_webhook: MailchimpWebhook,
         sample_email: Email,
     ) -> None:
@@ -216,7 +236,9 @@ class TestEmailService:
             )
         ]
         service = EmailService(
-            db=mock_db_session, attachment_service=mock_attachment_service
+            db=mock_db_session,
+            attachment_service=mock_attachment_service,
+            storage=mock_storage_service,
         )
 
         # Create a patch to control Email creation
@@ -238,12 +260,15 @@ class TestEmailService:
         self,
         mock_db_session: AsyncMock,
         mock_attachment_service: AsyncMock,
+        mock_storage_service: AsyncMock,
         sample_webhook: MailchimpWebhook,
     ) -> None:
         """Test error handling during webhook processing."""
         # Arrange
         service = EmailService(
-            db=mock_db_session, attachment_service=mock_attachment_service
+            db=mock_db_session,
+            attachment_service=mock_attachment_service,
+            storage=mock_storage_service,
         )
         mock_db_session.execute.side_effect = Exception("Database error")
 
@@ -258,6 +283,7 @@ class TestEmailService:
         self,
         mock_db_session: AsyncMock,
         mock_attachment_service: AsyncMock,
+        mock_storage_service: AsyncMock,
         sample_email: Email,
     ) -> None:
         """Test retrieving an email by message ID."""
@@ -270,7 +296,9 @@ class TestEmailService:
         # Patch the SQLAlchemy select function
         with patch("app.services.email_service.select") as mock_select:
             service = EmailService(
-                db=mock_db_session, attachment_service=mock_attachment_service
+                db=mock_db_session,
+                attachment_service=mock_attachment_service,
+                storage=mock_storage_service,
             )
 
             # Act

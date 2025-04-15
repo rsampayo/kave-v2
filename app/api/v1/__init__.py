@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import attachments, email_webhooks, organizations
+from app.api.v1.endpoints import attachments, auth, email_webhooks, organizations
 
 # Create a v1 router with prefix
 api_v1_router = APIRouter(prefix="/v1")
@@ -15,3 +15,4 @@ api_v1_router.include_router(
 api_v1_router.include_router(
     organizations.router, prefix="/organizations", tags=["organizations"]
 )
+api_v1_router.include_router(auth.router, prefix="/auth", tags=["auth"])

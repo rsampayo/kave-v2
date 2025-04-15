@@ -11,9 +11,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.v1 import api_v1_router
 from app.core.config import settings
-from app.db.session import engine, get_session
 from app.services.initialization_service import InitializationService
-from app.services.organization_service import OrganizationService
 
 # Set up logging
 logging.basicConfig(
@@ -56,22 +54,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Initialize default data
     try:
-        logger.info("Initializing default organization")
-        db = get_session()
-        org_service = OrganizationService(db)
-        init_service = InitializationService(db, org_service)
-        await init_service.init_default_organization()
-        await db.close()
-        logger.info("Default data initialization completed")
+        logger.info("Initializing application data")
+        init_service = InitializationService()
+        await init_service.initialize_database()
+        logger.info("Application data initialization completed")
     except Exception as e:
-        logger.error(f"Failed to initialize default data: {str(e)}")
+        logger.error(f"Failed to initialize application data: {str(e)}")
 
     # App runs here
     yield
 
     # Shutdown: Close database connections
+    logger.info("Application shutdown")
+    from app.db.session import engine
+
     await engine.dispose()
-    logger.info("Database connections closed")
 
 
 def create_application() -> FastAPI:

@@ -5,6 +5,7 @@ using Pydantic's BaseSettings for environment variable loading.
 """
 
 from pathlib import Path
+from typing import Optional
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -28,6 +29,14 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     SECRET_KEY: str
     PROJECT_NAME: str = "Kave"
+
+    # Authentication
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    # First superuser credentials for initial setup
+    FIRST_SUPERUSER_USERNAME: Optional[str] = None
+    FIRST_SUPERUSER_EMAIL: Optional[str] = None
+    FIRST_SUPERUSER_PASSWORD: Optional[str] = None
 
     # Database
     DATABASE_URL: str
