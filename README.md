@@ -24,6 +24,7 @@ Future phases will include:
 - **Validation**: Pydantic V2
 - **Testing**: Pytest with async support
 - **Development**: Black, isort, Flake8, Mypy, Autoflake
+- **Webhook Testing**: ngrok for local webhook testing
 
 ## Getting Started
 
@@ -147,6 +148,11 @@ mypy app
 │   ├── agents/                 # Future AI agents
 │   ├── tools/                  # Tools for AI agents
 │   └── tests/                  # Test suite
+├── scripts/                    # Utility scripts
+│   ├── start_ngrok.py          # Script to start ngrok tunnel
+│   └── start_local_with_webhook.py  # Script to start app with ngrok
+├── docs/                       # Documentation
+│   └── ngrok_webhook_testing.md  # Guide for webhook testing
 ├── requirements/               # Dependency files
 ├── .env.example                # Example environment variables
 └── README.md                   # This file
@@ -181,4 +187,28 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Heroku Deployment
 
-This application is configured for Heroku deployment. Refer to the `HEROKU_DEPLOYMENT_PLAN.md` file for detailed deployment instructions. 
+This application is configured for Heroku deployment. Refer to the `HEROKU_DEPLOYMENT_PLAN.md` file for detailed deployment instructions.
+
+## Testing Webhooks Locally
+
+For testing Mandrill webhooks with your local development environment, we've integrated ngrok to expose your local server to the internet.
+
+### Prerequisites
+
+1. Install ngrok from [ngrok.com](https://ngrok.com/download)
+2. Get your auth token by signing up for a free account
+
+### Quick Start
+
+Run the following command to start both the FastAPI application and ngrok tunnel:
+
+```bash
+./start_webhook_testing.sh
+```
+
+This will:
+1. Start your FastAPI application on port 8000
+2. Create an ngrok tunnel to expose your local server
+3. Display the URL to use in your Mandrill webhook configuration
+
+For more detailed information, see [docs/ngrok_webhook_testing.md](docs/ngrok_webhook_testing.md). 

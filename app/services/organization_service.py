@@ -1,7 +1,6 @@
 """Module providing Organization Service functionality."""
 
 import logging
-from typing import Any
 
 from fastapi import Depends
 from sqlalchemy import select

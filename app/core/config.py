@@ -20,6 +20,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
+        extra="ignore",  # Ignore extra fields in .env
     )
 
     # API
@@ -49,6 +50,12 @@ class Settings(BaseSettings):
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_REGION: str = "us-east-1"
     USE_S3_STORAGE: bool = False
+
+    # Ngrok settings (for webhook testing)
+    NGROK_AUTH_TOKEN: str = ""
+    NGROK_REGION: str = "us"
+    NGROK_LOCAL_PORT: int = 8000
+    WEBHOOK_PATH: str = "/v1/webhooks/mandrill"
 
     @classmethod
     @field_validator("DATABASE_URL")

@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 async def _handle_form_data(
     request: Request,
 ) -> tuple[dict[str, Any] | list[dict[str, Any]] | None, JSONResponse | None]:
-    """Parse and handle form data from a Mandrill webhook request.
+    """Handle form data from Mandrill webhook requests.
 
     Args:
         request: The FastAPI request object
@@ -42,19 +42,36 @@ async def _handle_form_data(
     try:
         # Log raw body first - with hex dump for byte-level inspection
         raw_body = await request.body()
-        logger.info(
-            f"RAW WEBHOOK BODY (length {len(raw_body)} bytes): "
-            f"{raw_body.decode('utf-8', errors='replace')}"
-        )
-        logger.info(f"RAW WEBHOOK BODY (hex): {raw_body.hex()}")
-        logger.info(f"RAW WEBHOOK BODY (repr): {repr(raw_body)}")
+
+        # Use safe methods to decode and convert bytes to avoid coroutine issues with mocks
+        try:
+            raw_body_str = (
+                raw_body.decode("utf-8", errors="replace")
+                if hasattr(raw_body, "decode")
+                else str(raw_body)
+            )
+            raw_body_hex = (
+                raw_body.hex() if hasattr(raw_body, "hex") else repr(raw_body)
+            )
+            raw_body_repr = repr(raw_body)
+
+            logger.info(
+                f"RAW WEBHOOK BODY (length {len(raw_body)} bytes): {raw_body_str}"
+            )
+            logger.info(f"RAW WEBHOOK BODY (hex): {raw_body_hex}")
+            logger.info(f"RAW WEBHOOK BODY (repr): {raw_body_repr}")
+        except Exception as decode_err:
+            logger.error(f"Error decoding raw body: {str(decode_err)}")
 
         # Try to URL decode manually to verify
         import urllib.parse
 
         try:
-            url_decoded = urllib.parse.unquote(raw_body.decode("utf-8"))
-            logger.info(f"URL DECODED MANUALLY: {url_decoded}")
+            # Safely decode the raw_body
+            if hasattr(raw_body, "decode"):
+                body_str = raw_body.decode("utf-8")
+                url_decoded = urllib.parse.unquote(body_str)
+                logger.info(f"URL DECODED MANUALLY: {url_decoded}")
         except Exception as e:
             logger.error(f"Manual URL decoding failed: {str(e)}")
 
@@ -515,8 +532,7 @@ async def _prepare_webhook_body(
 
         if error_response:
             logger.info(
-                f"Error response generated: "
-                f"{error_response.body.decode('utf-8')}"
+                f"Error response generated: " f"{error_response.body.decode('utf-8')}"
             )
             return None, error_response
 

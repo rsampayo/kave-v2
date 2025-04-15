@@ -207,7 +207,14 @@ async def test_attachment_with_invalid_base64(
 ) -> None:
     """Test handling of attachment with invalid base64 encoding."""
     # GIVEN
-    service = EmailProcessingService(mock_db_session, mock_storage_service)
+    # Create a completely non-async mock setup to avoid warnings
+    db_mock = MagicMock(spec=AsyncSession)
+    storage_mock = MagicMock(spec=StorageService)
+
+    # Only mock methods that need to be awaited as AsyncMock
+    storage_mock.save_file = AsyncMock(side_effect=ValueError("Invalid base64"))
+
+    service = EmailProcessingService(db_mock, storage_mock)
 
     # Create a test email
     email = Email(
@@ -220,9 +227,6 @@ async def test_attachment_with_invalid_base64(
         body_text="This is a test with an invalid attachment",
         received_at=datetime.utcnow(),
     )
-
-    # Mock storage service to raise exception for invalid base64
-    mock_storage_service.save_file.side_effect = ValueError("Invalid base64")
 
     # Create an attachment with invalid base64
     invalid_schema_attachment = SchemaEmailAttachment(

@@ -4,7 +4,6 @@ import logging
 from typing import Optional
 
 from fastapi import Depends
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_db

@@ -1,0 +1,23 @@
+{
+  "exclude": [
+    "venv",
+    "venv_new",
+    "venv_py310",
+    ".git",
+    ".cursor",
+    ".mypy_cache",
+    ".pytest_cache",
+    "htmlcov",
+    "kave.egg-info",
+    "__pycache__",
+    "MagicMock",
+    "test_attachments",
+    "test_data",
+    "data"
+  ],
+  "ignore": [
+    "examples"
+  ],
+  "reportMissingImports": false,
+  "reportMissingTypeStubs": false
+} 

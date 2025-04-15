@@ -3,7 +3,6 @@
 
 import argparse
 import asyncio
-import json
 
 import httpx
 
@@ -16,7 +15,8 @@ async def list_organizations():
             org_data = response.json()
             for org in org_data:
                 print(
-                    f"ID: {org['id']}, Name: {org['name']}, Email: {org['webhook_email']}, Active: {org['is_active']}"
+                    f"ID: {org['id']}, Name: {org['name']}, "
+                    f"Email: {org['webhook_email']}, Active: {org['is_active']}"
                 )
         else:
             print(
@@ -32,7 +32,8 @@ async def get_organization(org_id: int):
         if response.status_code == 200:
             org = response.json()
             print(
-                f"ID: {org['id']}, Name: {org['name']}, Email: {org['webhook_email']}, Active: {org['is_active']}"
+                f"ID: {org['id']}, Name: {org['name']}, "
+                f"Email: {org['webhook_email']}, Active: {org['is_active']}"
             )
         else:
             print(
@@ -58,7 +59,8 @@ async def create_organization(name: str, email: str, api_key: str, secret: str):
         if response.status_code == 201:
             org = response.json()
             print(
-                f"Created organization - ID: {org['id']}, Name: {org['name']}, Email: {org['webhook_email']}"
+                f"Created organization - ID: {org['id']}, Name: {org['name']}, "
+                f"Email: {org['webhook_email']}"
             )
         else:
             print(
@@ -96,7 +98,8 @@ async def update_organization(
         if response.status_code == 200:
             org = response.json()
             print(
-                f"Updated organization - ID: {org['id']}, Name: {org['name']}, Email: {org['webhook_email']}"
+                f"Updated organization - ID: {org['id']}, Name: {org['name']}, "
+                f"Email: {org['webhook_email']}"
             )
         else:
             print(

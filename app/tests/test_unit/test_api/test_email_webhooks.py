@@ -1,4 +1,4 @@
-"""Unit tests for email webhook endpoints."""
+"""Tests for email webhook endpoints and processors."""
 
 import json
 from typing import Any
@@ -9,7 +9,6 @@ from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Import from the correct refactored locations
-# Note: receive_mandrill_webhook is imported locally in tests to avoid redefinition issues
 from app.api.v1.endpoints.webhooks.common.attachments import _normalize_attachments
 from app.api.v1.endpoints.webhooks.mandrill.formatters import (
     _format_event,
@@ -380,14 +379,22 @@ class MockRequest:
 async def test_prepare_webhook_body_form_data() -> None:
     """Test parsing form data with _prepare_webhook_body function."""
     # Create a mock request with appropriate content-type header
-    mock_request = MagicMock(spec=Request)
-    type(mock_request).headers = PropertyMock(
-        return_value={"content-type": "multipart/form-data; boundary=xyz"}
-    )
+    mock_request = AsyncMock(spec=Request)
+
+    # Setup mock headers
+    headers_mock = MagicMock()
+    headers_mock.get = MagicMock(return_value="multipart/form-data; boundary=xyz")
+    mock_request.headers = headers_mock
 
     # Setup form data return value
-    form_data = {"mandrill_events": '[{"event":"inbound"}]'}
-    mock_request.form = AsyncMock(return_value=form_data)
+    mock_form = AsyncMock()
+    mock_form.return_value = {"mandrill_events": '[{"event":"inbound"}]'}
+    mock_request.form = mock_form
+
+    # Mock body method to return bytes
+    mock_body = AsyncMock()
+    mock_body.return_value = b""  # Empty bytes
+    mock_request.body = mock_body
 
     # Call the function
     body, error = await _prepare_webhook_body(mock_request)
@@ -406,15 +413,15 @@ async def test_prepare_webhook_body_json() -> None:
     json_data = {"event": "inbound", "msg": {"from_email": "test@example.com"}}
     json_str = json.dumps(json_data)
 
-    # Create a mock request using MagicMock
-    mock_request = MagicMock(spec=Request)
+    # Create a mock request using AsyncMock
+    mock_request = AsyncMock(spec=Request)
     mock_request.body = AsyncMock(return_value=json_str.encode())
     mock_request.json = AsyncMock(return_value=json_data)
 
     # Mock headers
-    type(mock_request).headers = PropertyMock(
-        return_value={"content-type": "application/json"}
-    )
+    headers_mock = MagicMock()
+    headers_mock.get = MagicMock(return_value="application/json")
+    mock_request.headers = headers_mock
 
     # Call the function
     body, error = await _prepare_webhook_body(mock_request)
@@ -429,15 +436,15 @@ async def test_prepare_webhook_body_json() -> None:
 @pytest.mark.asyncio
 async def test_prepare_webhook_body_unsupported_content_type() -> None:
     """Test preparing webhook body with unsupported content type."""
-    # Create a mock request with unsupported content type using MagicMock
-    mock_request = MagicMock(spec=Request)
+    # Create a mock request with unsupported content type using AsyncMock
+    mock_request = AsyncMock(spec=Request)
     mock_request.body = AsyncMock(return_value=b"This is plain text")
     mock_request.json = AsyncMock(side_effect=ValueError("Invalid JSON"))
 
     # Mock headers
-    type(mock_request).headers = PropertyMock(
-        return_value={"content-type": "text/plain"}
-    )
+    headers_mock = MagicMock()
+    headers_mock.get = MagicMock(return_value="text/plain")
+    mock_request.headers = headers_mock
 
     # Try to process it - it will try to handle as JSON
     body, error = await _prepare_webhook_body(mock_request)
@@ -455,9 +462,16 @@ async def test_handle_form_data_success() -> None:
         '[{"event":"inbound", "_id":"123", "msg":{"from_email":"test@example.com"}}]'
     )
 
-    # Create a proper mock request with MagicMock
-    mock_request = MagicMock(spec=Request)
-    mock_request.form = AsyncMock(return_value={"mandrill_events": mandrill_events})
+    # Create a proper mock request with AsyncMock
+    mock_request = AsyncMock(spec=Request)
+    mock_form = AsyncMock()
+    mock_form.return_value = {"mandrill_events": mandrill_events}
+    mock_request.form = mock_form
+
+    # Mock body method to return bytes
+    mock_body = AsyncMock()
+    mock_body.return_value = b""  # Empty bytes or sample bytes
+    mock_request.body = mock_body
 
     # Call the function
     body, error = await _handle_form_data(mock_request)
@@ -474,9 +488,16 @@ async def test_handle_form_data_success() -> None:
 @pytest.mark.asyncio
 async def test_handle_form_data_missing_events() -> None:
     """Test form data handling when mandrill_events is missing."""
-    # Create a mock request with MagicMock
-    mock_request = MagicMock(spec=Request)
-    mock_request.form = AsyncMock(return_value={"some_other_field": "value"})
+    # Create a mock request with AsyncMock
+    mock_request = AsyncMock(spec=Request)
+    mock_form = AsyncMock()
+    mock_form.return_value = {"some_other_field": "value"}
+    mock_request.form = mock_form
+
+    # Mock body method to return bytes
+    mock_body = AsyncMock()
+    mock_body.return_value = b""  # Empty bytes or sample bytes
+    mock_request.body = mock_body
 
     # Call the function
     body, error = await _handle_form_data(mock_request)
@@ -491,9 +512,16 @@ async def test_handle_form_data_missing_events() -> None:
 @pytest.mark.asyncio
 async def test_handle_form_data_invalid_json() -> None:
     """Test form data handling when mandrill_events contains invalid JSON."""
-    # Create a mock request with MagicMock
-    mock_request = MagicMock(spec=Request)
-    mock_request.form = AsyncMock(return_value={"mandrill_events": "this is not json"})
+    # Create a mock request with AsyncMock
+    mock_request = AsyncMock(spec=Request)
+    mock_form = AsyncMock()
+    mock_form.return_value = {"mandrill_events": "this is not json"}
+    mock_request.form = mock_form
+
+    # Mock body method to return bytes
+    mock_body = AsyncMock()
+    mock_body.return_value = b""  # Empty bytes or sample bytes
+    mock_request.body = mock_body
 
     # Call the function
     body, error = await _handle_form_data(mock_request)
@@ -511,6 +539,11 @@ async def test_handle_form_data_form_exception() -> None:
     # Create a mock request that raises an exception when form() is called
     mock_request = AsyncMock(spec=Request)
     mock_request.form.side_effect = Exception("Form processing error")
+
+    # Mock body method to return bytes
+    mock_body = AsyncMock()
+    mock_body.return_value = b""  # Empty bytes or sample bytes
+    mock_request.body = mock_body
 
     # Call the function
     body, error = await _handle_form_data(mock_request)
