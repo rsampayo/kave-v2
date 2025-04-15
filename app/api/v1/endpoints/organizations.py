@@ -39,7 +39,8 @@ async def create_organization(
         OrganizationResponse: The created organization
 
     Raises:
-        HTTPException: If an organization with the same name or webhook email already exists
+        HTTPException: If an organization with the same name, webhook email,
+                      or webhook secret already exists
     """
     # Check if organization with the same name already exists
     existing_org = await service.get_organization_by_name(data.name)
@@ -54,7 +55,20 @@ async def create_organization(
     if existing_org:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Organization with webhook email {data.webhook_email!r} already exists",
+            detail=(
+                f"Organization with webhook email {data.webhook_email!r} already exists"
+            ),
+        )
+
+    # Check if organization with the same webhook secret already exists
+    existing_org = await service.get_organization_by_webhook_secret(
+        data.mandrill_webhook_secret
+    )
+    if existing_org:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Organization with the same webhook secret already exists. "
+            "This is a security risk.",
         )
 
     # Create the organization
@@ -81,8 +95,10 @@ async def get_organizations(
         List[OrganizationResponse]: List of all organizations
     """
     organizations = await service.get_all_organizations()
-    # Convert to response model
-    return [OrganizationResponse.model_validate(org) for org in organizations]
+    return [
+        OrganizationResponse.model_validate(organization)
+        for organization in organizations
+    ]
 
 
 @router.get(
@@ -101,7 +117,7 @@ async def get_organization(
         service: Organization service
 
     Returns:
-        OrganizationResponse: The organization
+        OrganizationResponse: The requested organization
 
     Raises:
         HTTPException: If the organization is not found
@@ -112,7 +128,6 @@ async def get_organization(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Organization with ID {organization_id} not found",
         )
-    # Convert to response model
     return OrganizationResponse.model_validate(organization)
 
 
@@ -165,6 +180,21 @@ async def update_organization(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Organization with webhook email {data.webhook_email!r} already exists",
+            )
+
+    # If the webhook secret is changing, check if the new secret is already in use
+    if (
+        data.mandrill_webhook_secret
+        and data.mandrill_webhook_secret != existing_org.mandrill_webhook_secret
+    ):
+        secret_exists = await service.get_organization_by_webhook_secret(
+            data.mandrill_webhook_secret
+        )
+        if secret_exists:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Organization with the same webhook secret already exists. "
+                "This is a security risk.",
             )
 
     # Update the organization

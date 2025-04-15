@@ -83,6 +83,23 @@ class OrganizationService:
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
+    async def get_organization_by_webhook_secret(
+        self, secret: str
+    ) -> Organization | None:
+        """Get an organization by webhook secret.
+
+        Args:
+            secret: Organization webhook secret
+
+        Returns:
+            Optional[Organization]: The organization if found, None otherwise
+        """
+        query = select(Organization).where(
+            Organization.mandrill_webhook_secret == secret
+        )
+        result = await self.db.execute(query)
+        return result.scalar_one_or_none()
+
     async def get_all_organizations(self) -> list[Organization]:
         """Get all organizations.
 
