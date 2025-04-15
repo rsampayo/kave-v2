@@ -11,7 +11,9 @@ from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.ext.declarative import DeclarativeMeta
 
 from app.models.email_data import Attachment, Email, EmailAttachment
-from app.schemas.webhook_schemas import DetailedWebhookResponse
+from app.schemas.webhook_schemas import (
+    DetailedWebhookResponse,
+)
 from app.schemas.webhook_schemas import EmailAttachment as SchemaEmailAttachment
 from app.schemas.webhook_schemas import (
     InboundEmailData,

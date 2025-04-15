@@ -62,6 +62,12 @@ class OrganizationResponse(OrganizationBase):
     """Schema for organization API responses."""
 
     id: int = Field(..., description="Unique identifier for the organization")
+    mandrill_api_key: str = Field(
+        ..., description="Mandrill API key for this organization"
+    )
+    mandrill_webhook_secret: str = Field(
+        ..., description="Mandrill webhook secret for this organization"
+    )
     is_active: bool = Field(
         ..., description="Whether this organization's webhooks are active"
     )
@@ -73,6 +79,8 @@ class OrganizationResponse(OrganizationBase):
                 "id": 1,
                 "name": "Example Organization",
                 "webhook_email": "webhooks@example.com",
+                "mandrill_api_key": "api-key-example-123",
+                "mandrill_webhook_secret": "webhook-secret-example-123",
                 "is_active": True,
             }
         },
