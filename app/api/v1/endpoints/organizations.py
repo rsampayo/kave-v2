@@ -1,6 +1,7 @@
 """Module providing Organizations API endpoints."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_db
@@ -60,20 +61,20 @@ async def create_organization(
             ),
         )
 
-    # Check if organization with the same webhook secret already exists
-    existing_org = await service.get_organization_by_webhook_secret(
-        data.mandrill_webhook_secret
-    )
-    if existing_org:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Organization with the same webhook secret already exists. "
-            "This is a security risk.",
-        )
-
     # Create the organization
     organization = await service.create_organization(data)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        await db.rollback()
+        if "mandrill_webhook_secret" in str(e):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Organization with the same webhook secret already exists. "
+                "This is a security risk.",
+            )
+        raise e
+        
     # Convert to response model
     return OrganizationResponse.model_validate(organization)
 
@@ -192,24 +193,20 @@ async def update_organization(
                 detail=f"Organization with webhook email {data.webhook_email!r} already exists",
             )
 
-    # If the webhook secret is changing, check if the new secret is already in use
-    if (
-        data.mandrill_webhook_secret
-        and data.mandrill_webhook_secret != existing_org.mandrill_webhook_secret
-    ):
-        secret_exists = await service.get_organization_by_webhook_secret(
-            data.mandrill_webhook_secret
-        )
-        if secret_exists:
+    # Update the organization
+    updated_org = await service.update_organization(organization_id, data)
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        await db.rollback()
+        if "mandrill_webhook_secret" in str(e):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Organization with the same webhook secret already exists. "
                 "This is a security risk.",
             )
-
-    # Update the organization
-    updated_org = await service.update_organization(organization_id, data)
-    await db.commit()
+        raise e
+        
     # Convert to response model
     return OrganizationResponse.model_validate(updated_org)
 
@@ -265,24 +262,20 @@ async def patch_organization(
                 detail=f"Organization with webhook email {data.webhook_email!r} already exists",
             )
 
-    # If the webhook secret is changing, check if the new secret is already in use
-    if (
-        data.mandrill_webhook_secret
-        and data.mandrill_webhook_secret != existing_org.mandrill_webhook_secret
-    ):
-        secret_exists = await service.get_organization_by_webhook_secret(
-            data.mandrill_webhook_secret
-        )
-        if secret_exists:
+    # Update the organization
+    updated_org = await service.update_organization(organization_id, data)
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        await db.rollback()
+        if "mandrill_webhook_secret" in str(e):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Organization with the same webhook secret already exists. "
                 "This is a security risk.",
             )
-
-    # Update the organization
-    updated_org = await service.update_organization(organization_id, data)
-    await db.commit()
+        raise e
+        
     # Convert to response model
     return OrganizationResponse.model_validate(updated_org)
 

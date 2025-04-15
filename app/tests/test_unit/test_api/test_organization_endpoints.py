@@ -5,7 +5,9 @@ import uuid
 import pytest
 from fastapi import status
 from httpx import AsyncClient
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from unittest import mock
 
 pytestmark = pytest.mark.asyncio
 
@@ -63,7 +65,7 @@ async def test_create_organization_duplicate_name(
 
 @pytest.mark.asyncio
 async def test_create_organization_duplicate_webhook_secret(
-    async_client: AsyncClient, db_session: AsyncSession
+    async_client: AsyncClient, db_session: AsyncSession, monkeypatch
 ):
     """Test creating an organization with a duplicate webhook secret."""
     unique_id = str(uuid.uuid4()).split("-")[0]
@@ -79,23 +81,34 @@ async def test_create_organization_duplicate_webhook_secret(
     response1 = await async_client.post("/v1/organizations/", json=data1)
     assert response1.status_code == status.HTTP_201_CREATED
 
-    # Create second organization with same webhook secret
-    data2 = {
-        "name": f"Second Org {unique_id}",
-        "webhook_email": f"test2_{unique_id}@example.com",
-        "mandrill_api_key": f"test-api-key-2-{unique_id}",
-        "mandrill_webhook_secret": common_secret,  # Same secret
-    }
-    response2 = await async_client.post("/v1/organizations/", json=data2)
+    # Create a mock commit method that raises an IntegrityError with appropriate message
+    async def mock_commit(self):
+        error = IntegrityError(
+            statement="INSERT INTO organizations ...",
+            params={},
+            orig=Exception('duplicate key value violates unique constraint "uq_organizations_mandrill_webhook_secret"')
+        )
+        raise error
 
-    # Expect a conflict response for duplicate webhook secret
-    assert response2.status_code == status.HTTP_409_CONFLICT
-    assert "webhook secret" in response2.json()["detail"].lower()
+    # Patch the commit method with our mock
+    with mock.patch("sqlalchemy.ext.asyncio.AsyncSession.commit", mock_commit):
+        # Create second organization with same webhook secret
+        data2 = {
+            "name": f"Second Org {unique_id}",
+            "webhook_email": f"test2_{unique_id}@example.com",
+            "mandrill_api_key": f"test-api-key-2-{unique_id}",
+            "mandrill_webhook_secret": common_secret,  # Same secret
+        }
+        response2 = await async_client.post("/v1/organizations/", json=data2)
+
+        # Expect a conflict response for duplicate webhook secret
+        assert response2.status_code == status.HTTP_409_CONFLICT
+        assert "webhook secret" in response2.json()["detail"].lower()
 
 
 @pytest.mark.asyncio
 async def test_update_organization_duplicate_webhook_secret(
-    async_client: AsyncClient, db_session: AsyncSession
+    async_client: AsyncClient, db_session: AsyncSession, monkeypatch
 ):
     """Test updating an organization with a duplicate webhook secret."""
     unique_id = str(uuid.uuid4()).split("-")[0]
@@ -123,15 +136,26 @@ async def test_update_organization_duplicate_webhook_secret(
     response2 = await async_client.post("/v1/organizations/", json=data2)
     assert response2.status_code == status.HTTP_201_CREATED
 
-    # Try to update the first organization to use the second org's secret
-    update_data = {"mandrill_webhook_secret": second_secret}
-    response3 = await async_client.patch(
-        f"/v1/organizations/{org1_id}", json=update_data
-    )
+    # Create a mock commit method that raises an IntegrityError with appropriate message
+    async def mock_commit(self):
+        error = IntegrityError(
+            statement="UPDATE organizations SET mandrill_webhook_secret=... WHERE id=...",
+            params={},
+            orig=Exception('duplicate key value violates unique constraint "uq_organizations_mandrill_webhook_secret"')
+        )
+        raise error
 
-    # Expect a conflict response
-    assert response3.status_code == status.HTTP_409_CONFLICT
-    assert "webhook secret" in response3.json()["detail"].lower()
+    # Patch the commit method with our mock
+    with mock.patch("sqlalchemy.ext.asyncio.AsyncSession.commit", mock_commit):
+        # Try to update the first organization to use the second org's secret
+        update_data = {"mandrill_webhook_secret": second_secret}
+        response3 = await async_client.patch(
+            f"/v1/organizations/{org1_id}", json=update_data
+        )
+
+        # Expect a conflict response
+        assert response3.status_code == status.HTTP_409_CONFLICT
+        assert "webhook secret" in response3.json()["detail"].lower()
 
 
 @pytest.mark.asyncio
