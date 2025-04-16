@@ -26,7 +26,7 @@ def upgrade() -> None:
     conn = op.get_bind()
     inspector = sa.inspect(conn)
     dialect = inspector.dialect.name
-    
+
     # Only apply this migration for PostgreSQL, skip for SQLite
     if dialect == "postgresql":
         try:
@@ -46,12 +46,14 @@ def downgrade() -> None:
     conn = op.get_bind()
     inspector = sa.inspect(conn)
     dialect = inspector.dialect.name
-    
+
     # Only apply this migration for PostgreSQL, skip for SQLite
     if dialect == "postgresql":
         try:
             op.drop_constraint(
-                "uq_organizations_mandrill_webhook_secret", "organizations", type_="unique"
+                "uq_organizations_mandrill_webhook_secret",
+                "organizations",
+                type_="unique",
             )
         except (sa.exc.ProgrammingError, OperationalError):
             # Constraint might not exist

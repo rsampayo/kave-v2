@@ -4,7 +4,6 @@ This module defines the application settings and configuration options
 using Pydantic's BaseSettings for environment variable loading.
 """
 
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -82,7 +81,7 @@ class Settings(BaseSettings):
         Returns:
             bool: True for production, False otherwise
         """
-        return self.MAILCHIMP_WEBHOOK_ENVIRONMENT.lower() == "production"
+        return self.API_ENV.lower() == "production"
 
     @property
     def should_reject_unverified(self) -> bool:
@@ -122,20 +121,20 @@ class Settings(BaseSettings):
     @property
     def effective_database_url(self) -> str:
         """Get the effective database URL, prioritizing KAVE_DATABASE_URL if set.
-        
+
         This is critical for Heroku deployments where DATABASE_URL may be overridden
         by a custom configuration.
-        
+
         Returns:
             str: The validated and normalized database URL to use
         """
         # Use KAVE_DATABASE_URL if set (contains Heroku's DATABASE_URL)
         db_url = self.KAVE_DATABASE_URL or self.DATABASE_URL
-        
+
         # Apply validation
         if db_url.startswith("postgres://"):
             db_url = db_url.replace("postgres://", "postgresql://", 1)
-            
+
         return db_url
 
     @classmethod
