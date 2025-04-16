@@ -9,7 +9,8 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.engine import reflection
+from sqlalchemy.exc import OperationalError, ProgrammingError, InternalError
 
 
 # revision identifiers, used by Alembic.
@@ -27,16 +28,27 @@ def upgrade() -> None:
     dialect = inspector.dialect.name
     
     if dialect == "postgresql":
-        # For PostgreSQL, apply the constraint directly
-        try:
-            op.create_unique_constraint(
-                "uq_organizations_mandrill_webhook_secret",
-                "organizations",
-                ["mandrill_webhook_secret"],
-            )
-        except (sa.exc.ProgrammingError, OperationalError):
-            # Constraint might already exist, so we'll ignore the error
-            pass
+        # Check if the table and column exist before adding constraints
+        insp = reflection.Inspector.from_engine(conn)
+        if ('organizations' in insp.get_table_names() and 
+            'mandrill_webhook_secret' in [col['name'] for col in insp.get_columns('organizations')]):
+            
+            # Check if constraint already exists
+            constraints = insp.get_unique_constraints('organizations')
+            constraint_names = [constraint['name'] for constraint in constraints]
+            
+            if "uq_organizations_mandrill_webhook_secret" not in constraint_names:
+                try:
+                    op.create_unique_constraint(
+                        "uq_organizations_mandrill_webhook_secret",
+                        "organizations",
+                        ["mandrill_webhook_secret"],
+                    )
+                except (ProgrammingError, OperationalError, InternalError) as e:
+                    # Log the error but continue
+                    print(f"Warning: Could not create constraint: {str(e)}")
+                    # Commit what we've done so far to avoid transaction interruption
+                    conn.execute(sa.text("COMMIT"))
 
 
 def downgrade() -> None:
@@ -47,12 +59,20 @@ def downgrade() -> None:
     dialect = inspector.dialect.name
     
     if dialect == "postgresql":
-        try:
-            op.drop_constraint(
-                "uq_organizations_mandrill_webhook_secret", 
-                "organizations", 
-                type_="unique"
-            )
-        except (sa.exc.ProgrammingError, OperationalError):
-            # If constraint doesn't exist, ignore the error
-            pass
+        # Check if constraint exists before trying to drop it
+        insp = reflection.Inspector.from_engine(conn)
+        constraints = insp.get_unique_constraints('organizations')
+        constraint_names = [constraint['name'] for constraint in constraints]
+        
+        if "uq_organizations_mandrill_webhook_secret" in constraint_names:
+            try:
+                op.drop_constraint(
+                    "uq_organizations_mandrill_webhook_secret", 
+                    "organizations", 
+                    type_="unique"
+                )
+            except (ProgrammingError, OperationalError, InternalError) as e:
+                # Log the error but continue
+                print(f"Warning: Could not drop constraint: {str(e)}")
+                # Commit what we've done so far to avoid transaction interruption
+                conn.execute(sa.text("COMMIT"))
