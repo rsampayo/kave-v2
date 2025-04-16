@@ -1,20 +1,19 @@
 import asyncio
-import os
 import sys
 from logging.config import fileConfig
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from alembic import context
 
-# Add the project root to the Python path
+# This must be before other imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.core.config import settings
-from app.db.session import Base  # Your SQLAlchemy Base
+# Now app imports are available
+from app.core.config import settings  # noqa: E402
+from app.db.session import Base  # noqa: E402, Your SQLAlchemy Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -78,14 +77,14 @@ async def run_migrations_online() -> None:
     """
     # Handle the database URL for async connections
     db_url = settings.effective_database_url
-    
+
     # Prevent using SQLite in production
     if settings.API_ENV == "production" and db_url.startswith("sqlite://"):
         raise ValueError(
             "SQLite database is not supported in production environment. "
             "Please configure a PostgreSQL database using DATABASE_URL."
         )
-    
+
     if db_url.startswith("sqlite://"):
         db_url = db_url.replace("sqlite://", "sqlite+aiosqlite://")
     elif db_url.startswith("postgres://"):

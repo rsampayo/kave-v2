@@ -208,22 +208,6 @@ class WebhookClient:
         required_fields = ["name", "type"]
         return all(field in attachment for field in required_fields)
 
-    def _convert_params_to_string(self, params: Any) -> str:
-        """Convert parameters to string format for signature verification.
-
-        Args:
-            params: The parameters to convert
-
-        Returns:
-            str: String representation of parameters
-        """
-        if not isinstance(params, str):
-            try:
-                return json.dumps(params)
-            except (TypeError, ValueError):
-                return str(params)
-        return params
-
     def _generate_signature(self, data: str) -> str:
         """Generate HMAC-SHA1 signature with base64 encoding.
 
@@ -240,222 +224,6 @@ class WebhookClient:
                 digestmod=hashlib.sha1,
             ).digest()
         ).decode("utf-8")
-
-    def _process_string_params(self, url: str, params: str) -> str:
-        """Process string parameters for Method 1 signature.
-
-        Args:
-            url: Webhook URL
-            params: String parameters
-
-        Returns:
-            str: Signed data for Method 1
-        """
-        signed_data = url
-        try:
-            json_data = json.loads(params)
-            logger.debug("Parsed string payload as JSON")
-
-            if isinstance(json_data, dict):
-                signed_data = self._process_dict_for_method1(signed_data, json_data)
-            elif isinstance(json_data, list):
-                signed_data = self._process_list_for_method1(signed_data, json_data)
-            else:
-                # For simple values, just append
-                signed_data += params
-        except json.JSONDecodeError:
-            # If not valid JSON, use the raw string
-            logger.debug("Using raw string payload (not valid JSON)")
-            signed_data += params
-
-        return signed_data
-
-    def _process_dict_for_method1(self, signed_data: str, data: dict[str, Any]) -> str:
-        """Process dictionary for Method 1 signature.
-
-        Args:
-            signed_data: Current signed data
-            data: Dictionary to process
-
-        Returns:
-            str: Updated signed data
-        """
-        for key, value in sorted(data.items()):
-            signed_data += str(key)
-            if isinstance(value, dict):
-                # Handle nested dictionaries
-                for nested_key, nested_value in sorted(value.items()):
-                    signed_data += str(nested_key)
-                    signed_data += str(nested_value)
-            else:
-                signed_data += str(value)
-        return signed_data
-
-    def _process_list_for_method1(self, signed_data: str, data_list: list[Any]) -> str:
-        """Process list for Method 1 signature.
-
-        Args:
-            signed_data: Current signed data
-            data_list: List to process
-
-        Returns:
-            str: Updated signed data
-        """
-        for item in data_list:
-            if isinstance(item, dict):
-                signed_data = self._process_dict_for_method1(signed_data, item)
-            else:
-                signed_data += str(item)
-        return signed_data
-
-    def _build_method1_signature(
-        self, url: str, params: dict[str, Any] | list[dict[str, Any]] | str
-    ) -> str:
-        """Build signature using Method 1 (key/value iteration).
-
-        Args:
-            url: Webhook URL
-            params: Request parameters
-
-        Returns:
-            str: Calculated signature
-        """
-        # Start with the webhook URL
-        signed_data = url
-
-        if isinstance(params, str):
-            signed_data = self._process_string_params(url, params)
-        elif isinstance(params, dict):
-            signed_data = self._process_dict_for_method1(signed_data, params)
-        elif isinstance(params, list):
-            signed_data = self._process_list_for_method1(signed_data, params)
-        else:
-            # Fallback for other types
-            signed_data += str(params)
-
-        logger.debug(f"Method 1 - Signed data length: {len(signed_data)}")
-        logger.debug(f"Method 1 - Signed data preview: {signed_data[:50]}...")
-
-        # Generate the signature
-        calculated_signature = self._generate_signature(signed_data)
-        logger.debug(f"Method 1 - Calculated signature: {calculated_signature}")
-
-        return calculated_signature
-
-    def _build_method2_signature(self, url: str, params_json: str) -> str:
-        """Build signature using Method 2 (simple URL + JSON).
-
-        Args:
-            url: Webhook URL
-            params_json: JSON string of parameters
-
-        Returns:
-            str: Calculated signature
-        """
-        # Method 2: Simple URL + raw JSON concatenation
-        signed_data = url + str(params_json)
-        logger.debug(f"Method 2 - Signed data length: {len(signed_data)}")
-        logger.debug(f"Method 2 - Signed data preview: {signed_data[:50]}...")
-
-        # Generate the signature
-        calculated_signature = self._generate_signature(signed_data)
-        logger.debug(f"Method 2 - Calculated signature: {calculated_signature}")
-
-        return calculated_signature
-
-    def _build_method3_signature(
-        self, url: str, params: dict[str, Any] | list[dict[str, Any]] | str
-    ) -> str:
-        """Build signature using Method 3 (direct concatenation).
-
-        Args:
-            url: Webhook URL
-            params: Request parameters
-
-        Returns:
-            str: Calculated signature
-        """
-        # Method 3: Direct concatenation without any processing
-        signed_data = url
-
-        if isinstance(params, str):
-            # Use raw string as is
-            signed_data += params
-        elif isinstance(params, (dict, list)):
-            # Convert to JSON with consistent formatting
-            try:
-                signed_data += json.dumps(params, separators=(",", ":"))
-            except (TypeError, ValueError):
-                signed_data += str(params)
-        else:
-            # Fallback for other types
-            signed_data += str(params)
-
-        logger.debug(f"Method 3 - Signed data length: {len(signed_data)}")
-        logger.debug(f"Method 3 - Signed data preview: {signed_data[:50]}...")
-
-        # Generate the signature
-        calculated_signature = self._generate_signature(signed_data)
-        logger.debug(f"Method 3 - Calculated signature: {calculated_signature}")
-
-        return calculated_signature
-
-    def _build_method4_signature(
-        self, url: str, params: dict[str, Any] | list[dict[str, Any]] | str
-    ) -> str:
-        """Build signature using Method 4 (form data handling).
-
-        Args:
-            url: Webhook URL
-            params: Request parameters
-
-        Returns:
-            str: Calculated signature
-        """
-        # Method 4: Form data specific handling
-        signed_data = url
-
-        # Check if this is form data with mandrill_events
-        if isinstance(params, dict) and "mandrill_events" in params:
-            # Direct append of the mandrill_events value
-            mandrill_events = params["mandrill_events"]
-            signed_data += "mandrill_events" + str(mandrill_events)
-            logger.debug("Method 4 - Using mandrill_events from dictionary")
-        elif isinstance(params, str):
-            # Try to parse as form data
-            try:
-                # Check if it's form-encoded data
-                if "=" in params and ("&" in params or "mandrill_events" in params):
-                    form_data = urllib.parse.parse_qs(params)
-                    logger.debug(f"Method 4 - Parsed form data: {form_data.keys()}")
-
-                    # If mandrill_events is present, use it directly
-                    if "mandrill_events" in form_data:
-                        mandrill_events = form_data["mandrill_events"][0]
-                        signed_data += "mandrill_events" + str(mandrill_events)
-                    else:
-                        # Otherwise append each key/value in the form
-                        for key in sorted(form_data.keys()):
-                            signed_data += key + "".join(form_data[key])
-                else:
-                    # Not form data, append as is
-                    signed_data += params
-            except Exception as e:
-                logger.debug(f"Method 4 - Error parsing form data: {str(e)}")
-                # If parsing fails, just append as is
-                signed_data += params
-        else:
-            # For other types, just use the original method
-            signed_data += str(params)
-
-        logger.debug(f"Method 4 - Signed data length: {len(signed_data)}")
-        logger.debug(f"Method 4 - Signed data preview: {signed_data[:50]}...")
-
-        # Generate the signature
-        calculated_signature = self._generate_signature(signed_data)
-        logger.debug(f"Method 4 - Calculated signature: {calculated_signature}")
-
-        return calculated_signature
 
     def _extract_mandrill_events(
         self, params: dict[str, Any] | list[dict[str, Any]] | str
@@ -483,13 +251,25 @@ class WebhookClient:
 
                 match = re.search(r"mandrill_events=([^&]+)", params)
                 if match:
-                    return urllib.parse.unquote_plus(match.group(1))
+                    # URL decode the value
+                    return urllib.parse.unquote(match.group(1))
+        elif isinstance(params, str):
+            # Check if the string is a JSON representation
+            try:
+                # Use json to parse the string - ensures that json import is used
+                json_data = json.loads(params)
+                if isinstance(json_data, dict) and "mandrill_events" in json_data:
+                    return str(json_data["mandrill_events"])
+            except (json.JSONDecodeError, TypeError):
+                # Not a valid JSON string
+                pass
+
         return None
 
-    def _build_method5_signature(
+    def _build_signature(
         self, url: str, params: dict[str, Any] | list[dict[str, Any]] | str
     ) -> str:
-        """Build signature using Method 5 (Mandrill documentation approach).
+        """Build signature using Mandrill's documented approach.
 
         Args:
             url: Webhook URL
@@ -498,31 +278,31 @@ class WebhookClient:
         Returns:
             str: Calculated signature
         """
-        # Method 5: Exact Mandrill documentation approach
+        # Start with the webhook URL
         signed_data = url
 
         # Using the webhook URL without query strings if present
         if "?" in signed_data:
             signed_data = signed_data.split("?")[0]
-            logger.debug(f"Method 5 - Using URL without query string: {signed_data}")
+            logger.debug(f"Using URL without query string: {signed_data}")
 
         # Try to extract mandrill_events parameter
         mandrill_events_value = self._extract_mandrill_events(params)
 
         # If we found mandrill_events, use it directly
         if mandrill_events_value:
-            logger.debug("Method 5 - Using extracted mandrill_events parameter")
+            logger.debug("Using extracted mandrill_events parameter")
             signed_data += "mandrill_events" + str(mandrill_events_value)
         else:
             # Otherwise just use the params directly
             signed_data += str(params)
 
-        logger.debug(f"Method 5 - Signed data length: {len(signed_data)}")
-        logger.debug(f"Method 5 - Signed data preview: {signed_data[:50]}...")
+        logger.debug(f"Signed data length: {len(signed_data)}")
+        logger.debug(f"Signed data preview: {signed_data[:50]}...")
 
         # Generate the signature
         calculated_signature = self._generate_signature(signed_data)
-        logger.debug(f"Method 5 - Calculated signature: {calculated_signature}")
+        logger.debug(f"Calculated signature: {calculated_signature}")
 
         return calculated_signature
 
@@ -549,30 +329,14 @@ class WebhookClient:
         key_preview = self.webhook_secret[:4] + "..." if self.webhook_secret else "None"
         logger.debug(f"Using secret key: {key_preview}")
 
-        # Try five different methods for signature verification
-        # Convert params to string for method 2
-        params_json = self._convert_params_to_string(params)
+        # Calculate signature using Mandrill's documented approach
+        calculated_signature = self._build_signature(url, params)
 
-        # Calculate signatures using different methods
-        calculated_signature1 = self._build_method1_signature(url, params)
-        calculated_signature2 = self._build_method2_signature(url, params_json)
-        calculated_signature3 = self._build_method3_signature(url, params)
-        calculated_signature4 = self._build_method4_signature(url, params)
-        calculated_signature5 = self._build_method5_signature(url, params)
+        # Compare signatures
+        is_valid = calculated_signature == signature
 
-        # Compare signatures - if any method matches, consider it valid
-        is_valid1 = calculated_signature1 == signature
-        is_valid2 = calculated_signature2 == signature
-        is_valid3 = calculated_signature3 == signature
-        is_valid4 = calculated_signature4 == signature
-        is_valid5 = calculated_signature5 == signature
-        is_valid = is_valid1 or is_valid2 or is_valid3 or is_valid4 or is_valid5
+        logger.debug(f"Signature verification result: {is_valid}")
 
-        logger.debug(
-            "Signature verification result: "
-            f"{is_valid} (Method 1: {is_valid1}, Method 2: {is_valid2}, "
-            f"Method 3: {is_valid3}, Method 4: {is_valid4}, Method 5: {is_valid5})"
-        )
         return is_valid
 
     async def identify_organization_by_signature(
