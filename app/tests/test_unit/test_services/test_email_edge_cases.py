@@ -73,6 +73,7 @@ async def test_process_very_large_attachment(
         content=large_content_b64,
         content_id="large001",
         size=len(large_content),
+        base64=True,
     )
 
     # Convert to model attachment
@@ -125,6 +126,7 @@ async def test_process_many_attachments(
             content=content_b64,
             content_id=f"many{i:03d}",
             size=len(content),
+            base64=True,
         )
         from app.services.email_processing_service import _schema_to_model_attachment
 
@@ -235,6 +237,7 @@ async def test_attachment_with_invalid_base64(
         content="this-is-not-valid-base64!@#$%^",
         content_id="invalid001",
         size=10,
+        base64=True,
     )
 
     from app.services.email_processing_service import _schema_to_model_attachment

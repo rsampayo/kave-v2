@@ -124,11 +124,15 @@ async def test_storage_service_mocking() -> None:
             real_service, "get_file", return_value=b"file content"
         ) as mock_get_file:
             # Call the mocked method
-            file_data = await real_service.get_file(object_key="test/file.txt")
+            file_data = await real_service.get_file(
+                uri="s3://test-bucket", object_key="test/file.txt"
+            )
 
             # Verify the mocked behavior
             assert file_data == b"file content"
-            mock_get_file.assert_awaited_once_with(object_key="test/file.txt")
+            mock_get_file.assert_awaited_once_with(
+                uri="s3://test-bucket", object_key="test/file.txt"
+            )
 
 
 @pytest.mark.asyncio

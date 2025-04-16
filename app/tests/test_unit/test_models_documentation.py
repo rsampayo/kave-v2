@@ -4,6 +4,7 @@ This module ensures that our database models are properly documented
 and follow naming conventions.
 """
 
+from datetime import datetime
 from typing import Any
 
 import pytest
@@ -85,15 +86,66 @@ def test_schema_field_documentation() -> None:
         DetailedWebhookResponse,
     ]
 
-    for schema in schemas:
-        # Get the schema fields
-        for field_name, field in schema.model_fields.items():
-            # Check that each field has a description
-            msg = f"Field {field_name} in {schema.__name__} has no description"
-            assert field.description, msg
+    for schema_class in schemas:
+        # Create an instance with default values for testing
+        try:
+            # Try with empty constructor (for models with all optional fields)
+            schema_instance = schema_class()
+        except Exception:
+            # Try with minimal required fields for different schema types
+            if schema_class == SchemaEmailAttachment:
+                schema_instance = schema_class(name="test", type="test")
+            # Try with minimal required fields for InboundEmailData
+            elif schema_class == InboundEmailData:
+                schema_instance = schema_class(
+                    message_id="test",
+                    from_email="test@example.com",
+                    to_email="test@example.com",
+                    subject="test",
+                )
+            # Handle WebhookData/MailchimpWebhook
+            elif schema_class == MailchimpWebhook:
+                # Create a minimal InboundEmailData instance
+                email_data = InboundEmailData(
+                    message_id="test",
+                    from_email="test@example.com",
+                    to_email="test@example.com",
+                    subject="test",
+                    from_name="Test User",
+                    body_plain="Test plain body",
+                    body_html="<p>Test HTML body</p>",
+                )
+                # Create the webhook instance with minimal data
+                schema_instance = schema_class(
+                    webhook_id="test_id",
+                    event="test_event",
+                    timestamp=datetime.now(),
+                    data=email_data,
+                )
+            # For WebhookResponse and DetailedWebhookResponse
+            elif (
+                schema_class == WebhookResponse
+                or schema_class == DetailedWebhookResponse
+            ):
+                schema_instance = schema_class(status="success", message="test message")
+            else:
+                # This should never happen with the current schemas, but as a fallback
+                # raise a specific assertion error instead of skipping
+                assert False, (
+                    f"Could not create instance of {schema_class.__name__}: "
+                    f"No constructor pattern defined"
+                )
 
-            msg = f"Field {field_name} in {schema.__name__} has a too short description"
-            assert len(field.description) > 5, msg
+        # Get the schema fields from model_json_schema
+        schema_fields = schema_instance.model_json_schema()["properties"]
+
+        for field_name, field_info in schema_fields.items():
+            # Check that each field has a description
+            msg = f"Field {field_name} in {schema_class.__name__} has no description"
+            assert "description" in field_info, msg
+
+            msg = f"Field {field_name} in {schema_class.__name__} has a too short description"
+            assert len(field_info["description"]) > 5, msg
 
 
 def test_schema_examples() -> None:
@@ -143,15 +195,30 @@ def test_model_and_schema_consistency() -> None:
         "base64",  # Processing flag, not stored in DB
     }
 
-    for model, schema in model_schema_pairs:
+    for model, schema_class in model_schema_pairs:
+        # Create an instance of the schema class to access model_json_schema
+        if schema_class == SchemaEmailAttachment:
+            schema_instance = schema_class(name="test", type="test")
+        # Try with minimal required fields for InboundEmailData
+        elif schema_class == InboundEmailData:
+            schema_instance = schema_class(
+                message_id="test",
+                from_email="test@example.com",
+                to_email="test@example.com",
+                subject="test",
+            )
+        else:
+            # Any unexpected schema class - should not happen with current test setup
+            assert (
+                False
+            ), f"Unknown schema class {schema_class.__name__}: add creation logic for this class"
+
         # Get all fields from the schema
-        schema_fields = schema.model_fields.keys()
+        schema_fields = schema_instance.model_json_schema()["properties"].keys()
 
         # Get all columns from the model (excluding relationship fields)
         mapper = sa_inspect(model)
-        if mapper is None:
-            pytest.skip(f"Could not inspect model {model.__name__}")
-            continue
+        assert mapper is not None, f"Could not inspect model {model.__name__}"
 
         model_columns = [c.key for c in mapper.columns]
 
@@ -169,7 +236,7 @@ def test_model_and_schema_consistency() -> None:
                 error_msg = (
                     f"Schema field {field!r} "
                     f"(mapped to {mapped_field!r}) "
-                    f"in {schema.__name__} "
+                    f"in {schema_class.__name__} "
                     f"has no corresponding column"
                     f" in {model.__name__}"
                 )
@@ -178,12 +245,18 @@ def test_model_and_schema_consistency() -> None:
 
 def test_response_schema_structure() -> None:
     """Test that response schemas have the needed fields and structure."""
+    # Create instances to use model_json_schema
+    webhook_response = WebhookResponse(status="success", message="test")
+    detailed_response = DetailedWebhookResponse(
+        status="success", message="test", data={"test": "value"}
+    )
+
     # Basic checks
     assert (
-        "status" in WebhookResponse.model_fields
+        "status" in webhook_response.model_json_schema()["properties"]
     ), "WebhookResponse is missing 'status' field"
     assert (
-        "message" in WebhookResponse.model_fields
+        "message" in webhook_response.model_json_schema()["properties"]
     ), "WebhookResponse is missing 'message' field"
 
     # Inheritance check
@@ -193,8 +266,8 @@ def test_response_schema_structure() -> None:
 
     # DetailedWebhookResponse should have additional fields
     assert (
-        "data" in DetailedWebhookResponse.model_fields
+        "data" in detailed_response.model_json_schema()["properties"]
     ), "DetailedWebhookResponse is missing 'data' field"
-    assert "processed_at" in DetailedWebhookResponse.model_fields, (
+    assert "processed_at" in detailed_response.model_json_schema()["properties"], (
         "DetailedWebhookResponse is missing " "'processed_at' field"
     )

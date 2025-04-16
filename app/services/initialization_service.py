@@ -86,37 +86,32 @@ class InitializationService:
         This will only create the user if all required credentials are provided
         in the application settings and no user with the same username exists.
         """
-        # Check if superuser credentials are provided in settings
-        if not all(
-            [
-                settings.FIRST_SUPERUSER_USERNAME,
-                settings.FIRST_SUPERUSER_EMAIL,
-                settings.FIRST_SUPERUSER_PASSWORD,
-            ]
-        ):
-            logger.info(
-                "First superuser credentials not provided in settings. Skipping."
-            )
-            return
+        # Use settings for superuser creation if available
+        username = settings.FIRST_SUPERUSER_USERNAME
+        email = settings.FIRST_SUPERUSER_EMAIL
+        password = settings.FIRST_SUPERUSER_PASSWORD
+
+        # Skip if credentials not provided
+        if not username or not email or not password:
+            logger.info("First superuser credentials not provided, skipping creation")
+            return None
 
         # Check if user already exists
-        existing_user = await self.user_service.get_user_by_username(
-            settings.FIRST_SUPERUSER_USERNAME
-        )
+        existing_user = await self.user_service.get_user_by_username(username)
 
         if existing_user:
-            logger.info(
-                "Superuser already exists: %s", settings.FIRST_SUPERUSER_USERNAME
-            )
+            logger.info("Superuser already exists: %s", username)
             return
 
-        logger.info("Creating first superuser: %s", settings.FIRST_SUPERUSER_USERNAME)
+        logger.info("Creating first superuser: %s", username)
 
         # Create user data
         user_data = UserCreate(
-            username=settings.FIRST_SUPERUSER_USERNAME,
-            email=settings.FIRST_SUPERUSER_EMAIL,
-            password=settings.FIRST_SUPERUSER_PASSWORD,
+            username=username,
+            email=email,
+            password=password,
+            full_name="System Administrator",
+            is_active=True,
             is_superuser=True,
         )
 
@@ -185,7 +180,7 @@ class InitializationService:
         user_count = result.scalar()
 
         # If no users exist at all, create a default admin user
-        if not user_count:
+        if user_count == 0:
             logger.info("No users found in database. Creating default admin user.")
             await self._create_default_admin_user()
         else:

@@ -50,6 +50,7 @@ def schema_to_model_attachment(
         content=schema_attachment.content or "",
         content_id=schema_attachment.content_id,
         size=schema_attachment.size,
+        base64=True,
     )
 
 
@@ -164,6 +165,7 @@ async def test_process_attachments(
             content=test_content_b64,
             content_id="att001",
             size=len(test_content),
+            base64=True,
         )
     ]
 
@@ -247,6 +249,7 @@ async def test_process_attachments_file_write_error(
         content=test_content_b64,
         content_id="error001",
         size=len(test_content),
+        base64=True,
     )
 
     # Convert to model attachment
@@ -320,6 +323,7 @@ async def test_process_webhook_with_attachments(
         content=base64.b64encode(b"Test content").decode(),
         content_id="123",
         size=123,
+        base64=True,
     )
     webhook.data.attachments.append(schema_attachment)
 

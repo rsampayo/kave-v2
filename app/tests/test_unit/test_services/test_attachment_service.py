@@ -38,6 +38,7 @@ def sample_attachment() -> EmailAttachment:
         content=base64.b64encode(b"Hello, world!").decode("utf-8"),
         content_id="test123",
         size=13,
+        base64=True,
     )
 
 
@@ -113,3 +114,39 @@ class TestAttachmentService:
         assert result[0].storage_uri is None
         mock_storage_service.save_file.assert_not_called()
         mock_db_session.add.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_process_attachments_with_db_session(self, db_session: AsyncSession):
+        """Test the process_attachments method with a real database session."""
+        # Arrange
+        email_id = 1
+        attachments = [
+            EmailAttachment(
+                name="test.txt",
+                type="text/plain",
+                content="SGVsbG8gV29ybGQ=",  # "Hello World" in base64
+                content_id="test123",
+                size=11,
+                base64=True,
+            )
+        ]
+        # Create a mock storage service
+        mock_storage = AsyncMock(spec=StorageService)
+
+        # Act
+        service = AttachmentService(db=db_session, storage=mock_storage)
+        result = await service.process_attachments(email_id, attachments)
+
+        # Assert
+        assert len(result) == 1
+        assert isinstance(result[0], Attachment)
+        assert result[0].email_id == email_id
+        assert result[0].filename == "test.txt"
+        assert result[0].content_type == "text/plain"
+        assert result[0].content_id == "test123"
+        assert result[0].size == 11
+
+        # Add assertions for storage_uri if needed
+
+        # No need to verify db_session.add since it's a real session, not a mock
+        assert result[0].storage_uri is not None  # Verify the storage URI was set

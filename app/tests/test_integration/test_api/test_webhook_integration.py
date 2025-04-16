@@ -19,7 +19,7 @@ from app.integrations.email.models import MailchimpWebhook as ModelsMailchimpWeb
 from app.main import create_application
 from app.models.email_data import Attachment, Email
 from app.schemas.webhook_schemas import EmailAttachment as SchemaEmailAttachment
-from app.schemas.webhook_schemas import InboundEmailData, MailchimpWebhook
+from app.schemas.webhook_schemas import InboundEmailData, WebhookData
 from app.services.email_processing_service import EmailProcessingService
 from app.services.storage_service import StorageService
 
@@ -103,6 +103,8 @@ async def test_webhook_endpoint_success(
         event=webhook_payload["event"],
         data=webhook_payload["data"],
         fired_at=datetime.fromisoformat(webhook_payload["timestamp"]),
+        type="inbound",
+        test_mode=False,
     )
 
     # Extract data as a schema before processing
@@ -113,7 +115,7 @@ async def test_webhook_endpoint_success(
         # It's already an InboundEmailData object
         schema_data = InboundEmailData(**webhook_model.data.to_dict())
 
-    schema_webhook = MailchimpWebhook(
+    schema_webhook = WebhookData(
         webhook_id=webhook_model.webhook_id or "",
         event=webhook_model.event or "",
         timestamp=webhook_model.fired_at or datetime.utcnow(),
@@ -160,6 +162,8 @@ async def test_webhook_with_attachments(
         event=webhook_payload["event"],
         data=webhook_payload["data"],
         fired_at=datetime.fromisoformat(webhook_payload["timestamp"]),
+        type="inbound",
+        test_mode=False,
     )
 
     # Extract data as a schema before processing
@@ -178,10 +182,11 @@ async def test_webhook_with_attachments(
             content="VGhpcyBpcyBhIHRlc3QgZmlsZQ==",  # "This is a test file" in base64
             content_id="test123",
             size=15,
+            base64=True,
         )
     )
 
-    schema_webhook = MailchimpWebhook(
+    schema_webhook = WebhookData(
         webhook_id=webhook_model.webhook_id or "",
         event=webhook_model.event or "",
         timestamp=webhook_model.fired_at or datetime.utcnow(),
@@ -242,12 +247,13 @@ async def test_email_processing_service(
     service = EmailProcessingService(db_session, storage_service)
     webhook_payload = create_test_webhook_payload()
 
-    # Create a webhook object with proper types
     webhook_model = ModelsMailchimpWebhook(
         webhook_id=webhook_payload["webhook_id"],
         event=webhook_payload["event"],
         data=webhook_payload["data"],
         fired_at=datetime.fromisoformat(webhook_payload["timestamp"]),
+        type="inbound",
+        test_mode=False,
     )
 
     # Extract data as a schema before processing
@@ -258,7 +264,8 @@ async def test_email_processing_service(
         # It's already an InboundEmailData object
         schema_data = InboundEmailData(**webhook_model.data.to_dict())
 
-    schema_webhook = MailchimpWebhook(
+    # Convert to our schema
+    schema_webhook = WebhookData(
         webhook_id=webhook_model.webhook_id or "",
         event=webhook_model.event or "",
         timestamp=webhook_model.fired_at or datetime.utcnow(),
@@ -293,18 +300,19 @@ async def test_email_processing_service(
 async def test_error_handling_in_service(
     db_session: AsyncSession, setup_db: Any
 ) -> None:
-    """Test error handling in the email processing service."""
+    """Test error handling in the EmailProcessingService."""
     # GIVEN
     storage_service = StorageService()
     service = EmailProcessingService(db_session, storage_service)
     webhook_payload = create_test_webhook_payload()
 
-    # Create a webhook object with proper types
     webhook_model = ModelsMailchimpWebhook(
         webhook_id=webhook_payload["webhook_id"],
         event=webhook_payload["event"],
         data=webhook_payload["data"],
         fired_at=datetime.fromisoformat(webhook_payload["timestamp"]),
+        type="inbound",
+        test_mode=False,
     )
 
     # Extract data as a schema before processing
@@ -315,7 +323,8 @@ async def test_error_handling_in_service(
         # It's already an InboundEmailData object
         schema_data = InboundEmailData(**webhook_model.data.to_dict())
 
-    schema_webhook = MailchimpWebhook(
+    # Create the webhook with schema
+    schema_webhook = WebhookData(
         webhook_id=webhook_model.webhook_id or "",
         event=webhook_model.event or "",
         timestamp=webhook_model.fired_at or datetime.utcnow(),

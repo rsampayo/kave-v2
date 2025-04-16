@@ -1,7 +1,6 @@
 """Tests for organization endpoints."""
 
 import uuid
-from typing import Any
 from unittest import mock
 from unittest.mock import AsyncMock
 
@@ -409,7 +408,7 @@ async def test_patch_organization_not_found():
 
 
 @pytest.mark.asyncio
-async def test_delete_organization_success() -> Any:
+async def test_delete_organization_success() -> None:
     """Test successful organization deletion."""
     # Arrange
     existing_org = Organization(id=1, name="Org 1", webhook_email="org1@example.com")
@@ -421,11 +420,9 @@ async def test_delete_organization_success() -> Any:
     mock_service.delete_organization.return_value = None
 
     # Act
-    # Using type ignore for mypy error about function return type
-    result = await delete_organization(1, mock_db, mock_service, mock_user)  # type: ignore
+    await delete_organization(1, mock_db, mock_service, mock_user)
 
     # Assert
-    assert result is None  # Explicitly check for None return
     mock_service.get_organization_by_id.assert_awaited_once_with(1)
     mock_service.delete_organization.assert_awaited_once_with(1)
     mock_db.commit.assert_awaited_once()

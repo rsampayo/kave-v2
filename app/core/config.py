@@ -131,4 +131,9 @@ class Settings(BaseSettings):
 
 
 # settings will be initialized from environment variables or .env file
-settings = Settings()
+settings = Settings(
+    SECRET_KEY="insecure-test-key-if-missing-in-env",
+    DATABASE_URL="sqlite:///./test.db",
+    MAILCHIMP_API_KEY="mailchimp-key-if-missing-in-env",
+    MAILCHIMP_WEBHOOK_SECRET="webhook-secret-if-missing-in-env",
+)

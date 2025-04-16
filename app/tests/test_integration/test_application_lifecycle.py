@@ -25,7 +25,10 @@ async def test_application_creation() -> None:
     assert "CORSMiddleware" in middleware_names
 
     # Verify routes - check for webhook route pattern
-    route_paths = [route.path for route in app.routes]
+    route_paths = []
+    for route in app.routes:
+        if hasattr(route, "path"):
+            route_paths.append(route.path)
     assert any("/webhooks" in path for path in route_paths)
 
 

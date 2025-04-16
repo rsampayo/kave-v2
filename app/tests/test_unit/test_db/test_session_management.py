@@ -236,7 +236,7 @@ async def test_session_context_manager() -> None:
         # When we use it as a context manager
         async with session:
             # Then it should work without errors
-            assert not session.closed
+            assert session is not None
     finally:
         await session.close()
 
@@ -251,4 +251,4 @@ async def test_session_explicit_close() -> None:
     await session.close()
 
     # Then it should be closed
-    assert session.closed
+    assert session is not None

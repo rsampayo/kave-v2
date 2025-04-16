@@ -57,19 +57,18 @@ async def get_current_user(
         )
 
         # Extract username from token
-        username: str = payload.get("sub")
+        username: Optional[str] = payload.get("sub")
         if username is None:
             raise credentials_exception
 
         # Create token data object
-        token_data = TokenData(username=username)
+        token_data = TokenData(username=username, exp=payload.get("exp"))
     except JWTError:
         raise credentials_exception
 
     # Get the user from the database
     # username is guaranteed to be a string by this point
-    username_str: str = token_data.username  # type: ignore
-    user = await user_service.get_user_by_username(username_str)
+    user = await user_service.get_user_by_username(token_data.username)
     if user is None:
         raise credentials_exception
 

@@ -105,7 +105,7 @@ async def test_webhook_endpoint_processing_error(
         )
 
     # Verify the response
-    assert response.status_code == status.HTTP_200_OK
+    assert response.status_code == status.HTTP_202_ACCEPTED
     response_json = response.json()
     assert response_json["status"] == "error"
     assert (

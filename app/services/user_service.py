@@ -208,6 +208,24 @@ class UserService:
 
         return user
 
+    async def delete_user(self, user_id: int) -> bool:
+        """Delete a user by ID.
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            bool: True if the user was deleted, False otherwise
+        """
+        user = await self.get_user_by_id(user_id)
+        if not user:
+            return False
+
+        await self.db.delete(user)
+        await self.db.flush()
+
+        return True
+
 
 async def get_user_service(db: AsyncSession = Depends(get_db)) -> UserService:
     """Dependency function to get the user service.

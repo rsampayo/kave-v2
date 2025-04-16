@@ -235,9 +235,11 @@ async def test_identify_organization_by_signature(monkeypatch) -> None:
     original_verify_signature = client.verify_signature
     original_identify_organization = client.identify_organization_by_signature
 
-    client.verify_signature = mock_verify_signature
+    monkeypatch.setattr(client, "verify_signature", mock_verify_signature)
     # Replace with a simpler implementation for the test
-    client.identify_organization_by_signature = mock_identify_organization
+    monkeypatch.setattr(
+        client, "identify_organization_by_signature", mock_identify_organization
+    )
 
     # Mock settings
     monkeypatch.setattr(
@@ -260,8 +262,10 @@ async def test_identify_organization_by_signature(monkeypatch) -> None:
     )
 
     # Restore original methods
-    client.verify_signature = original_verify_signature
-    client.identify_organization_by_signature = original_identify_organization
+    monkeypatch.setattr(client, "verify_signature", original_verify_signature)
+    monkeypatch.setattr(
+        client, "identify_organization_by_signature", original_identify_organization
+    )
 
     # Verify results
     assert result_org == org1
@@ -309,7 +313,9 @@ async def test_identify_organization_by_signature_with_multiple_environments(
     original_identify_organization = client.identify_organization_by_signature
 
     # Apply our mock
-    client.identify_organization_by_signature = mock_identify_organization
+    monkeypatch.setattr(
+        client, "identify_organization_by_signature", mock_identify_organization
+    )
 
     # Mock settings with different URLs for production and testing
     monkeypatch.setattr(
@@ -332,7 +338,9 @@ async def test_identify_organization_by_signature_with_multiple_environments(
     )
 
     # Restore original
-    client.identify_organization_by_signature = original_identify_organization
+    monkeypatch.setattr(
+        client, "identify_organization_by_signature", original_identify_organization
+    )
 
     # Verify results
     assert result_org == org1

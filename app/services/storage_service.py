@@ -103,15 +103,21 @@ class StorageService:
 
         return f"file://{full_path.absolute()}"
 
-    async def get_file(self, uri: str) -> bytes | None:
+    async def get_file(self, uri: str, object_key: str | None = None) -> bytes | None:
         """Get file content from either S3 or filesystem.
 
         Args:
             uri: The storage URI (s3:// or file:// prefix)
+            object_key: Optional object key (for backwards compatibility)
 
         Returns:
             Optional[bytes]: The file content or None if not found
         """
+        # For backward compatibility - object_key was previously used
+        if object_key and not uri.startswith(("s3://", "file://")):
+            # If uri is actually a bucket name and object_key is provided
+            uri = f"s3://{uri}/{object_key}"
+
         if uri.startswith("s3://"):
             return await self._get_from_s3(uri)
         if uri.startswith("file://"):

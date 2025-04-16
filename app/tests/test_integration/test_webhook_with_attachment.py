@@ -53,6 +53,7 @@ async def test_webhook_with_attachment() -> None:
                     content=att_data["content"],
                     content_id=att_key,
                     size=len(att_data["content"]) if "content" in att_data else 0,
+                    base64=True,
                 )
             )
 

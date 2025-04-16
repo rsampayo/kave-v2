@@ -29,7 +29,12 @@ def test_settings_default_values() -> None:
             "MAILCHIMP_WEBHOOK_SECRET": "test_webhook_secret",
         },
     ):
-        settings = Settings()
+        settings = Settings(
+            SECRET_KEY="test_secret",
+            DATABASE_URL="sqlite:///./test.db",
+            MAILCHIMP_API_KEY="test_api_key",
+            MAILCHIMP_WEBHOOK_SECRET="test_webhook_secret",
+        )
 
     # Verify default values
     assert settings.API_ENV == "development"
@@ -78,7 +83,12 @@ def test_get_webhook_url_property() -> None:
             "WEBHOOK_PATH": "/v1/webhooks/mandrill",
         },
     ):
-        settings = Settings()
+        settings = Settings(
+            SECRET_KEY="test_secret",
+            DATABASE_URL="sqlite:///./test.db",
+            MAILCHIMP_API_KEY="test_api_key",
+            MAILCHIMP_WEBHOOK_SECRET="test_webhook_secret",
+        )
         assert (
             settings.get_webhook_url == "https://api.example.com/v1/webhooks/mandrill"
         )
@@ -97,7 +107,12 @@ def test_get_webhook_url_property() -> None:
             "WEBHOOK_PATH": "/v1/webhooks/mandrill",
         },
     ):
-        settings = Settings()
+        settings = Settings(
+            SECRET_KEY="test_secret",
+            DATABASE_URL="sqlite:///./test.db",
+            MAILCHIMP_API_KEY="test_api_key",
+            MAILCHIMP_WEBHOOK_SECRET="test_webhook_secret",
+        )
         assert (
             settings.get_webhook_url == "https://dev.example.com/v1/webhooks/mandrill"
         )
@@ -118,7 +133,12 @@ def test_should_reject_unverified_property() -> None:
             "MAILCHIMP_REJECT_UNVERIFIED_TESTING": "false",
         },
     ):
-        settings = Settings()
+        settings = Settings(
+            SECRET_KEY="test_secret",
+            DATABASE_URL="sqlite:///./test.db",
+            MAILCHIMP_API_KEY="test_api_key",
+            MAILCHIMP_WEBHOOK_SECRET="test_webhook_secret",
+        )
         assert settings.should_reject_unverified is True
 
     # Test development environment with rejection disabled
@@ -134,5 +154,10 @@ def test_should_reject_unverified_property() -> None:
             "MAILCHIMP_REJECT_UNVERIFIED_TESTING": "false",
         },
     ):
-        settings = Settings()
+        settings = Settings(
+            SECRET_KEY="test_secret",
+            DATABASE_URL="sqlite:///./test.db",
+            MAILCHIMP_API_KEY="test_api_key",
+            MAILCHIMP_WEBHOOK_SECRET="test_webhook_secret",
+        )
         assert settings.should_reject_unverified is False

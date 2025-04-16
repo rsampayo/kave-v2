@@ -224,7 +224,7 @@ async def _handle_event_list(
                 "status": "error",
                 "message": f"Failed to process any events ({skipped_count} skipped)",
             },
-            status_code=status.HTTP_200_OK,  # Use 200 for Mandrill to avoid retries
+            status_code=status.HTTP_202_ACCEPTED,
         )
 
 
@@ -252,3 +252,39 @@ async def _handle_single_event_dict(
         JSONResponse: Response with processing result and 202 Accepted status code
     """
     return await _process_non_list_event(client, email_service, body, request)
+
+
+def _is_ping_event(body: dict[str, Any]) -> bool:
+    # Implement the logic to determine if the event is a ping event
+    # This is a placeholder and should be replaced with the actual implementation
+    return False
+
+
+async def _handle_special_webhooks(
+    body: dict[str, Any],
+    client: WebhookClient,
+    email_service: EmailService,
+    request: Request | None = None,
+) -> JSONResponse:
+    """Handle processing for special webhook events.
+
+    Args:
+        body: The event body to process
+        client: Webhook client for parsing
+        email_service: Email service for processing
+        request: Optional request object containing state
+
+    Returns:
+        JSONResponse: Response to return to the client
+    """
+    if _is_ping_event(body):
+        logger.info("Received webhook validation ping")
+        return JSONResponse(
+            content={
+                "status": "success",
+                "message": "Ping acknowledged",
+            },
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+    else:
+        return await _process_non_list_event(client, email_service, body, request)

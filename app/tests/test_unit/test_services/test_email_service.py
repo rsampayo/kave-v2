@@ -232,7 +232,12 @@ class TestEmailService:
         # Arrange
         sample_webhook.data.attachments = [
             EmailAttachment(
-                name="test.txt", type="text/plain", size=10, content_id="test123"
+                name="test.txt",
+                type="text/plain",
+                size=10,
+                content_id="test123",
+                content="",
+                base64=True,
             )
         ]
         service = EmailService(

@@ -426,5 +426,5 @@ async def receive_mandrill_webhook(
                 "status": "error",
                 "message": f"Failed to process webhook but acknowledged: {str(e)}",
             },
-            status_code=status.HTTP_200_OK,
+            status_code=status.HTTP_202_ACCEPTED,
         )
