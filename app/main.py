@@ -119,7 +119,7 @@ def create_application() -> FastAPI:
 
     # Mount static files directory
     static_dir = Path(__file__).parent / "static"
-    app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
+    app.mount("/static", StaticFiles(directory=str(static_dir), html=True), name="static")
 
     # Add global exception handlers
     @app.exception_handler(IntegrityError)
