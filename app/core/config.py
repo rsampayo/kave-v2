@@ -135,6 +135,13 @@ class Settings(BaseSettings):
         if db_url.startswith("postgres://"):
             db_url = db_url.replace("postgres://", "postgresql://", 1)
 
+        # Prevent using SQLite in production environments
+        if self.API_ENV == "production" and db_url.startswith("sqlite://"):
+            raise ValueError(
+                "SQLite database is not supported in production environment. "
+                "Please configure a PostgreSQL database using DATABASE_URL."
+            )
+
         return db_url
 
     @classmethod

@@ -19,6 +19,13 @@ Base = declarative_base()
 # Database configuration
 DATABASE_URL = settings.effective_database_url
 
+# In production, ensure we're not using SQLite
+if settings.API_ENV == "production" and DATABASE_URL.startswith("sqlite://"):
+    raise ValueError(
+        "SQLite database is not supported in production environment. "
+        "Please configure a PostgreSQL database using DATABASE_URL."
+    )
+
 # Ensure the aiosqlite dialect for SQLite
 if DATABASE_URL.startswith("sqlite://"):
     DATABASE_URL = DATABASE_URL.replace("sqlite://", "sqlite+aiosqlite://")
