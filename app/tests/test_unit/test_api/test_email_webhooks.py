@@ -29,7 +29,6 @@ from app.api.v1.endpoints.webhooks.mandrill.processors import (
 )
 from app.integrations.email.client import WebhookClient
 from app.schemas.webhook_schemas import InboundEmailData, WebhookData
-from app.services.email_processing_service import EmailProcessingService
 from app.services.email_service import EmailService
 
 
@@ -47,7 +46,7 @@ async def test_receive_mailchimp_webhook_success() -> None:
         request: Request,
         _: Any | None = None,  # Placeholder for background tasks if needed
         db: AsyncSession | None = None,
-        email_service: EmailProcessingService | None = None,
+        email_service: EmailService | None = None,
         client: WebhookClient | None = None,
     ) -> dict[str, str]:
         assert client is not None
@@ -62,7 +61,7 @@ async def test_receive_mailchimp_webhook_success() -> None:
 
     # Setup test dependencies
     mock_request = MagicMock(spec=Request)
-    mock_email_service = AsyncMock(spec=EmailProcessingService)
+    mock_email_service = AsyncMock(spec=EmailService)
     mock_client = AsyncMock(spec=WebhookClient)
 
     # Create test webhook data
@@ -96,7 +95,7 @@ async def test_receive_mailchimp_webhook_parse_error() -> None:
         request: Request,
         _: Any | None = None,
         db: AsyncSession | None = None,
-        email_service: EmailProcessingService | None = None,
+        email_service: EmailService | None = None,
         client: WebhookClient | None = None,
     ) -> dict[str, str]:
         assert client is not None
@@ -117,7 +116,7 @@ async def test_receive_mailchimp_webhook_parse_error() -> None:
 
     # Setup test dependencies
     mock_request = MagicMock(spec=Request)
-    mock_email_service = AsyncMock(spec=EmailProcessingService)
+    mock_email_service = AsyncMock(spec=EmailService)
     mock_client = AsyncMock(spec=WebhookClient)
 
     # Make parse_webhook fail
@@ -153,7 +152,7 @@ async def test_receive_mailchimp_webhook_processing_error() -> None:
         request: Request,
         _: Any | None = None,
         db: AsyncSession | None = None,
-        email_service: EmailProcessingService | None = None,
+        email_service: EmailService | None = None,
         client: WebhookClient | None = None,
     ) -> dict[str, str]:
         assert client is not None
@@ -174,7 +173,7 @@ async def test_receive_mailchimp_webhook_processing_error() -> None:
 
     # Mock the dependencies
     mock_request = MagicMock(spec=Request)
-    mock_email_service = AsyncMock(spec=EmailProcessingService)
+    mock_email_service = AsyncMock(spec=EmailService)
     mock_client = AsyncMock(spec=WebhookClient)
 
     # Setup test data
@@ -207,7 +206,7 @@ async def test_receive_mandrill_webhook_success() -> None:
         request: Request,
         _: Any | None = None,
         db: AsyncSession | None = None,
-        email_service: EmailProcessingService | None = None,
+        email_service: EmailService | None = None,
         client: WebhookClient | None = None,
     ) -> dict[str, str]:
         assert client is not None
@@ -224,7 +223,7 @@ async def test_receive_mandrill_webhook_success() -> None:
 
     # Setup test dependencies with proper mocks
     mock_request = MagicMock(spec=Request)
-    mock_email_service = AsyncMock(spec=EmailProcessingService)
+    mock_email_service = AsyncMock(spec=EmailService)
     mock_client = AsyncMock(spec=WebhookClient)
 
     # Create test webhook data
@@ -275,7 +274,7 @@ async def test_receive_mandrill_webhook_error() -> None:
         request: Request,
         _: Any | None = None,
         db: AsyncSession | None = None,
-        email_service: EmailProcessingService | None = None,
+        email_service: EmailService | None = None,
         client: WebhookClient | None = None,
     ) -> dict[str, str]:
         assert client is not None
@@ -295,7 +294,7 @@ async def test_receive_mandrill_webhook_error() -> None:
 
     # Setup test dependencies
     mock_request = MagicMock(spec=Request)
-    mock_email_service = AsyncMock(spec=EmailProcessingService)
+    mock_email_service = AsyncMock(spec=EmailService)
     mock_client = AsyncMock(spec=WebhookClient)
 
     # Make the client.parse_webhook method raise an exception

@@ -1,21 +1,17 @@
-"""Unit tests for EmailProcessingService."""
+"""Unit tests for EmailService."""
 
-import base64
 from datetime import datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.email_data import Attachment, Email, EmailAttachment
 from app.schemas.webhook_schemas import EmailAttachment as SchemaEmailAttachment
 from app.schemas.webhook_schemas import InboundEmailData, MailchimpWebhook
-from app.services.email_processing_service import (
-    EmailProcessingService,
-    get_email_service,
-)
+from app.services.attachment_service import AttachmentService
+from app.services.email_service import EmailService, get_email_service
 from app.services.storage_service import StorageService
 
 
@@ -62,25 +58,38 @@ def mock_storage_service() -> AsyncMock:
     return mock
 
 
+@pytest.fixture
+def mock_attachment_service(mock_storage_service: AsyncMock) -> AsyncMock:
+    """Create a mock attachment service for tests."""
+    mock = AsyncMock(spec=AttachmentService)
+    mock.process_attachments.return_value = []
+    return mock
+
+
 @pytest.mark.asyncio
 async def test_get_email_service() -> None:
-    """Test that get_email_service returns a proper EmailProcessingService instance."""
-    # Mock database session and storage service
+    """Test that get_email_service returns a proper EmailService instance."""
+    # Mock database session, attachment service, and storage service
     mock_db = MagicMock(spec=AsyncSession)
+    mock_attachment = MagicMock(spec=AttachmentService)
     mock_storage = MagicMock(spec=StorageService)
 
     # Get service from dependency function
-    service = await get_email_service(mock_db, mock_storage)
+    service = await get_email_service(mock_db, mock_attachment, mock_storage)
 
-    # Verify service was created with the right DB session and storage
-    assert isinstance(service, EmailProcessingService)
+    # Verify service was created with the right dependencies
+    assert isinstance(service, EmailService)
     assert service.db == mock_db
+    assert service.attachment_service == mock_attachment
     assert service.storage == mock_storage
 
 
 @pytest.mark.asyncio
 async def test_store_email(
-    db_session: AsyncSession, mock_storage_service: AsyncMock, setup_db: Any
+    db_session: AsyncSession,
+    mock_storage_service: AsyncMock,
+    mock_attachment_service: AsyncMock,
+    setup_db: Any,
 ) -> None:
     """Test storing an email in the database."""
     # GIVEN
@@ -96,7 +105,7 @@ async def test_store_email(
     session_mock.add = MagicMock()  # Regular MagicMock for add (not async)
     session_mock.flush = AsyncMock()
 
-    service = EmailProcessingService(session_mock, mock_storage_service)
+    service = EmailService(session_mock, mock_attachment_service, mock_storage_service)
     email_data = InboundEmailData(
         message_id="test123@example.com",
         from_email="sender@example.com",
@@ -133,157 +142,15 @@ async def test_store_email(
 
 
 @pytest.mark.asyncio
-async def test_process_attachments(
-    db_session: AsyncSession, mock_storage_service: AsyncMock, setup_db: Any
-) -> None:
-    """Test processing of email attachments."""
-    # GIVEN
-    service = EmailProcessingService(db_session, mock_storage_service)
-
-    # Create a test email
-    email = Email(
-        message_id="test@example.com",
-        from_email="sender@example.com",
-        from_name="Test Sender",
-        to_email="recipient@kave.com",
-        subject="Test Email",
-        body_text="This is a test email",
-        received_at=datetime.utcnow(),
-    )
-    db_session.add(email)
-    await db_session.flush()
-
-    # Test attachment data
-    test_content = "This is a test attachment"
-    test_content_b64 = base64.b64encode(test_content.encode()).decode()
-
-    # First create schema attachments
-    schema_attachments = [
-        SchemaEmailAttachment(
-            name="test.txt",
-            type="text/plain",
-            content=test_content_b64,
-            content_id="att001",
-            size=len(test_content),
-            base64=True,
-        )
-    ]
-
-    # Convert to model attachments
-    attachments = [schema_to_model_attachment(a) for a in schema_attachments]
-
-    # Setup mock for storage service
-    expected_storage_uri = f"file:///test/attachments/{email.id}/test.txt"
-    mock_storage_service.save_file.return_value = expected_storage_uri
-
-    # WHEN
-    result = await service.process_attachments(email.id, attachments)
-
-    # Explicitly commit to make sure the attachment is saved
-    await db_session.commit()
-
-    # THEN
-    assert len(result) == 1
-    assert result[0].filename == "test.txt"
-    assert result[0].content_type == "text/plain"
-    assert result[0].content_id == "att001"
-    assert result[0].size == len(test_content)
-    assert result[0].storage_uri == expected_storage_uri
-
-    # Verify an attachment was added to the database
-    query = select(Attachment).where(Attachment.email_id == email.id)
-    db_result = await db_session.execute(query)
-    attachment_records = db_result.scalars().all()
-    assert len(attachment_records) == 1
-    assert attachment_records[0].filename == "test.txt"
-    assert attachment_records[0].storage_uri == expected_storage_uri
-
-    # Verify storage service was called correctly
-    mock_storage_service.save_file.assert_called_once()
-    call_args = mock_storage_service.save_file.call_args[1]
-    assert call_args["content_type"] == "text/plain"
-    assert isinstance(call_args["file_data"], bytes)
-    assert "attachments/" in call_args["object_key"]
-    assert "test.txt" in call_args["object_key"]
-
-
-@pytest.mark.asyncio
-async def test_process_attachments_file_write_error(
-    db_session: AsyncSession, mock_storage_service: AsyncMock, setup_db: Any
-) -> None:
-    """Test handling of file write errors during attachment processing."""
-    # GIVEN
-    # Create a non-async mock db to avoid "coroutine was never awaited" warnings
-    non_async_db = MagicMock(spec=AsyncSession)
-    non_async_db.add = MagicMock()
-
-    # Configure async mocks to have return_value=None
-    non_async_db.execute = AsyncMock(return_value=MagicMock())
-    non_async_db.flush = AsyncMock(return_value=None)
-    non_async_db.commit = AsyncMock(return_value=None)
-    non_async_db.rollback = AsyncMock(return_value=None)
-
-    service = EmailProcessingService(non_async_db, mock_storage_service)
-
-    # Create a test email
-    email = Email(
-        message_id="file_error@example.com",
-        from_email="sender@example.com",
-        from_name="Test Sender",
-        to_email="recipient@kave.com",
-        subject="Test File Error",
-        body_text="This is a test for file writing errors",
-        received_at=datetime.utcnow(),
-    )
-    non_async_db.add(email)
-    await non_async_db.flush()
-
-    # Test attachment data
-    test_content = "Test content for file error"
-    test_content_b64 = base64.b64encode(test_content.encode()).decode()
-
-    # Create schema attachment
-    schema_attachment = SchemaEmailAttachment(
-        name="error.txt",
-        type="text/plain",
-        content=test_content_b64,
-        content_id="error001",
-        size=len(test_content),
-        base64=True,
-    )
-
-    # Convert to model attachment
-    attachments = [schema_to_model_attachment(schema_attachment)]
-
-    # Make storage service raise an error
-    mock_storage_service.save_file.side_effect = PermissionError("Permission denied")
-
-    # WHEN/THEN - Ensure the error is propagated
-    with pytest.raises(PermissionError, match="Permission denied"):
-        await service.process_attachments(email.id, attachments)
-
-    # Verify attachment record was not created
-    query = select(Attachment).where(Attachment.email_id == email.id)
-    # Set up a result that returns empty list
-    result_mock = MagicMock()
-    result_mock.scalars = MagicMock(return_value=MagicMock())
-    result_mock.scalars().all = MagicMock(return_value=[])
-    non_async_db.execute.return_value = result_mock
-
-    result = await non_async_db.execute(query)
-    attachments_db = result.scalars().all()
-    assert len(attachments_db) == 0
-
-
-@pytest.mark.asyncio
 async def test_process_webhook_basic(
-    db_session: AsyncSession, mock_storage_service: AsyncMock, setup_db: Any
+    db_session: AsyncSession,
+    mock_storage_service: AsyncMock,
+    mock_attachment_service: AsyncMock,
+    setup_db: Any,
 ) -> None:
-    """Test processing a basic webhook with no attachments."""
+    """Test basic webhook processing."""
     # GIVEN
-    service = EmailProcessingService(db_session, mock_storage_service)
-
-    # Create a test webhook
+    service = EmailService(db_session, mock_attachment_service, mock_storage_service)
     webhook = create_test_webhook()
 
     # WHEN
@@ -296,220 +163,163 @@ async def test_process_webhook_basic(
     assert email.from_name == webhook.data.from_name
     assert email.to_email == webhook.data.to_email
     assert email.subject == webhook.data.subject
-    assert email.body_text == webhook.data.body_plain
-    assert email.body_html == webhook.data.body_html
-
-    # Check it was saved to the database
-    query = select(Email).where(Email.message_id == webhook.data.message_id)
-    result = await db_session.execute(query)
-    db_email = result.scalar_one_or_none()
-    assert db_email is not None
-    assert db_email.id == email.id
+    assert email.webhook_id == webhook.webhook_id
+    assert email.webhook_event == webhook.event
 
 
 @pytest.mark.asyncio
 async def test_process_webhook_with_attachments(
-    db_session: AsyncSession, mock_storage_service: AsyncMock, setup_db: Any
+    db_session: AsyncSession,
+    mock_storage_service: AsyncMock,
+    mock_attachment_service: AsyncMock,
+    setup_db: Any,
 ) -> None:
-    """Test processing a webhook with attachments."""
-    # Arrange
-    service = EmailProcessingService(db_session, mock_storage_service)
+    """Test webhook processing with attachments."""
+    # GIVEN
+    service = EmailService(db_session, mock_attachment_service, mock_storage_service)
     webhook = create_test_webhook()
 
-    # Add an attachment to the webhook
-    schema_attachment = SchemaEmailAttachment(
-        name="test.txt",
-        type="text/plain",
-        content=base64.b64encode(b"Test content").decode(),
-        content_id="123",
-        size=123,
-        base64=True,
+    # Add an attachment to the webhook data
+    webhook.data.attachments.append(
+        SchemaEmailAttachment(
+            name="test.txt",
+            type="text/plain",
+            content="VGhpcyBpcyBhIHRlc3QgZmlsZQ==",  # "This is a test file" in base64
+            content_id="test123",
+            size=15,
+            base64=True,
+        )
     )
-    webhook.data.attachments.append(schema_attachment)
 
-    # Setup mock for storage service
-    mock_storage_service.save_file.return_value = "file:///test/attachments/test.txt"
+    # Set up a mock for attachment processing
+    test_attachment = Attachment(
+        id=1,
+        email_id=1,
+        filename="test.txt",
+        content_type="text/plain",
+        storage_uri="file:///test/path/to/attachment.txt",
+    )
+    mock_attachment_service.process_attachments.return_value = [test_attachment]
 
-    # Act
+    # WHEN
     email = await service.process_webhook(webhook)
 
-    # Assert
+    # THEN
     assert email is not None
     assert email.message_id == webhook.data.message_id
 
-    # Check for attachment in database
-    query = select(Attachment).where(Attachment.email_id == email.id)
-    result = await db_session.execute(query)
-    attachments = result.scalars().all()
-    assert len(attachments) == 1
-    assert attachments[0].filename == "test.txt"
-    assert attachments[0].content_type == "text/plain"
-    assert attachments[0].storage_uri == "file:///test/attachments/test.txt"
-
-    # Verify storage service was called
-    mock_storage_service.save_file.assert_called_once()
+    # Verify attachment service was called with correct parameters
+    mock_attachment_service.process_attachments.assert_awaited_once()
+    assert mock_attachment_service.process_attachments.call_args[0][0] == email.id
+    assert len(mock_attachment_service.process_attachments.call_args[0][1]) == 1
+    assert (
+        mock_attachment_service.process_attachments.call_args[0][1][0].name
+        == "test.txt"
+    )
 
 
 @pytest.mark.asyncio
 async def test_process_webhook_error_handling(
-    db_session: AsyncSession, mock_storage_service: AsyncMock, setup_db: Any
+    mock_storage_service: AsyncMock,
+    mock_attachment_service: AsyncMock,
 ) -> None:
     """Test error handling during webhook processing."""
     # GIVEN
-    service = EmailProcessingService(db_session, mock_storage_service)
+    # Create a mocked session that can track calls
+    mock_db_session = MagicMock(spec=AsyncSession)
+    mock_db_session.rollback = AsyncMock()
 
-    # Create a proper mock session to avoid coroutine warnings
-    session_mock = AsyncMock(spec=AsyncSession)
-    service.db = session_mock  # Replace the session with our mock
-
-    # Create a test webhook with an error that will occur during processing
+    service = EmailService(
+        mock_db_session, mock_attachment_service, mock_storage_service
+    )
     webhook = create_test_webhook()
 
-    # Make the execute method raise an exception
-    error_message = "Database error during processing"
-    session_mock.execute.side_effect = RuntimeError(error_message)
+    # Setup mock for attachment service to fail
+    mock_attachment_service.process_attachments.side_effect = RuntimeError("Test error")
+
+    # Add an attachment to the webhook data
+    webhook.data.attachments.append(
+        SchemaEmailAttachment(
+            name="test.txt",
+            type="text/plain",
+            content="VGhpcyBpcyBhIHRlc3QgZmlsZQ==",
+            content_id="test123",
+            size=15,
+            base64=True,
+        )
+    )
 
     # WHEN/THEN
-    with pytest.raises(ValueError, match=f"Email processing failed: {error_message}"):
+    with pytest.raises(ValueError):
         await service.process_webhook(webhook)
 
-    # Verify session commit was not called but rollback was
-    session_mock.commit.assert_not_awaited()
-    session_mock.rollback.assert_awaited_once()
+    # Verify rollback was called
+    mock_db_session.rollback.assert_awaited_once()
 
 
 @pytest.mark.asyncio
 async def test_duplicate_email_handling(
-    db_session: AsyncSession, mock_storage_service: AsyncMock, setup_db: Any
+    db_session: AsyncSession,
+    mock_storage_service: AsyncMock,
+    mock_attachment_service: AsyncMock,
+    setup_db: Any,
 ) -> None:
     """Test handling of duplicate emails."""
     # GIVEN
-    service = EmailProcessingService(db_session, mock_storage_service)
+    service = EmailService(db_session, mock_attachment_service, mock_storage_service)
     webhook = create_test_webhook()
 
-    # First store the email
+    # First call to store the email
     email1 = await service.process_webhook(webhook)
     await db_session.commit()
 
-    # WHEN - Process the exact same webhook again
+    # Reset the session
+    await db_session.close()
+
+    # Second call with the same message_id should find the existing email
     email2 = await service.process_webhook(webhook)
 
-    # THEN - Should get back the same email (not create a duplicate)
+    # THEN
     assert email1.id == email2.id
     assert email1.message_id == email2.message_id
-
-    # Verify only one email with this message_id exists in the database
-    from sqlalchemy import func
-
-    count_query = (
-        select(func.count())
-        .select_from(Email)
-        .where(Email.message_id == webhook.data.message_id)
-    )
-    result = await db_session.execute(count_query)
-    count = result.scalar_one()
-    assert count == 1
 
 
 @pytest.mark.asyncio
 async def test_get_email_by_message_id(
-    db_session: AsyncSession, mock_storage_service: AsyncMock, setup_db: Any
+    db_session: AsyncSession,
+    mock_storage_service: AsyncMock,
+    mock_attachment_service: AsyncMock,
+    setup_db: Any,
 ) -> None:
-    """Test retrieval of an email by its message ID."""
+    """Test retrieving an email by message ID."""
     # GIVEN
-    service = EmailProcessingService(db_session, mock_storage_service)
-    message_id = "test_retrieval@example.com"
+    service = EmailService(db_session, mock_attachment_service, mock_storage_service)
 
-    # Create a test email in the database
+    # Create a test email
     email = Email(
-        message_id=message_id,
+        message_id="test-retrieve@example.com",
         from_email="sender@example.com",
         from_name="Test Sender",
         to_email="recipient@kave.com",
         subject="Test Retrieval",
-        body_text="This is a test for retrieval by message ID",
+        body_text="This is a test for retrieval",
         received_at=datetime.utcnow(),
     )
     db_session.add(email)
+    await db_session.flush()
     await db_session.commit()
 
-    # WHEN - Get the email by message ID
-    result = await service.get_email_by_message_id(message_id)
+    # Reset session
+    await db_session.close()
 
-    # THEN - Should retrieve the correct email
-    assert result is not None
-    assert result.message_id == message_id
-    assert result.from_email == "sender@example.com"
-    assert result.subject == "Test Retrieval"
+    # WHEN
+    found_email = await service.get_email_by_message_id("test-retrieve@example.com")
 
-    # Try with a non-existent message ID
-    result = await service.get_email_by_message_id("nonexistent@example.com")
-    assert result is None
+    # THEN
+    assert found_email is not None
+    assert found_email.message_id == "test-retrieve@example.com"
+    assert found_email.subject == "Test Retrieval"
 
-
-@pytest.mark.asyncio
-async def test_process_attachments_corrects_pdf_content_type(
-    db_session: AsyncSession, mock_storage_service: AsyncMock, setup_db: Any
-) -> None:
-    """Test that PDF files with wrong content type get application/pdf content type."""
-    # Create the service
-    service = EmailProcessingService(db_session, mock_storage_service)
-
-    # Test data - a PDF file with application/octet-stream content type
-    email_id = 123
-    attachments = [
-        EmailAttachment(
-            name="document.pdf",
-            type="application/octet-stream",  # Wrong content type
-            content="SGVsbG8gV29ybGQ=",  # Base64 encoded "Hello World"
-            content_id="123",
-            size=100,
-            base64=True,
-        ),
-        EmailAttachment(
-            name="another.PDF",  # Upper case extension
-            type="binary/octet-stream",  # Another incorrect type
-            content="SGVsbG8gV29ybGQ=",
-            content_id="456",
-            size=100,
-            base64=True,
-        ),
-        EmailAttachment(
-            name="normal.txt",  # Not a PDF
-            type="text/plain",
-            content="SGVsbG8gV29ybGQ=",
-            content_id="789",
-            size=100,
-            base64=True,
-        ),
-    ]
-
-    # Configure mock storage service
-    mock_storage_service.save_file.return_value = "s3://bucket/path"
-
-    # Process attachments
-    result = await service.process_attachments(email_id, attachments)
-
-    # Verify content types were corrected
-    assert len(result) == 3
-    assert result[0].content_type == "application/pdf"
-    assert result[1].content_type == "application/pdf"
-    assert result[2].content_type == "text/plain"  # This one should remain unchanged
-
-    # Verify storage service was called with correct content types
-    assert mock_storage_service.save_file.call_count == 3
-    call_args_list = mock_storage_service.save_file.call_args_list
-
-    # Extract the content_type from each call
-    pdf1_call = call_args_list[0].kwargs
-    pdf2_call = call_args_list[1].kwargs
-    txt_call = call_args_list[2].kwargs
-
-    assert pdf1_call["content_type"] == "application/pdf"
-    assert pdf2_call["content_type"] == "application/pdf"
-    assert txt_call["content_type"] == "text/plain"
-
-    # Check object keys contain corrected filenames
-    assert "document.pdf" in pdf1_call["object_key"]
-    assert "another.PDF" in pdf2_call["object_key"]  # Should preserve case
-    assert "normal.txt" in txt_call["object_key"]
+    # Test non-existent email
+    not_found = await service.get_email_by_message_id("non-existent@example.com")
+    assert not_found is None

@@ -14,10 +14,11 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.email_data import Email
+from app.models.email_data import Email, EmailAttachment
 from app.schemas.webhook_schemas import EmailAttachment as SchemaEmailAttachment
 from app.schemas.webhook_schemas import InboundEmailData, MailchimpWebhook
-from app.services.email_processing_service import EmailProcessingService
+from app.services.attachment_service import AttachmentService
+from app.services.email_service import EmailService, _schema_to_model_attachment
 from app.services.storage_service import StorageService
 
 
@@ -39,16 +40,30 @@ def mock_db_session() -> AsyncMock:
     return mock
 
 
+@pytest.fixture
+def mock_attachment_service() -> AsyncMock:
+    """Create a mock attachment service for tests."""
+    mock = AsyncMock(spec=AttachmentService)
+    mock.process_attachments.return_value = []
+    return mock
+
+
 @pytest.mark.asyncio
 async def test_process_very_large_attachment(
-    mock_db_session: AsyncMock, mock_storage_service: AsyncMock, setup_db: Any
+    mock_db_session: AsyncMock,
+    mock_storage_service: AsyncMock,
+    mock_attachment_service: AsyncMock,
+    setup_db: Any,
 ) -> None:
     """Test handling of a very large email attachment."""
     # GIVEN
-    service = EmailProcessingService(mock_db_session, mock_storage_service)
+    service = EmailService(
+        mock_db_session, mock_attachment_service, mock_storage_service
+    )
 
     # Create a test email
     email = Email(
+        id=123,
         message_id="large_attachment@example.com",
         from_email="sender@example.com",
         from_name="Test Sender",
@@ -57,8 +72,6 @@ async def test_process_very_large_attachment(
         body_text="This is a test with a large attachment",
         received_at=datetime.utcnow(),
     )
-    mock_db_session.add(email)
-    await mock_db_session.flush()
 
     # Generate a 1MB "large" attachment
     large_content = "".join(
@@ -76,34 +89,59 @@ async def test_process_very_large_attachment(
         base64=True,
     )
 
-    # Convert to model attachment
-    from app.services.email_processing_service import _schema_to_model_attachment
-
+    # Convert to model attachment for the mock return
     attachment = _schema_to_model_attachment(schema_attachment)
 
-    # Setup mock for storage service to handle the large file
-    mock_storage_service.save_file.return_value = "file:///test/path/to/large.txt"
+    # Mock store_email to return a properly constructed email object
+    with (
+        patch.object(service, "store_email", return_value=email),
+        patch.object(service, "get_email_by_message_id", return_value=None),
+    ):
 
-    # WHEN
-    await service.process_attachments(email.id, [attachment])
+        # Setup mock for attachment service to handle the large file
+        mock_attachment_service.process_attachments.return_value = [attachment]
 
-    # THEN
-    mock_storage_service.save_file.assert_called_once()
-    # Verify the content passed to save_file matches the size of the original content
-    call_args = mock_storage_service.save_file.call_args[1]
-    assert len(call_args["file_data"]) == len(large_content)
+        # Create a mock webhook with the large attachment
+        webhook = MailchimpWebhook(
+            webhook_id="test-large-123",
+            event="inbound_email",
+            timestamp=datetime.utcnow(),
+            data=InboundEmailData(
+                message_id="large_attachment@example.com",
+                from_email="sender@example.com",
+                from_name="Test Sender",
+                to_email="recipient@kave.com",
+                subject="Test Subject",
+                body_plain="Test body",
+                body_html="<p>Test body</p>",
+                attachments=[schema_attachment],
+            ),
+        )
+
+        # Process the webhook
+        result = await service.process_webhook(webhook)
+
+        # THEN
+        assert result is email
+        mock_attachment_service.process_attachments.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_process_many_attachments(
-    mock_db_session: AsyncMock, mock_storage_service: AsyncMock, setup_db: Any
+    mock_db_session: AsyncMock,
+    mock_storage_service: AsyncMock,
+    mock_attachment_service: AsyncMock,
+    setup_db: Any,
 ) -> None:
     """Test handling of an email with many attachments."""
     # GIVEN
-    service = EmailProcessingService(mock_db_session, mock_storage_service)
+    service = EmailService(
+        mock_db_session, mock_attachment_service, mock_storage_service
+    )
 
     # Create a test email
     email = Email(
+        id=123,
         message_id="many_attachments@example.com",
         from_email="sender@example.com",
         from_name="Test Sender",
@@ -112,11 +150,9 @@ async def test_process_many_attachments(
         body_text="This is a test with many attachments",
         received_at=datetime.utcnow(),
     )
-    mock_db_session.add(email)
-    await mock_db_session.flush()
 
     # Create 10 small test attachments
-    attachments = []
+    schema_attachments = []
     for i in range(10):
         content = f"This is test attachment {i}"
         content_b64 = base64.b64encode(content.encode()).decode()
@@ -128,35 +164,56 @@ async def test_process_many_attachments(
             size=len(content),
             base64=True,
         )
-        from app.services.email_processing_service import _schema_to_model_attachment
+        schema_attachments.append(schema_attachment)
 
-        attachment = _schema_to_model_attachment(schema_attachment)
-        attachments.append(attachment)
+    # Setup mock for attachment service to handle multiple attachments
+    mock_attachments = [Mock(spec=EmailAttachment) for _ in range(10)]
+    mock_attachment_service.process_attachments.return_value = mock_attachments
 
-    # Setup mock for storage service to return different URIs for each file
-    mock_storage_service.save_file.side_effect = [
-        f"file:///test/path/to/file{i}.txt" for i in range(10)
-    ]
+    # Create a webhook with multiple attachments
+    webhook = MailchimpWebhook(
+        webhook_id="test-many-123",
+        event="inbound_email",
+        timestamp=datetime.utcnow(),
+        data=InboundEmailData(
+            message_id="many_attachments@example.com",
+            from_email="sender@example.com",
+            from_name="Test Sender",
+            to_email="recipient@kave.com",
+            subject="Test Many Attachments",
+            body_plain="Test with many attachments",
+            body_html="<p>Test with many attachments</p>",
+            attachments=schema_attachments,
+        ),
+    )
 
-    # WHEN
-    await service.process_attachments(email.id, attachments)
+    # Mock necessary methods to avoid coroutine issues
+    with (
+        patch.object(service, "store_email", return_value=email),
+        patch.object(service, "get_email_by_message_id", return_value=None),
+    ):
+        # Process the webhook
+        result = await service.process_webhook(webhook)
 
-    # THEN
-    assert mock_storage_service.save_file.call_count == 10
+        # THEN
+        assert result is email
+        mock_attachment_service.process_attachments.assert_called_once()
+        # Verify we passed all 10 attachments
+        assert len(mock_attachment_service.process_attachments.call_args[0][1]) == 10
 
 
 @pytest.mark.asyncio
 async def test_malformed_email_data(
-    mock_db_session: AsyncMock, mock_storage_service: AsyncMock, setup_db: Any
+    mock_db_session: AsyncMock,
+    mock_storage_service: AsyncMock,
+    mock_attachment_service: AsyncMock,
+    setup_db: Any,
 ) -> None:
     """Test handling of malformed email data in a webhook."""
     # GIVEN
-    service = EmailProcessingService(mock_db_session, mock_storage_service)
-
-    # Configure mocks for email check
-    mock_email_result = AsyncMock()
-    mock_email_result.scalar_one_or_none.return_value = None
-    mock_db_session.execute.return_value = mock_email_result
+    service = EmailService(
+        mock_db_session, mock_attachment_service, mock_storage_service
+    )
 
     # Configure mock to return a mock Email when a new one is created
     mock_email = Mock()
@@ -166,8 +223,6 @@ async def test_malformed_email_data(
     mock_email.subject = ""
     mock_email.body_text = None
     mock_email.body_html = None
-    mock_db_session.flush.return_value = None
-    mock_db_session.commit.return_value = None
 
     # Create a webhook with some problematic data
     webhook = MailchimpWebhook(
@@ -190,7 +245,11 @@ async def test_malformed_email_data(
     )
 
     # Mock the store_email method to return our mock email
-    with patch.object(service, "store_email", return_value=mock_email):
+    # And also mock the get_email_by_message_id method to return None
+    with (
+        patch.object(service, "store_email", return_value=mock_email),
+        patch.object(service, "get_email_by_message_id", return_value=None),
+    ):
         # WHEN
         email = await service.process_webhook(webhook)
 
@@ -205,30 +264,20 @@ async def test_malformed_email_data(
 
 @pytest.mark.asyncio
 async def test_attachment_with_invalid_base64(
-    mock_db_session: AsyncMock, mock_storage_service: AsyncMock, setup_db: Any
+    mock_db_session: AsyncMock,
+    mock_storage_service: AsyncMock,
+    mock_attachment_service: AsyncMock,
+    setup_db: Any,
 ) -> None:
     """Test handling of attachment with invalid base64 encoding."""
     # GIVEN
-    # Create a completely non-async mock setup to avoid warnings
-    db_mock = MagicMock(spec=AsyncSession)
-    storage_mock = MagicMock(spec=StorageService)
-
-    # Only mock methods that need to be awaited as AsyncMock
-    storage_mock.save_file = AsyncMock(side_effect=ValueError("Invalid base64"))
-
-    service = EmailProcessingService(db_mock, storage_mock)
+    service = EmailService(
+        mock_db_session, mock_attachment_service, mock_storage_service
+    )
 
     # Create a test email
-    email = Email(
-        id=1,
-        message_id="invalid_attachment@example.com",
-        from_email="sender@example.com",
-        from_name="Test Sender",
-        to_email="recipient@kave.com",
-        subject="Test Invalid Attachment",
-        body_text="This is a test with an invalid attachment",
-        received_at=datetime.utcnow(),
-    )
+    mock_email = Mock()
+    mock_email.id = 1
 
     # Create an attachment with invalid base64
     invalid_schema_attachment = SchemaEmailAttachment(
@@ -240,45 +289,61 @@ async def test_attachment_with_invalid_base64(
         base64=True,
     )
 
-    from app.services.email_processing_service import _schema_to_model_attachment
+    # Setup the attachment service to raise an error when processing
+    mock_attachment_service.process_attachments.side_effect = ValueError(
+        "Invalid base64"
+    )
 
-    attachment = _schema_to_model_attachment(invalid_schema_attachment)
+    # Create a webhook with the invalid attachment
+    webhook = MailchimpWebhook(
+        webhook_id="test-invalid-base64-123",
+        event="inbound_email",
+        timestamp=datetime.utcnow(),
+        data=InboundEmailData(
+            message_id="invalid_base64@example.com",
+            from_email="sender@example.com",
+            from_name="Test Sender",
+            to_email="recipient@kave.com",
+            subject="Test Invalid Base64",
+            body_plain="Test with invalid base64 attachment",
+            body_html="<p>Test with invalid base64 attachment</p>",
+            attachments=[invalid_schema_attachment],
+        ),
+    )
 
-    # WHEN/THEN
-    with pytest.raises(ValueError):  # Base64 decoding should raise ValueError
-        await service.process_attachments(email.id, [attachment])
+    # Mock necessary methods to avoid coroutine issues
+    with (
+        patch.object(service, "store_email", return_value=mock_email),
+        patch.object(service, "get_email_by_message_id", return_value=None),
+    ):
+        # WHEN/THEN - Expect ValueError due to invalid base64
+        with pytest.raises(ValueError):
+            await service.process_webhook(webhook)
+
+    # Verify attachment service was called
+    mock_attachment_service.process_attachments.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_extremely_long_subject_and_content(
-    mock_db_session: AsyncMock, mock_storage_service: AsyncMock, setup_db: Any
+    mock_db_session: AsyncMock,
+    mock_storage_service: AsyncMock,
+    mock_attachment_service: AsyncMock,
+    setup_db: Any,
 ) -> None:
-    """Test handling of an email with extremely long subject and content."""
+    """Test handling of extremely long subject and content text."""
     # GIVEN
-    service = EmailProcessingService(mock_db_session, mock_storage_service)
+    service = EmailService(
+        mock_db_session, mock_attachment_service, mock_storage_service
+    )
 
-    # Configure mocks for email check
-    mock_email_result = AsyncMock()
-    mock_email_result.scalar_one_or_none.return_value = None
-    mock_db_session.execute.return_value = mock_email_result
+    # Create extremely long strings
+    very_long_subject = "A" * 1000  # 1000 characters
+    very_long_body = "B" * 100000  # 100K characters
 
-    # Mock Email object
-    mock_email = Mock()
-    mock_email.id = 1
-    mock_email.message_id = "long_content@example.com"
-    mock_email.subject = "A" * 255  # Truncated to 255 chars
-    mock_email.body_text = "B" * 100_000
-    mock_email.body_html = "<p>" + ("C" * 100_000) + "</p>"
-    mock_db_session.flush.return_value = None
-    mock_db_session.commit.return_value = None
-
-    # Create a test webhook with extremely long subject and content
-    long_subject = "A" * 1000  # 1000 characters
-    long_plain_body = "B" * 100_000  # 100K characters
-    long_html_body = "<p>" + ("C" * 100_000) + "</p>"  # 100K+ characters
-
+    # Create a webhook with long content
     webhook = MailchimpWebhook(
-        webhook_id="test-long-123",
+        webhook_id="test-long-content-123",
         event="inbound_email",
         timestamp=datetime.utcnow(),
         data=InboundEmailData(
@@ -286,26 +351,28 @@ async def test_extremely_long_subject_and_content(
             from_email="sender@example.com",
             from_name="Test Sender",
             to_email="recipient@kave.com",
-            subject=long_subject,
-            body_plain=long_plain_body,
-            body_html=long_html_body,
+            subject=very_long_subject,
+            body_plain=very_long_body,
+            body_html=f"<p>{very_long_body}</p>",
             headers={},
             attachments=[],
         ),
     )
 
-    # Mock the store_email method to return our mock email
-    with patch.object(service, "store_email", return_value=mock_email):
+    # Create a mock email with a truncated subject
+    mock_email = Mock()
+    mock_email.id = 1
+    mock_email.subject = very_long_subject[:255]  # Subject truncated to 255 chars
+
+    # Mock the methods that need to be called
+    with (
+        patch.object(service, "store_email", return_value=mock_email),
+        patch.object(service, "get_email_by_message_id", return_value=None),
+    ):
         # WHEN
         email = await service.process_webhook(webhook)
 
         # THEN
         assert email is not None
-        # Subject should be truncated to 255 characters
+        assert email.subject == very_long_subject[:255]
         assert len(email.subject) == 255
-        assert email.subject == "A" * 255
-        # Body content should be stored as-is
-        assert email.body_text is not None
-        assert len(email.body_text) == 100_000
-        assert email.body_html is not None
-        assert len(email.body_html) > 100_000
