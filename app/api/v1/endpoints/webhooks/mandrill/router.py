@@ -19,7 +19,8 @@ from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.deps import get_db, get_email_service, get_webhook_client
+from app.api.v1.deps.database import get_db
+from app.api.v1.deps.email import get_email_service, get_webhook_client
 from app.api.v1.endpoints.webhooks.mandrill.parsers import (
     _is_empty_event_list,
     _is_ping_event,

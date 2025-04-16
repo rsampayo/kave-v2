@@ -5,8 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import engine, get_session
-from app.db.session_management import get_db
+from app.db.session import TrackedAsyncSession, engine, get_db, get_session
 
 
 @pytest.mark.asyncio
@@ -25,10 +24,10 @@ async def test_engine_configuration() -> None:
 async def test_get_db_context_manager() -> None:
     """Test that get_db yields a session and closes it properly."""
     # Arrange
-    mock_session = AsyncMock(spec=AsyncSession)
+    mock_session = AsyncMock(spec=TrackedAsyncSession)
 
-    # Mock async_session_factory to return our mock session
-    with patch("app.db.session.async_session_factory", return_value=mock_session):
+    # Mock TrackedAsyncSession to return our mock session
+    with patch("app.db.session.TrackedAsyncSession", return_value=mock_session):
         # Act
         db_gen = get_db()
         session = await db_gen.__anext__()  # Use __anext__ instead of anext
@@ -50,11 +49,11 @@ async def test_get_db_context_manager() -> None:
 async def test_get_db_handles_exceptions() -> None:
     """Test that get_db closes the session even if an exception occurs."""
     # Arrange
-    mock_session = AsyncMock(spec=AsyncSession)
+    mock_session = AsyncMock(spec=TrackedAsyncSession)
     test_exception = Exception("Test error")
 
-    # Mock async_session_factory to return our mock session
-    with patch("app.db.session.async_session_factory", return_value=mock_session):
+    # Mock TrackedAsyncSession to return our mock session
+    with patch("app.db.session.TrackedAsyncSession", return_value=mock_session):
         # Act
         db_gen = get_db()
         session = await db_gen.__anext__()  # Use __anext__ instead of anext
@@ -142,13 +141,19 @@ async def test_nested_transactions() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_session_creates_new_session() -> None:
+async def test_get_session_creates_new_session(capfd) -> None:
     """Test that get_session creates a new session."""
     # When we get a session
     session = get_session()
 
-    # Then it should be an AsyncSession
-    assert isinstance(session, AsyncSession)
+    # Check by class name and type attributes instead of instanceof
+    session_type = type(session)
+    assert session_type.__name__ == "TrackedAsyncSession"
+    assert session_type.__module__ == "app.db.session"
+    assert hasattr(
+        session, "closed"
+    )  # Check for a TrackedAsyncSession-specific attribute
+
     await session.close()
 
 
@@ -248,5 +253,5 @@ async def test_session_explicit_close() -> None:
     # When we close it
     await session.close()
 
-    # Then it should be closed
-    assert session is not None
+    # Then it should be marked as closed
+    assert session.closed

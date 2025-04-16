@@ -20,7 +20,7 @@ from sqlalchemy import select  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 
 # Local application imports
-from app.db.session_management import get_db  # noqa: E402
+from app.db.session import get_db  # noqa: E402
 from app.models.user import User  # noqa: E402
 
 # Password hashing

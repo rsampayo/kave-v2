@@ -4,16 +4,6 @@ Overall, this is a well-structured project that follows many FastAPI best practi
 
 Here's a breakdown of areas I'd focus on for refactoring, aiming for improved clarity, maintainability, and adherence to conventions:
 
-**High-Priority Refactoring / Concerns:**
-
-1.  **Duplicate Email Services:**
-    *   **Observation:** You have both `app/services/email_service.py` and `app/services/email_processing_service.py`. Their functionality seems heavily overlapped, particularly around `process_webhook`. `EmailProcessingService` also seems to duplicate attachment processing logic that should reside in `AttachmentService`.
-    *   **Refactoring:**
-        *   Consolidate these into a single `EmailService`.
-        *   The `EmailService` should likely depend on the `AttachmentService` (as `email_service.py` currently does).
-        *   Remove the attachment processing logic from the consolidated `EmailService` – delegate fully to `AttachmentService`.
-        *   Update all dependencies (`get_email_service` in `deps/email.py`) and tests accordingly. Remove the redundant service file and its tests. The structure in `email_service.py` (depending on `AttachmentService`) seems more conventional.
-        *   Remove the schema-to-model adapter functions (`_schema_to_model_attachment`) within the service if possible. Services can often work directly with schemas or models. If conversion is needed, it might belong closer to the boundary (e.g., endpoint if transforming input) or be part of a dedicated mapper utility.
 
 2.  **Redundant Dependency/Session Management Files:**
     *   **Observation:** You have `app/api/v1/deps.py` which mostly re-exports from `app/api/v1/deps/`. You also have `app/db/session_management.py` containing only a `get_db` function, which is very similar to the one in `app/api/v1/deps/database.py` and `app/db/session.py`.
@@ -60,9 +50,7 @@ Here's a breakdown of areas I'd focus on for refactoring, aiming for improved cl
     *   **Observation:** Files like `add_docstrings.py`, `fix_migration.py`, `test_app_db.py`, `test_db.py` are in the project root.
     *   **Refactoring:** Move these utility/debugging scripts into the `scripts/` directory to keep the root clean. `fix_migration.py` is particularly concerning as manual Alembic version table manipulation is risky.
 
-5.  **Potentially Redundant ORM `EmailAttachment` Class:**
-    *   **Observation:** `app/models/email_data.py` defines an `EmailAttachment` class *in addition* to the SQLAlchemy `Attachment` model and the Pydantic `EmailAttachment` schema. This non-ORM class seems like a DTO.
-    *   **Refactoring:** Is this DTO class truly necessary? Can the Pydantic schema (`app/schemas/webhook_schemas.py::EmailAttachment`) serve this purpose? Consolidate if possible.
+
 
 6.  **`PATCH` vs `PUT` in Organizations Endpoint:**
     *   **Observation:** The logic for `PATCH` and `PUT` in `app/api/v1/endpoints/organizations.py` appears identical.

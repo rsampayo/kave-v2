@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.deps import get_db, get_storage_service
+from app.api.v1.deps.database import get_db
+from app.api.v1.deps.storage import get_storage_service
 from app.models.email_data import Attachment
 from app.services.storage_service import StorageService
 

@@ -13,7 +13,12 @@ from app.models.user import User
 from app.schemas.auth_schemas import TokenData
 from app.services.user_service import UserService, get_user_service
 
-__all__ = ["get_current_user", "get_optional_user", "get_current_active_user"]
+__all__ = [
+    "get_current_user",
+    "get_optional_user",
+    "get_current_active_user",
+    "get_current_superuser",
+]
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/token", auto_error=True)

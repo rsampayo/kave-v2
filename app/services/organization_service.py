@@ -6,7 +6,7 @@ from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.deps import get_db
+from app.api.v1.deps.database import get_db
 from app.models.organization import Organization
 from app.schemas.organization_schemas import OrganizationCreate, OrganizationUpdate
 

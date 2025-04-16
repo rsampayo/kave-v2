@@ -26,8 +26,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
-from app.db.session import Base
-from app.db.session_management import get_db
+from app.db.session import Base, get_db
 from app.integrations.email.client import WebhookClient
 from app.main import create_application
 

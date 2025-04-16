@@ -95,13 +95,13 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         await async_session.close()
 
 
-def get_session() -> AsyncSession:
+def get_session() -> TrackedAsyncSession:
     """Get a new database session.
 
     Used in cases where dependency injection is not available.
 
     Returns:
-        AsyncSession: Database session
+        TrackedAsyncSession: Database session
     """
     return TrackedAsyncSession(
         bind=engine, expire_on_commit=False, autoflush=False, autocommit=False

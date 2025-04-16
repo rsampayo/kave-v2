@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.api.v1.deps import get_db
+from app.api.v1.deps.database import get_db
 
 
 @pytest.mark.asyncio
