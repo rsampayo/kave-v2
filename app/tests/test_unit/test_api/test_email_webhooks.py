@@ -1206,8 +1206,8 @@ async def test_receive_mandrill_webhook_ping_event() -> None:
         client=mock_client,
     )
 
-    # Verify the response - 200 OK for ping events
-    assert response.status_code == 200
+    # Verify the response - 202 Accepted for ping events
+    assert response.status_code == 202
     response_data = json.loads(response.body.decode())
     assert response_data["status"] == "success"
     assert "ping acknowledged" in response_data["message"].lower()

@@ -19,22 +19,23 @@ Base = declarative_base()
 # Database configuration
 DATABASE_URL = settings.effective_database_url
 
-# In production, ensure we're not using SQLite
-if settings.API_ENV == "production" and DATABASE_URL.startswith("sqlite://"):
+# Ensure we're not using SQLite in any environment
+if DATABASE_URL.startswith("sqlite://"):
     raise ValueError(
-        "SQLite database is not supported in production environment. "
+        "SQLite database is not supported. "
         "Please configure a PostgreSQL database using DATABASE_URL."
     )
 
-# Ensure the aiosqlite dialect for SQLite
-if DATABASE_URL.startswith("sqlite://"):
-    DATABASE_URL = DATABASE_URL.replace("sqlite://", "sqlite+aiosqlite://")
 # Ensure postgresql dialect for postgres with asyncpg driver
-elif DATABASE_URL.startswith("postgres://"):
+if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
 elif DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
-
+else:
+    raise ValueError(
+        "Unsupported database type. Only PostgreSQL is supported. "
+        "Please configure a PostgreSQL database using DATABASE_URL."
+    )
 
 # Create async engine instance
 engine: AsyncEngine = create_async_engine(

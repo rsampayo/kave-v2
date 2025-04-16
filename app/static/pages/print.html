@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis de Plataforma: Diseño y Pedido de Ropa Personalizada</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #007AFF;
+            --text-color: #1d1d1f;
+            --secondary-text-color: #6e6e73;
+            --background-color: #f5f5f7;
+            --card-background: #ffffff;
+            --border-color: #d2d2d7;
+            --success-color: #34C759;
+            --warning-color: #FF9500;
+            --error-color: #FF3B30;
+            --highlight-bg: rgba(0, 122, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            overflow-x: hidden; /* Prevent horizontal scroll */
+        }
+
+        .presentation-container {
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 0 20px;
+            overflow: hidden; /* Contain slides */
+        }
+
+        .slide {
+            background-color: var(--card-background);
+            border-radius: 18px;
+            padding: 40px 50px;
+            margin-bottom: 40px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid var(--border-color);
+            opacity: 0;
+            transform: translateY(20px);
+            animation: slideFadeIn 0.6s ease-out forwards;
+        }
+
+        @keyframes slideFadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Add animation delay for subsequent slides */
+        .slide:nth-child(2) { animation-delay: 0.1s; }
+        .slide:nth-child(3) { animation-delay: 0.2s; }
+        .slide:nth-child(4) { animation-delay: 0.3s; }
+        .slide:nth-child(5) { animation-delay: 0.4s; }
+        .slide:nth-child(6) { animation-delay: 0.5s; }
+        .slide:nth-child(7) { animation-delay: 0.6s; }
+        .slide:nth-child(8) { animation-delay: 0.7s; }
+        .slide:nth-child(9) { animation-delay: 0.8s; }
+        /* Add more if needed */
+
+
+        h1, h2, h3, h4 {
+            color: var(--text-color);
+            margin-top: 0;
+            margin-bottom: 0.75em;
+            line-height: 1.3;
+        }
+
+        h1 { /* Slide Title */
+            font-size: 2.5rem; /* 40px */
+            font-weight: 700;
+            margin-bottom: 1em;
+            text-align: center;
+            color: var(--primary-color);
+        }
+
+        h2 { /* Section Heading */
+            font-size: 1.75rem; /* 28px */
+            font-weight: 600;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 0.3em;
+            margin-bottom: 1em;
+        }
+
+        h3 { /* Card Title / Subsection */
+            font-size: 1.375rem; /* 22px */
+            font-weight: 600;
+            margin-bottom: 0.8em;
+            color: var(--text-color);
+        }
+
+        h4 { /* Minor Heading */
+            font-size: 1.125rem; /* 18px */
+            font-weight: 500;
+            color: var(--secondary-text-color);
+            margin-bottom: 0.6em;
+        }
+
+        p {
+            font-size: 1rem; /* 16px */
+            color: var(--secondary-text-color);
+            margin-bottom: 1.25em;
+        }
+
+        ul {
+            list-style: none;
+            padding-left: 0;
+            margin-bottom: 1.25em;
+        }
+
+        ul li {
+            position: relative;
+            padding-left: 25px;
+            margin-bottom: 0.8em;
+            font-size: 1rem;
+            color: var(--secondary-text-color);
+        }
+
+        ul li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            top: 0;
+            color: var(--primary-color);
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .highlight {
+            background-color: var(--highlight-bg);
+            color: var(--primary-color);
+            padding: 0.1em 0.3em;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .card-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-top: 25px;
+        }
+
+        .card {
+            background-color: var(--background-color); /* Slightly different background for cards */
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+        }
+
+        .card h3 {
+            font-size: 1.25rem; /* 20px */
+            margin-bottom: 0.6em;
+            color: var(--primary-color);
+        }
+
+        .card p, .card ul li {
+            font-size: 0.95rem; /* 15px */
+            color: var(--secondary-text-color);
+        }
+         .card ul {
+            margin-bottom: 0; /* Remove extra space at bottom of card list */
+        }
+
+        /* Workflow Visualization */
+        .workflow-viz-container {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 30px 0;
+            flex-wrap: wrap; /* Allow wrapping on smaller screens */
+            gap: 20px;
+        }
+
+        .workflow-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            flex: 1;
+            min-width: 120px; /* Ensure steps have some width */
+        }
+
+        .workflow-step .icon {
+            width: 50px;
+            height: 50px;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(0, 122, 255, 0.3);
+        }
+
+        .workflow-step .label {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        /* Connector lines for workflow */
+        .workflow-step:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            top: 25px; /* Vertically center with the icon */
+            left: calc(50% + 35px); /* Start after the icon */
+            width: calc(100% - 70px); /* Span between icons */
+            height: 2px;
+            background-color: var(--border-color);
+            z-index: -1; /* Place behind icons */
+        }
+
+        /* Status indicators (optional, example) */
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-success { background-color: var(--success-color); }
+        .status-warning { background-color: var(--warning-color); }
+        .status-error { background-color: var(--error-color); }
+        .status-neutral { background-color: var(--secondary-text-color); }
+
+
+        /* Simple Table for Comparison */
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 30px;
+            font-size: 0.9rem;
+        }
+        .comparison-table th, .comparison-table td {
+            border: 1px solid var(--border-color);
+            padding: 12px 15px;
+            text-align: left;
+            vertical-align: top;
+        }
+        .comparison-table th {
+            background-color: var(--background-color);
+            font-weight: 600;
+            color: var(--text-color);
+        }
+        .comparison-table td {
+            color: var(--secondary-text-color);
+        }
+        .comparison-table .check { color: var(--success-color); font-weight: bold; }
+        .comparison-table .partial { color: var(--warning-color); font-weight: bold; }
+        .comparison-table .cross { color: var(--error-color); font-weight: bold; }
+
+
+        /* Responsive Adjustments */
+        @media (max-width: 768px) {
+            h1 { font-size: 2rem; }
+            h2 { font-size: 1.5rem; }
+            h3 { font-size: 1.2rem; }
+            h4 { font-size: 1rem; }
+            p, ul li { font-size: 0.95rem; }
+
+            .presentation-container {
+                margin: 20px auto;
+                padding: 0 15px;
+            }
+
+            .slide {
+                padding: 30px 25px;
+                margin-bottom: 30px;
+            }
+
+            .card-container {
+                grid-template-columns: 1fr; /* Stack cards */
+                gap: 20px;
+            }
+
+            .workflow-viz-container {
+                flex-direction: column; /* Stack steps vertically */
+                align-items: flex-start; /* Align to left */
+            }
+
+            .workflow-step {
+                flex-direction: row; /* Icon and text side-by-side */
+                align-items: center;
+                text-align: left;
+                width: 100%;
+                margin-bottom: 20px; /* Space between stacked steps */
+                min-width: 0;
+            }
+
+            .workflow-step .icon {
+                margin-bottom: 0;
+                margin-right: 15px;
+                width: 40px;
+                height: 40px;
+                font-size: 1.2rem;
+            }
+
+            .workflow-step .label {
+                font-size: 0.85rem;
+            }
+
+            .workflow-step::after {
+                 display: none; /* Hide horizontal connectors */
+            }
+             /* Optional: Add vertical connectors for stacked view */
+            .workflow-step:not(:last-child)::before {
+                content: '';
+                position: absolute;
+                left: 20px; /* Align with center of icon */
+                top: 50px; /* Start below the icon */
+                width: 2px;
+                height: calc(100% - 30px); /* Connect to next step */
+                background-color: var(--border-color);
+                z-index: -1;
+            }
+
+            .comparison-table {
+                font-size: 0.8rem;
+            }
+             .comparison-table th, .comparison-table td {
+                padding: 8px 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+             h1 { font-size: 1.8rem; }
+             .slide { padding: 25px 20px; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="presentation-container">
+
+        <!-- Slide 1: Title -->
+        <section class="slide">
+            <h1>Análisis de Plataforma</h1>
+            <h2>Diseño y Pedido de Ropa Personalizada</h2>
+            <p style="text-align: center; font-size: 1.1rem; color: var(--secondary-text-color);">Evaluación de opciones para una nueva plataforma D2C (Directo al Consumidor).</p>
+        </section>
+
+        <!-- Slide 2: Introduction & Client Requirements -->
+        <section class="slide">
+            <h2>Objetivo del Cliente y Requisitos Clave</h2>
+            <p>El cliente, actualmente fabricante B2B, busca lanzar una plataforma online que permita a los usuarios finales diseñar, pedir y rastrear ropa personalizada (ej. pijamas), automatizando el flujo desde el diseño hasta la entrega.</p>
+            <div class="card-container">
+                <div class="card">
+                    <h3><span class="icon">🎨</span> Diseñador Interactivo</h3>
+                    <p>Herramienta web fácil de usar para que los clientes personalicen productos (imágenes, texto, colores).</p>
+                </div>
+                <div class="card">
+                    <h3><span class="icon">🛒</span> Pedidos y Especificaciones</h3>
+                    <p>Gestión de tallas, cantidades (pequeñas/grandes), opciones personalizadas y precios dinámicos.</p>
+                </div>
+                <div class="card">
+                    <h3><span class="icon">🏭</span> Activación de Producción</h3>
+                    <p>Envío automático de pedidos al fabricante (interno o externo).</p>
+                </div>
+                 <div class="card">
+                    <h3><span class="icon">🚚</span> Seguimiento de Estado</h3>
+                    <p>Visibilidad del progreso del pedido para el cliente y el usuario final.</p>
+                </div>
+                 <div class="card">
+                    <h3><span class="icon">💳</span> Facturación y Flujo Completo</h3>
+                    <p>Gestión de pagos, facturación y un flujo de trabajo integrado de principio a fin.</p>
+                </div>
+            </div>
+        </section>
+
+         <!-- Slide 3: Desired Workflow Visualization -->
+        <section class="slide">
+            <h2>Flujo de Trabajo Deseado</h2>
+            <p>Visualización del proceso ideal desde la perspectiva del usuario final y del negocio.</p>
+            <div class="workflow-viz-container">
+                <div class="workflow-step">
+                    <div class="icon">👤</div>
+                    <div class="label">Cliente Inicia Sesión</div>
+                </div>
+                <div class="workflow-step">
+                    <div class="icon">🖌️</div>
+                    <div class="label">Diseña Producto</div>
+                </div>
+                <div class="workflow-step">
+                    <div class="icon">✅</div>
+                    <div class="label">Define Specs y Pide</div>
+                </div>
+                 <div class="workflow-step">
+                    <div class="icon">💸</div>
+                    <div class="label">Realiza Pago</div>
+                </div>
+                <div class="workflow-step">
+                    <div class="icon">⚙️</div>
+                    <div class="label">Producción Iniciada</div>
+                </div>
+                <div class="workflow-step">
+                    <div class="icon">📊</div>
+                    <div class="label">Actualización de Estado</div>
+                </div>
+                <div class="workflow-step">
+                    <div class="icon">📦</div>
+                    <div class="label">Envío y Entrega</div>
+                </div>
+            </div>
+             <p style="text-align: center; margin-top: 20px; font-style: italic;">La plataforma debe gestionar este flujo de manera transparente.</p>
+        </section>
+
+        <!-- Slide 4: Platform Analysis - All-in-One Focus -->
+        <section class="slide">
+            <h2>Análisis de Plataformas: Soluciones "Todo en Uno"</h2>
+            <p>Plataformas que buscan cubrir la mayoría de las necesidades (diseño, tienda, gestión) en un solo paquete.</p>
+            <div class="card-container">
+                <div class="card">
+                    <h3>OnPrintShop</h3>
+                    <ul>
+                        <li><span class="status-indicator status-success"></span> Fuerte en Web-to-Print (W2P).</li>
+                        <li><span class="status-indicator status-success"></span> Diseñador online integrado.</li>
+                        <li><span class="status-indicator status-success"></span> Tienda E-commerce B2C/B2B.</li>
+                        <li><span class="status-indicator status-success"></span> Integraciones con proveedores de impresión (ej. 4Over).</li>
+                        <li><span class="status-indicator status-warning"></span> Menos enfocado en gestión de producción interna detallada.</li>
+                        <li><span class="status-indicator status-success"></span> Precio inicial ~ $250/mes.</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>DecoNetwork</h3>
+                     <ul>
+                        <li><span class="status-indicator status-success"></span> Especializado en decoración de ropa.</li>
+                        <li><span class="status-indicator status-success"></span> Diseñador online + Múltiples tiendas.</li>
+                        <li><span class="status-indicator status-success"></span> Módulo robusto de gestión de producción (Business Hub).</li>
+                        <li><span class="status-indicator status-success"></span> Flujo de aprobación de arte.</li>
+                         <li><span class="status-indicator status-warning"></span> Integración con fabricantes externos requiere API (plan Enterprise) o manual.</li>
+                        <li><span class="status-indicator status-neutral"></span> Precio inicial ~ $199-$299/mes.</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>InkSoft</h3>
+                     <ul>
+                        <li><span class="status-indicator status-success"></span> Fuerte en tiendas online y diseñador fácil de usar.</li>
+                        <li><span class="status-indicator status-success"></span> Ideal para múltiples tiendas (clientes, campañas).</li>
+                        <li><span class="status-indicator status-success"></span> Integración nativa con catálogos de proveedores de ropa.</li>
+                        <li><span class="status-indicator status-warning"></span> Gestión de producción más básica (mejor con Printavo).</li>
+                        <li><span class="status-indicator status-warning"></span> Conexión con fabricantes externos requiere trabajo extra.</li>
+                         <li><span class="status-indicator status-neutral"></span> Precio inicial ~ $299/mes (puede requerir Printavo adicional).</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+         <!-- Slide 5: Platform Analysis - Complementary Tools -->
+        <section class="slide">
+            <h2>Análisis de Plataformas: Herramientas Complementarias</h2>
+            <p>Software especializado que cubre partes específicas del flujo de trabajo, necesitando integración.</p>
+            <div class="card-container">
+                <div class="card">
+                    <h3>Printavo</h3>
+                    <ul>
+                        <li><span class="status-indicator status-success"></span> <span class="highlight">Excelente</span> para gestión de flujo de producción interno.</li>
+                        <li><span class="status-indicator status-success"></span> Programación, tareas, aprobaciones.</li>
+                        <li><span class="status-indicator status-success"></span> Facturación y pagos integrados.</li>
+                        <li><span class="status-indicator status-error"></span> <span class="highlight">No</span> incluye diseñador ni tienda online para clientes.</li>
+                        <li><span class="status-indicator status-warning"></span> Requiere integración con un front-end (ej. InkSoft, sitio custom).</li>
+                        <li><span class="status-indicator status-neutral"></span> Precio inicial ~ $99-$149/mes.</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>CraftyBase</h3>
+                     <ul>
+                        <li><span class="status-indicator status-success"></span> Fuerte en gestión de <span class="highlight">inventario</span> (materia prima y productos).</li>
+                        <li><span class="status-indicator status-success"></span> Cálculo de costos de producción (COGS).</li>
+                        <li><span class="status-indicator status-success"></span> Gestión de Órdenes de Fabricación (BOMs).</li>
+                         <li><span class="status-indicator status-error"></span> <span class="highlight">No</span> es una plataforma de cara al cliente (diseño/tienda).</li>
+                        <li><span class="status-indicator status-warning"></span> Útil principalmente para <span class="highlight">fabricación interna</span>; importa pedidos de otras plataformas.</li>
+                        <li><span class="status-indicator status-neutral"></span> Precio inicial ~ $49/mes.</li>
+                    </ul>
+                </div>
+                 <div class="card">
+                    <h3>OrderDesk</h3>
+                     <ul>
+                        <li><span class="status-indicator status-success"></span> Potente <span class="highlight">middleware</span> de integración y automatización.</li>
+                        <li><span class="status-indicator status-success"></span> Conecta tiendas (Shopify, custom) con +300 servicios de fulfillment.</li>
+                        <li><span class="status-indicator status-success"></span> Reglas personalizables para enrutar y dividir pedidos.</li>
+                        <li><span class="status-indicator status-error"></span> <span class="highlight">No</span> es una plataforma de cara al cliente.</li>
+                        <li><span class="status-indicator status-warning"></span> Ideal si se usan <span class="highlight">múltiples proveedores</span> o se necesita integración compleja.</li>
+                        <li><span class="status-indicator status-neutral"></span> Precio: $20-$60/mes + costo por pedido.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 6: Comparison Summary -->
+        <section class="slide">
+            <h2>Comparativa Rápida de Capacidades Clave</h2>
+            <p>Evaluación de cómo las principales opciones cubren los requisitos del cliente.</p>
+            <div style="overflow-x: auto;"> <!-- Make table horizontally scrollable on small screens -->
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Plataforma</th>
+                            <th>Diseñador Online</th>
+                            <th>Tienda Cliente</th>
+                            <th>Gestión Pedidos</th>
+                            <th>Seguimiento Producción</th>
+                            <th>Integración Fabricante Externo</th>
+                            <th>Gestión Inventario/Costos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>OnPrintShop</strong></td>
+                            <td class="check">Sí</td>
+                            <td class="check">Sí</td>
+                            <td class="check">Sí</td>
+                            <td class="partial">Básico / Vía Integración</td>
+                            <td class="partial">Sí (Proveedores específicos) / API</td>
+                            <td class="cross">No</td>
+                        </tr>
+                        <tr>
+                            <td><strong>DecoNetwork</strong></td>
+                            <td class="check">Sí</td>
+                            <td class="check">Sí</td>
+                            <td class="check">Sí</td>
+                            <td class="check">Sí (Robusto)</td>
+                            <td class="partial">Limitado / API</td>
+                            <td class="partial">Básico (Blanks)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>InkSoft</strong></td>
+                            <td class="check">Sí</td>
+                            <td class="check">Sí</td>
+                            <td class="check">Sí</td>
+                            <td class="partial">Básico (Mejor con Printavo)</td>
+                            <td class="cross">No (Requiere extra)</td>
+                            <td class="partial">Básico (Blanks)</td>
+                        </tr>
+                         <tr>
+                            <td><strong>Printavo</strong></td>
+                            <td class="cross">No</td>
+                            <td class="cross">No</td>
+                            <td class="check">Sí</td>
+                            <td class="check">Sí (Robusto)</td>
+                            <td class="cross">No (Requiere extra)</td>
+                            <td class="cross">No</td>
+                        </tr>
+                          <tr>
+                            <td><strong>CraftyBase</strong></td>
+                            <td class="cross">No</td>
+                            <td class="cross">No</td>
+                            <td class="partial">Importa</td>
+                            <td class="check">Sí (Interno)</td>
+                            <td class="cross">No</td>
+                            <td class="check">Sí (Robusto)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>OrderDesk</strong></td>
+                            <td class="cross">No</td>
+                            <td class="cross">No</td>
+                            <td class="check">Sí (Agregador)</td>
+                            <td class="partial">Vía Integración</td>
+                            <td class="check">Sí (Extensivo)</td>
+                            <td class="cross">No</td>
+                        </tr>
+                         <tr>
+                            <td><strong>PrintDoors (Proveedor)</strong></td>
+                            <td class="partial">Sí (en su sitio)</td>
+                            <td class="cross">N/A</td>
+                            <td class="partial">Sí (su dashboard)</td>
+                            <td class="check">Sí (proveedor)</td>
+                            <td class="check">N/A (Es el proveedor)</td>
+                            <td class="cross">N/A</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+             <p style="margin-top: 15px; font-size: 0.9rem; color: var(--secondary-text-color);">Leyenda: <span class="check">Sí</span> | <span class="partial">Parcial/Limitado</span> | <span class="cross">No</span></p>
+        </section>
+
+        <!-- Slide 7: Gaps and Considerations -->
+        <section class="slide">
+            <h2>Brechas Clave y Consideraciones</h2>
+             <p>Puntos importantes a tener en cuenta al seleccionar e implementar una solución.</p>
+             <ul>
+                <li><span class="status-indicator status-warning"></span> <strong>Integración con Fabricantes Específicos (ej. PrintDoors):</strong> Ninguna plataforma lo incluye de forma nativa. Requerirá <span class="highlight">integración personalizada (API)</span> o usar un intermediario como <span class="highlight">OrderDesk</span>.</li>
+                 <li><span class="status-indicator status-warning"></span> <strong>Gestión Detallada de Producción Interna:</strong> Si se fabrica en casa, las plataformas W2P pueden ser limitadas. Considerar <span class="highlight">Printavo</span> (flujo) o <span class="highlight">CraftyBase</span> (inventario/costos) como complemento.</li>
+                 <li><span class="status-indicator status-warning"></span> <strong>Necesidades Únicas de Diseño:</strong> Si el diseñador estándar no es suficiente (ej. patrones complejos, 3D avanzado), podría necesitarse un <span class="highlight">módulo de diseño personalizado</span> integrado al backend de pedidos.</li>
+                 <li><span class="status-indicator status-warning"></span> <strong>Coordinación Multi-Sistema:</strong> Si se elige una solución modular (ej. Shopify + OrderDesk + Printavo), asegurar que los conectores funcionen bien y mantener el ecosistema.</li>
+                 <li><span class="status-indicator status-neutral"></span> <strong>Experiencia de Usuario (UX):</strong> La facilidad y atractivo del diseñador online es crucial para el éxito D2C. Evaluar la UX de las plataformas o considerar un front-end a medida si es necesario.</li>
+                 <li><span class="status-indicator status-neutral"></span> <strong>Visibilidad para el Cliente Final:</strong> Asegurar que la solución ofrezca un buen seguimiento del estado del pedido para el cliente (portal de cuenta, notificaciones).</li>
+             </ul>
+        </section>
+
+         <!-- Slide 8: Recommendations -->
+        <section class="slide">
+            <h2>Recomendaciones y Próximos Pasos</h2>
+            <p>Basado en el análisis, se sugieren las siguientes rutas, priorizando velocidad y cobertura:</p>
+
+            <h4>Opción 1: Plataforma "Todo en Uno" (Recomendado para Inicio Rápido)</h4>
+            <p>Utilizar <span class="highlight">DecoNetwork</span> o <span class="highlight">InkSoft (+Printavo)</span>. Cubren la mayoría de necesidades con configuración mínima. Ideal para lanzar rápido.</p>
+             <ul>
+                 <li><strong>Ventajas:</strong> Rápida implementación, flujo integrado, soporte centralizado.</li>
+                 <li><strong>Desventajas:</strong> Menos flexible que soluciones modulares, puede requerir API para integraciones específicas.</li>
+                 <li><strong>Alternativa Económica:</strong> <span class="highlight">OnPrintShop</span> si el presupuesto es clave y sus características son suficientes.</li>
+             </ul>
+
+             <h4>Opción 2: Solución Modular Integrada (Mayor Flexibilidad)</h4>
+             <p>Combinar <span class="highlight">Shopify/WooCommerce</span> (tienda) + <span class="highlight">App de Diseño</span> + <span class="highlight">OrderDesk</span> (integración fulfillment) + Opcional: <span class="highlight">Printavo/CraftyBase</span> (si hay producción interna).</p>
+              <ul>
+                 <li><strong>Ventajas:</strong> Máxima flexibilidad, control sobre UX, evita bloqueo de proveedor.</li>
+                 <li><strong>Desventajas:</strong> Mayor esfuerzo de configuración/integración, múltiples suscripciones, mantenimiento distribuido.</li>
+             </ul>
+
+             <h4>Opción 3: Desarrollo a Medida (Máximo Control, Mayor Inversión)</h4>
+             <p>Construir todo desde cero. Solo recomendado si las necesidades son muy específicas y no cubiertas por plataformas existentes.</p>
+             <ul>
+                 <li><strong>Ventajas:</strong> Solución 100% adaptada.</li>
+                 <li><strong>Desventajas:</strong> Alto costo, largo tiempo de desarrollo, mantenimiento continuo.</li>
+             </ul>
+
+             <h4>Próximos Pasos Sugeridos:</h4>
+             <ol style="padding-left: 20px; list-style: decimal;">
+                 <li style="padding-left: 10px; margin-bottom: 0.5em;">Realizar <span class="highlight">demos/pruebas gratuitas</span> de las plataformas preseleccionadas (DecoNetwork, InkSoft, OnPrintShop).</li>
+                 <li style="padding-left: 10px; margin-bottom: 0.5em;">Validar si el <span class="highlight">diseñador online</span> cumple los requisitos específicos de personalización de pijamas.</li>
+                 <li style="padding-left: 10px; margin-bottom: 0.5em;">Confirmar la viabilidad de integrar con el <span class="highlight">fabricante deseado</span> (ej. PrintDoors) vía API o OrderDesk.</li>
+                 <li style="padding-left: 10px; margin-bottom: 0.5em;">Seleccionar la ruta (Plataforma vs. Modular) basada en la evaluación, presupuesto y tiempo.</li>
+             </ol>
+        </section>
+
+        <!-- Slide 9: Conclusion -->
+        <section class="slide">
+            <h2>Conclusión</h2>
+            <p>Existen múltiples plataformas viables para habilitar el modelo de negocio D2C de ropa personalizada. La elección dependerá del balance entre <span class="highlight">funcionalidades listas para usar</span>, <span class="highlight">necesidades de personalización</span>, <span class="highlight">presupuesto</span> y <span class="highlight">estrategia de producción</span> (interna vs. externa).</p>
+            <p>Se recomienda empezar con una plataforma especializada (<span class="highlight">DecoNetwork, InkSoft, OnPrintShop</span>) para acelerar el lanzamiento, abordando las brechas mediante integraciones o configuración. Una solución modular ofrece más flexibilidad a largo plazo pero requiere más esfuerzo inicial.</p>
+            <div class="card" style="background-color: var(--highlight-bg); border-color: var(--primary-color);">
+                 <h3 style="color: var(--primary-color);">Enfoque Clave</h3>
+                 <p style="color: var(--text-color);">Priorizar una solución que ofrezca una <span style="font-weight: 600;">excelente experiencia de diseño para el usuario final</span> y un <span style="font-weight: 600;">flujo de trabajo eficiente</span> desde el pedido hasta la entrega, ya sea mediante una plataforma integrada o una combinación bien orquestada de herramientas.</p>
+             </div>
+        </section>
+
+    </div>
+
+</body>
+</html>

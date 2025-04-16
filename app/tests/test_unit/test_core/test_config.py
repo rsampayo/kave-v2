@@ -3,6 +3,8 @@
 import os
 from unittest.mock import patch
 
+import pytest
+
 from app.core.config import Settings
 
 
@@ -56,15 +58,13 @@ def test_validate_db_url_postgresql() -> None:
 
 
 def test_validate_db_url_unchanged() -> None:
-    """Test database URL validation for non-PostgreSQL URLs."""
-    # Create a test URL that shouldn't be changed
+    """Test database URL validation for SQLite URLs."""
+    # Create a test URL that should be rejected
     sqlite_url = "sqlite:///./test.db"
 
-    # Validate URL using the classmethod directly
-    result = Settings.validate_db_url(sqlite_url)
-
-    # Verify URL remains unchanged
-    assert result == sqlite_url
+    # Validate URL using the classmethod directly - should raise ValueError
+    with pytest.raises(ValueError, match="SQLite database is not supported"):
+        Settings.validate_db_url(sqlite_url)
 
 
 def test_get_webhook_url_property() -> None:

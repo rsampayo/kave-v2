@@ -140,21 +140,31 @@ async def test_webhook_e2e_invalid_signature(
     # GIVEN
     webhook_payload = create_test_webhook_payload()
 
-    # WHEN - Send a POST request to the webhook endpoint
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        response = await client.post(
-            "/v1/webhooks/mandrill",
-            json=webhook_payload,
-            headers={"X-Mailchimp-Signature": "invalid_signature"},
-        )
+    # Mock the validation settings to accept invalid signatures
+    with (
+        mock.patch(
+            "app.core.config.settings.MAILCHIMP_REJECT_UNVERIFIED_TESTING", False
+        ),
+        mock.patch("app.core.config.settings.API_ENV", "development"),
+        mock.patch(
+            "app.integrations.email.client.WebhookClient.identify_organization_by_signature",
+            return_value=(None, False),  # Return no org and not verified
+        ),
+    ):
+        # WHEN - Send a POST request to the webhook endpoint
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post(
+                "/v1/webhooks/mandrill",
+                json=webhook_payload,
+                headers={"X-Mailchimp-Signature": "invalid_signature"},
+            )
 
-    # THEN - Check that the request was processed successfully despite invalid signature
-    assert response.status_code == 202  # Accepted
-    # Use explicit string literal and cast the result
-    status_value = response.json()["status"]  # type: ignore
-    assert "success" in status_value
+        # THEN - With invalid signature, we should get a 202 status code but an error in the response
+        assert response.status_code == 202  # Accepted
+        status_value = response.json()["status"]  # type: ignore
+        assert "error" in status_value
 
 
 @pytest.mark.asyncio

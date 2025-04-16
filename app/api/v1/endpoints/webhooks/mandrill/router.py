@@ -250,7 +250,7 @@ def _handle_special_webhooks(
                 "status": "success",
                 "message": "Ping acknowledged",
             },
-            status_code=status.HTTP_200_OK,
+            status_code=status.HTTP_202_ACCEPTED,
         )
 
     return None

@@ -18,9 +18,7 @@ async def test_engine_configuration() -> None:
     assert engine is not None
 
     # The internal SQL dialect object should reflect the proper driver
-    assert "sqlite+aiosqlite" in str(engine.url) or "postgresql+asyncpg" in str(
-        engine.url
-    )
+    assert "postgresql+asyncpg" in str(engine.url)
 
 
 @pytest.mark.asyncio

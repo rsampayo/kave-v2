@@ -135,10 +135,10 @@ class Settings(BaseSettings):
         if db_url.startswith("postgres://"):
             db_url = db_url.replace("postgres://", "postgresql://", 1)
 
-        # Prevent using SQLite in production environments
-        if self.API_ENV == "production" and db_url.startswith("sqlite://"):
+        # Prevent using SQLite in any environment - PostgreSQL only
+        if db_url.startswith("sqlite://"):
             raise ValueError(
-                "SQLite database is not supported in production environment. "
+                "SQLite database is not supported. "
                 "Please configure a PostgreSQL database using DATABASE_URL."
             )
 
@@ -149,18 +149,26 @@ class Settings(BaseSettings):
     def validate_db_url(cls, v: str) -> str:
         """Validate and normalize the database URL.
 
-        This ensures SQLite URLs are prefixed with 'sqlite:///' if not already,
-        and validates PostgreSQL URLs.
+        This ensures PostgreSQL URLs are properly formatted.
+        SQLite URLs are not supported.
         """
         if v.startswith("postgres://"):
             v = v.replace("postgres://", "postgresql://", 1)
+
+        # Prevent using SQLite in any environment
+        if v.startswith("sqlite://"):
+            raise ValueError(
+                "SQLite database is not supported. "
+                "Please configure a PostgreSQL database using DATABASE_URL."
+            )
+
         return v
 
 
 # settings will be initialized from environment variables or .env file
 settings = Settings(
     SECRET_KEY="insecure-test-key-if-missing-in-env",
-    DATABASE_URL="sqlite:///./test.db",
+    DATABASE_URL="postgresql://rsampayo:postgres@localhost:5432/kave_dev",
     MAILCHIMP_API_KEY="mailchimp-key-if-missing-in-env",
     MAILCHIMP_WEBHOOK_SECRET="webhook-secret-if-missing-in-env",
 )

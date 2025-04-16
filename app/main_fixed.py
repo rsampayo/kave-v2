@@ -1,15 +1,13 @@
-"""Main FastAPI application module."""
+"""Main FastAPI application module with improved lifespan error handling."""
 
 import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import IntegrityError
 
 from app.api.v1 import api_v1_router
@@ -46,11 +44,10 @@ signature_logger.propagate = False  # Prevent duplicate logs
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Lifespan events for the FastAPI application.
+    """Lifespan events for the FastAPI application with improved error handling.
 
-    Handles startup and shutdown events.
-    Note: Database schema should be managed through Alembic migrations
-    before application startup.
+    Handles startup and shutdown events, including proper handling of
+    asyncio.CancelledError which can occur during uvicorn shutdown.
     """
     # Startup
     logger.info("Application starting up")
@@ -84,7 +81,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # Re-raise to let uvicorn handle it properly
         raise
     finally:
-        # Shutdown: Close database connections in finally block to ensure it runs
+        # Shutdown: Close database connections
+        # This will run regardless of normal exit or cancellation
         try:
             logger.info("Application shutdown - cleaning up resources")
             from app.db.session import engine
@@ -116,10 +114,6 @@ def create_application() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-    # Mount static files directory
-    static_dir = Path(__file__).parent / "static"
-    app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
 
     # Add global exception handlers
     @app.exception_handler(IntegrityError)

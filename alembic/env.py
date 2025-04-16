@@ -78,19 +78,23 @@ async def run_migrations_online() -> None:
     # Handle the database URL for async connections
     db_url = settings.effective_database_url
 
-    # Prevent using SQLite in production
-    if settings.API_ENV == "production" and db_url.startswith("sqlite://"):
+    # Prevent using SQLite in any environment
+    if db_url.startswith("sqlite://"):
         raise ValueError(
-            "SQLite database is not supported in production environment. "
+            "SQLite database is not supported. "
             "Please configure a PostgreSQL database using DATABASE_URL."
         )
 
-    if db_url.startswith("sqlite://"):
-        db_url = db_url.replace("sqlite://", "sqlite+aiosqlite://")
-    elif db_url.startswith("postgres://"):
+    # Ensure postgresql dialect for postgres with asyncpg driver
+    if db_url.startswith("postgres://"):
         db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
     elif db_url.startswith("postgresql://"):
         db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    else:
+        raise ValueError(
+            "Unsupported database type. Only PostgreSQL is supported. "
+            "Please configure a PostgreSQL database using DATABASE_URL."
+        )
 
     # Create the async engine
     engine = create_async_engine(db_url)

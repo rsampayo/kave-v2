@@ -100,3 +100,4 @@ data/
 
 # Environment
 .env.postgres
+.env.backup

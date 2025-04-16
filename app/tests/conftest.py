@@ -1,45 +1,44 @@
 """Pytest configuration file for the FastAPI application tests."""
 
-# Force SQLite for all tests - patch applied before any imports
+# Force PostgreSQL for all tests - patch applied before any imports
+import logging
 import os
-
-# import sys  # Removing unused import
+from collections.abc import AsyncGenerator, Callable
+from datetime import datetime
+from typing import Any, cast
 from unittest import mock
 
-# Create test SQLite database path
-test_db_dir = os.path.join(os.path.dirname(__file__), "test_data")
-os.makedirs(test_db_dir, exist_ok=True)
-test_db_path = os.path.join(test_db_dir, "test.db")
-test_db_url = f"sqlite+aiosqlite:///{test_db_path}"
-
-# Patch the environment variable directly to ensure SQLite is used
-os.environ["DATABASE_URL"] = test_db_url
-
-import importlib  # noqa: E402
-import json  # noqa: E402
-from collections.abc import AsyncGenerator, Callable  # noqa: E402
-from datetime import datetime  # noqa: E402
-from typing import Any, cast  # noqa: E402
-
-import httpx  # noqa: E402
-import pytest  # noqa: E402
-import pytest_asyncio  # noqa: E402
-from fastapi import FastAPI  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
-from httpx import ASGITransport  # noqa: E402
-from sqlalchemy.ext.asyncio import (  # noqa: E402
+import httpx
+import importlib
+import json
+import pytest
+import pytest_asyncio
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from httpx import ASGITransport
+from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
+    async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import sessionmaker  # noqa: E402
-from sqlalchemy.pool import NullPool  # noqa: E402
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 
-from app.core.config import settings  # noqa: E402
-from app.db.session import Base  # noqa: E402
-from app.db.session_management import get_db  # noqa: E402
-from app.integrations.email.client import WebhookClient  # noqa: E402
-from app.main import create_application  # noqa: E402
+from app.core.config import settings
+from app.db.session import Base
+from app.db.session_management import get_db
+from app.integrations.email.client import WebhookClient
+from app.main import create_application
+
+# Create test PostgreSQL URL
+test_db_url = "postgresql://ramonsampayo:postgres@localhost:5432/kave_test"
+
+# Patch the environment variable directly to ensure PostgreSQL is used
+os.environ["DATABASE_URL"] = test_db_url
+
+# Setup logger for test configurations
+logger = logging.getLogger(__name__)
 
 
 # Custom JSON encoder to handle datetime objects
@@ -54,31 +53,29 @@ class CustomJSONEncoder(json.JSONEncoder):
 class TestDatabaseConfig:
     """Centralized test database configuration."""
 
-    # Test database URL (persistent file-based SQLite for tests)
-    TEST_DB_DIR = os.path.join(os.path.dirname(__file__), "test_data")
-    os.makedirs(TEST_DB_DIR, exist_ok=True)
-    TEST_DB_PATH = os.path.join(TEST_DB_DIR, "test.db")
-    TEST_DB_URL = f"sqlite+aiosqlite:///{TEST_DB_PATH}"
+    # Test database URL using PostgreSQL
+    TEST_DB_URL = "postgresql+asyncpg://rsampayo:postgres@localhost:5432/kave_test"
 
-    # Alternative in-memory database for isolated tests
-    MEMORY_DB_URL = "sqlite+aiosqlite:///:memory:"
+    # Alternative test database
+    ISOLATED_TEST_DB_URL = (
+        "postgresql+asyncpg://rsampayo:postgres@localhost:5432/kave_test_isolated"
+    )
 
     @classmethod
-    def get_engine(cls, memory_db: bool = False) -> AsyncEngine:
+    def get_engine(cls, isolated_db: bool = False) -> AsyncEngine:
         """Create an async engine with appropriate settings.
 
         Args:
-            memory_db: If True, use in-memory database for increased isolation
+            isolated_db: If True, use isolated database for increased isolation
 
         Returns:
             An async database engine
         """
-        # Always use SQLite for tests to avoid PostgreSQL connection issues
-        db_url = cls.MEMORY_DB_URL if memory_db else cls.TEST_DB_URL
+        # Always use PostgreSQL for tests
+        db_url = cls.ISOLATED_TEST_DB_URL if isolated_db else cls.TEST_DB_URL
         return create_async_engine(
             db_url,
             echo=False,
-            connect_args={"check_same_thread": False},
             # Disable connection pooling for tests to avoid connection reuse issues
             poolclass=NullPool,
             # Force close connections
@@ -130,39 +127,47 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     # Create a completely isolated engine for each test
     engine = TestDatabaseConfig.get_engine()
 
+    # Create session maker for AsyncSession with explicit connection parameters
+    async_session_maker = sessionmaker(
+        class_=AsyncSession,
+        autoflush=False,
+        autocommit=False,
+        expire_on_commit=False,
+    )
+    # Configure with engine
+    async_session_maker.configure(bind=engine)
+
+    # Create a session and cast to AsyncSession
+    session = cast(AsyncSession, async_session_maker())
+
     try:
-        # Create tables for this test
+        # Ensure tables exist but handle in a separate connection
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
-        # Create session maker for AsyncSession with explicit connection parameters
-        async_session_maker = sessionmaker(
-            class_=AsyncSession,
-            autoflush=False,
-            autocommit=False,
-            expire_on_commit=False,
-        )
-        # Configure with engine
-        async_session_maker.configure(bind=engine)
-
-        # Create a session and cast to AsyncSession
-        session = cast(AsyncSession, async_session_maker())
+        # Ensure we're starting with a clean session
+        if session.in_transaction():
+            await session.rollback()
 
         yield session
     finally:
         # Ensure session is properly closed
-        if session.in_transaction():
-            await session.rollback()  # No return value expected
-        await session.close()  # No return value expected
-        # Dispose engine to ensure connections are fully closed
-        await engine.dispose()
+        try:
+            if session.in_transaction():
+                await session.rollback()
+            await session.close()
+        except Exception as e:
+            logger.warning(f"Error during session cleanup: {e}")
+        finally:
+            # Dispose engine to ensure connections are fully closed
+            await engine.dispose()
 
 
 @pytest_asyncio.fixture
 async def isolated_db() -> AsyncGenerator[AsyncSession, None]:
     """Create an isolated in-memory database session for tests requiring full isolation."""
     # Create a completely isolated in-memory engine
-    isolated_engine = TestDatabaseConfig.get_engine(memory_db=True)
+    isolated_engine = TestDatabaseConfig.get_engine(isolated_db=True)
 
     # Create and initialize the schema
     async with isolated_engine.begin() as conn:
@@ -223,25 +228,28 @@ def mock_current_user() -> Any:
     return user
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="function")
 async def async_client(
     app: FastAPI, mock_current_user: Any
 ) -> AsyncGenerator[httpx.AsyncClient, None]:
     """Provide an AsyncClient instance for async endpoint testing."""
-    # Create an in-memory SQLite database for maximum isolation
-    memory_db_url = "sqlite+aiosqlite:///:memory:"
+    # Create an isolated PostgreSQL database for maximum isolation
+    isolated_test_db_url = (
+        "postgresql+asyncpg://rsampayo:postgres@localhost:5432/kave_test_isolated"
+    )
 
     # Create a dedicated engine for this test with connection pooling disabled
     engine = create_async_engine(
-        memory_db_url,
+        isolated_test_db_url,
         echo=False,
-        connect_args={"check_same_thread": False},
         poolclass=NullPool,
+        # Force close connections
+        isolation_level="AUTOCOMMIT",
     )
 
-    # Override settings to use our in-memory database
+    # Override settings to use our isolated PostgreSQL database
     original_db_url = settings.DATABASE_URL
-    settings.DATABASE_URL = memory_db_url
+    settings.DATABASE_URL = isolated_test_db_url
 
     # Override the get_db dependency to use our test session
     original_get_db = app.dependency_overrides.get(get_db)
@@ -252,36 +260,30 @@ async def async_client(
     original_get_current_user = app.dependency_overrides.get(get_current_active_user)
     app.dependency_overrides[get_current_active_user] = lambda: mock_current_user
 
-    # Track session for cleanup
-    test_session = None
+    # Create session maker for each request
+    test_async_session_maker = async_sessionmaker(
+        class_=AsyncSession,
+        autoflush=False,
+        autocommit=False,
+        expire_on_commit=False,
+        bind=engine,
+    )
 
     async def get_test_db():
         """Create a fresh session for each request in tests."""
-        nonlocal test_session
-
-        # Close any existing session
-        if test_session is not None:
-            if test_session.in_transaction():
-                await test_session.rollback()
-            await test_session.close()
-
-        # Create session maker for AsyncSession with explicit connection parameters
-        test_async_session_maker = sessionmaker(
-            class_=AsyncSession,
-            autoflush=False,
-            autocommit=False,
-            expire_on_commit=False,
-        )
-        # Configure with engine
-        test_async_session_maker.configure(bind=engine)
-        # Create a new session
-        test_session = cast(AsyncSession, test_async_session_maker())
+        # Create a new session for each request
+        session = test_async_session_maker()
 
         try:
-            yield test_session
+            yield session
         finally:
-            # We'll handle cleanup in the fixture teardown
-            pass
+            # Properly close session after each request
+            try:
+                if session.in_transaction():
+                    await session.rollback()
+                await session.close()
+            except Exception as e:
+                logger.warning(f"Error closing session: {e}")
 
     # Set up the override
     app.dependency_overrides[get_db] = get_test_db
@@ -297,12 +299,6 @@ async def async_client(
         ) as ac:
             yield ac
     finally:
-        # Clean up session if it exists
-        if test_session is not None:
-            if test_session.in_transaction():
-                await test_session.rollback()  # No return value expected
-            await test_session.close()  # No return value expected
-
         # Restore original dependency if there was one
         if original_get_db:
             app.dependency_overrides[get_db] = original_get_db
@@ -383,32 +379,19 @@ def async_mock_factory() -> Callable[[str], mock.AsyncMock]:
     return _create_async_mock
 
 
-# Patch the settings to use SQLite for tests
+# Patch the settings to use PostgreSQL for tests
 @pytest.fixture(scope="session", autouse=True)
 def patch_settings():
-    """Patch settings to use SQLite for tests."""
+    """Patch settings to use PostgreSQL for tests."""
     # Save original values
     original_db_url = settings.DATABASE_URL
 
-    # Set SQLite URL for testing
-    test_db_dir = os.path.join(os.path.dirname(__file__), "test_data")
-    os.makedirs(test_db_dir, exist_ok=True)
-    test_db_path = os.path.join(test_db_dir, "test.db")
-    test_db_url = f"sqlite+aiosqlite:///{test_db_path}"
+    # Set PostgreSQL URL for testing
+    test_db_url = "postgresql://rsampayo:postgres@localhost:5432/kave_test"
 
-    # Verify we're using SQLite - if not, set it
-    if not settings.DATABASE_URL.startswith("sqlite+aiosqlite://"):
+    # Verify we're using PostgreSQL - if not, set it
+    if not settings.DATABASE_URL.startswith("postgresql+asyncpg://"):
         settings.DATABASE_URL = test_db_url
-
-    # Ensure the database directory exists
-    os.makedirs(os.path.dirname(test_db_path), exist_ok=True)
-
-    # Reset the SQLite database
-    if os.path.exists(test_db_path):
-        try:
-            os.unlink(test_db_path)
-        except (OSError, PermissionError):
-            pass  # Ignore if we can't delete it
 
     # Yield to allow tests to run
     yield

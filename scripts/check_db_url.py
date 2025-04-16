@@ -19,13 +19,13 @@ try:
     print(f"KAVE_DATABASE_URL: {settings.KAVE_DATABASE_URL}")
     print(f"effective_database_url: {settings.effective_database_url}")
 
-    # Check if DB URL starts with sqlite or postgresql
-    if settings.effective_database_url.startswith("sqlite"):
-        print("WARNING: Using SQLite database!")
-    elif settings.effective_database_url.startswith("postgresql"):
+    # Check if DB URL starts with postgresql
+    if settings.effective_database_url.startswith("postgresql"):
         print("SUCCESS: Using PostgreSQL database!")
     else:
-        print(f"UNKNOWN DB TYPE: {settings.effective_database_url[:20]}...")
+        print("ERROR: Unsupported database type. Only PostgreSQL is supported.")
+        sys.exit(1)
 
 except Exception as e:
     print(f"ERROR: {str(e)}")
+    sys.exit(1)
