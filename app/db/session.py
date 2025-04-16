@@ -17,7 +17,7 @@ from app.core.config import settings
 Base = declarative_base()
 
 # Database configuration
-DATABASE_URL = settings.DATABASE_URL
+DATABASE_URL = settings.effective_database_url
 
 # Ensure the aiosqlite dialect for SQLite
 if DATABASE_URL.startswith("sqlite://"):

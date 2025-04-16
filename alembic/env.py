@@ -21,7 +21,7 @@ from app.db.session import Base  # Your SQLAlchemy Base
 config = context.config
 
 # Override the sqlalchemy.url with our app's DATABASE_URL
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+config.set_main_option("sqlalchemy.url", settings.effective_database_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -77,7 +77,7 @@ async def run_migrations_online() -> None:
     and associate a connection with the context.
     """
     # Handle the database URL for async connections
-    db_url = settings.DATABASE_URL
+    db_url = settings.effective_database_url
     if db_url.startswith("sqlite://"):
         db_url = db_url.replace("sqlite://", "sqlite+aiosqlite://")
     elif db_url.startswith("postgres://"):

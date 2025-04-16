@@ -4,6 +4,7 @@ This module defines the application settings and configuration options
 using Pydantic's BaseSettings for environment variable loading.
 """
 
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -40,6 +41,7 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str
+    KAVE_DATABASE_URL: Optional[str] = None
     SQL_ECHO: bool = False
 
     # MailChimp
@@ -75,12 +77,12 @@ class Settings(BaseSettings):
 
     @property
     def is_production_environment(self) -> bool:
-        """Determine if we're running in a production environment.
+        """Return True if the environment is configured for production.
 
         Returns:
-            bool: True if in production or staging
+            bool: True for production, False otherwise
         """
-        return self.API_ENV in ("production", "staging")
+        return self.MAILCHIMP_WEBHOOK_ENVIRONMENT.lower() == "production"
 
     @property
     def should_reject_unverified(self) -> bool:
@@ -95,7 +97,7 @@ class Settings(BaseSettings):
 
     @property
     def get_webhook_url(self) -> str:
-        """Get the full webhook URL for the current environment.
+        """Get the complete webhook URL for the current environment.
 
         Returns:
             str: The complete webhook URL for the current environment
@@ -116,6 +118,25 @@ class Settings(BaseSettings):
             return base_url
 
         return f"{base_url}{path}"
+
+    @property
+    def effective_database_url(self) -> str:
+        """Get the effective database URL, prioritizing KAVE_DATABASE_URL if set.
+        
+        This is critical for Heroku deployments where DATABASE_URL may be overridden
+        by a custom configuration.
+        
+        Returns:
+            str: The validated and normalized database URL to use
+        """
+        # Use KAVE_DATABASE_URL if set (contains Heroku's DATABASE_URL)
+        db_url = self.KAVE_DATABASE_URL or self.DATABASE_URL
+        
+        # Apply validation
+        if db_url.startswith("postgres://"):
+            db_url = db_url.replace("postgres://", "postgresql://", 1)
+            
+        return db_url
 
     @classmethod
     @field_validator("DATABASE_URL")
