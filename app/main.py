@@ -56,9 +56,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         logger.info("Initializing application data")
         # Get a database session
-        from app.db.session import async_session
+        from app.db.session import async_session_factory
 
-        async with async_session() as db:
+        async with async_session_factory() as db:
             init_service = InitializationService(db)
             await init_service.initialize()
             logger.info("Application data initialization completed")
