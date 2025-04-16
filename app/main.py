@@ -1,4 +1,4 @@
-"""Main FastAPI application module."""
+"""Main FastAPI application module with improved lifespan error handling."""
 
 import asyncio
 import logging
@@ -46,9 +46,10 @@ signature_logger.propagate = False  # Prevent duplicate logs
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Lifespan events for the FastAPI application.
+    """Lifespan events for the FastAPI application with improved error handling.
 
-    Handles startup and shutdown events.
+    Handles startup and shutdown events, including proper handling of
+    asyncio.CancelledError which can occur during uvicorn shutdown.
     Note: Database schema should be managed through Alembic migrations
     before application startup.
     """
@@ -84,7 +85,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # Re-raise to let uvicorn handle it properly
         raise
     finally:
-        # Shutdown: Close database connections in finally block to ensure it runs
+        # Shutdown: Close database connections
+        # This will run regardless of normal exit or cancellation
         try:
             logger.info("Application shutdown - cleaning up resources")
             from app.db.session import engine
