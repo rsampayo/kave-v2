@@ -9,6 +9,7 @@ Create Date: 2025-04-15 16:18:41.381596
 from typing import Sequence, Union
 
 import sqlalchemy as sa
+from sqlalchemy.exc import OperationalError
 
 from alembic import op
 
@@ -21,15 +22,37 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    op.create_unique_constraint(
-        "uq_organizations_mandrill_webhook_secret",
-        "organizations",
-        ["mandrill_webhook_secret"],
-    )
+    # Check current dialect
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    dialect = inspector.dialect.name
+    
+    # Only apply this migration for PostgreSQL, skip for SQLite
+    if dialect == "postgresql":
+        try:
+            op.create_unique_constraint(
+                "uq_organizations_mandrill_webhook_secret",
+                "organizations",
+                ["mandrill_webhook_secret"],
+            )
+        except (sa.exc.ProgrammingError, OperationalError):
+            # Constraint might already exist
+            pass
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_constraint(
-        "uq_organizations_mandrill_webhook_secret", "organizations", type_="unique"
-    )
+    # Check current dialect
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    dialect = inspector.dialect.name
+    
+    # Only apply this migration for PostgreSQL, skip for SQLite
+    if dialect == "postgresql":
+        try:
+            op.drop_constraint(
+                "uq_organizations_mandrill_webhook_secret", "organizations", type_="unique"
+            )
+        except (sa.exc.ProgrammingError, OperationalError):
+            # Constraint might not exist
+            pass
