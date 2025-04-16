@@ -1,6 +1,8 @@
 """Pytest configuration file for the FastAPI application tests."""
 
 # Force PostgreSQL for all tests - patch applied before any imports
+import importlib
+import json
 import logging
 import os
 from collections.abc import AsyncGenerator, Callable
@@ -9,8 +11,6 @@ from typing import Any, cast
 from unittest import mock
 
 import httpx
-import importlib
-import json
 import pytest
 import pytest_asyncio
 from fastapi import FastAPI
