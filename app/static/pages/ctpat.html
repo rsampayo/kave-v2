@@ -1,0 +1,699 @@
+Okay, entendido. He recopilado toda la información sobre CTPAT, OEA, sus beneficios, requisitos, y cómo la plataforma Naviio puede ayudar a los transportistas mexicanos a cumplir con estas certificaciones.
+
+Ahora procederé a generar la presentación completa en un único archivo HTML, siguiendo estrictamente las directrices de la plantilla "DAT Evolución". La presentación estará diseñada para educar a tu Director Comercial y destacar el valor de Naviio en este contexto.
+
+Aquí tienes la presentación:
+
+```html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTPAT, OEA y el Rol Estratégico de Naviio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #007AFF;
+            --text-color: #1d1d1f;
+            --secondary-text-color: #6e6e73;
+            --background-color: #f5f5f7;
+            --card-background: #ffffff;
+            --border-color: #d2d2d7;
+            --slide-padding: 4rem;
+            --max-width: 1100px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            scroll-snap-type: y mandatory;
+             overflow-y: scroll; /* Ensure scrollbar is always present to avoid layout shifts */
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .presentation-container {
+            width: 100%;
+            height: 100vh; /* Use viewport height for snapping container */
+            overflow-y: scroll; /* Enable scrolling for the container */
+            scroll-snap-type: y mandatory; /* Snap scrolling on the container */
+        }
+
+
+        .slide {
+            min-height: 100vh; /* Ensure slides take full viewport height */
+            width: 100%;
+            padding: var(--slide-padding);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--background-color);
+            scroll-snap-align: start; /* Snap alignment */
+            position: relative; /* For absolute positioning of slide numbers */
+        }
+
+        .slide:last-child {
+            border-bottom: none;
+        }
+
+        .slide-content {
+            max-width: var(--max-width);
+            width: 100%;
+            text-align: left; /* Default text alignment for content */
+        }
+
+        .slide.title-slide {
+            background-color: var(--card-background); /* White background for title */
+        }
+
+        .slide.title-slide .slide-content {
+             text-align: center; /* Center title slide content */
+        }
+
+        .slide-number {
+            position: absolute;
+            bottom: 1rem;
+            right: 1.5rem;
+            font-size: 0.8rem;
+            color: var(--secondary-text-color);
+        }
+
+        h1, h2, h3, h4 {
+            color: var(--text-color);
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+
+        h1 {
+            font-size: 3rem; /* 48px */
+            line-height: 1.2;
+            margin-bottom: 1.5rem;
+        }
+
+        h2 {
+            font-size: 2rem; /* 32px */
+            line-height: 1.3;
+            margin-bottom: 1rem;
+            color: var(--primary-color); /* Highlight section titles */
+        }
+
+        h3 {
+            font-size: 1.5rem; /* 24px */
+            line-height: 1.4;
+            font-weight: 500;
+        }
+
+        h4 {
+            font-size: 1.125rem; /* 18px */
+            line-height: 1.5;
+            font-weight: 500;
+            color: var(--secondary-text-color);
+        }
+
+        p {
+            font-size: 1rem; /* 16px */
+            color: var(--secondary-text-color);
+            margin-bottom: 1rem;
+            max-width: 75ch; /* Improve readability */
+        }
+
+        ul {
+            list-style-position: outside;
+            margin-left: 1.5rem;
+            margin-bottom: 1rem;
+            text-align: left;
+        }
+
+        li {
+            font-size: 1rem;
+            color: var(--secondary-text-color);
+            margin-bottom: 0.5rem;
+            padding-left: 0.5rem;
+        }
+
+        li::marker {
+            color: var(--primary-color);
+        }
+
+        strong, .highlight {
+            font-weight: 500;
+            color: var(--text-color); /* Make highlighted text slightly darker */
+        }
+
+        .highlight.primary {
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+
+        .card-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+            width: 100%;
+        }
+
+        .card {
+            background-color: var(--card-background);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            text-align: left;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+
+        .card:hover {
+           transform: translateY(-5px);
+           box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .card h3 {
+            font-size: 1.25rem; /* 20px */
+            color: var(--primary-color);
+            margin-bottom: 0.75rem;
+        }
+         .card h4 {
+            font-size: 1.1rem;
+            color: var(--text-color);
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .card p {
+            font-size: 0.95rem;
+            color: var(--secondary-text-color);
+            margin-bottom: 0; /* Reset margin for paragraph inside card */
+        }
+        .card ul {
+             margin-left: 1.2rem;
+             margin-bottom: 0;
+        }
+         .card li {
+            font-size: 0.95rem;
+            color: var(--secondary-text-color);
+            margin-bottom: 0.3rem;
+         }
+
+        /* Workflow Visualization - Kept simple for this context */
+        .workflow-viz-container {
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 2rem;
+            width: 100%;
+            padding: 1rem 0;
+            position: relative;
+        }
+
+        .workflow-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: 1rem;
+            background-color: var(--card-background);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            min-width: 150px;
+            flex: 1;
+            position: relative;
+        }
+
+        .workflow-step h4 {
+             font-size: 1rem;
+             margin-bottom: 0.5rem;
+             color: var(--primary-color);
+        }
+
+        .workflow-step p {
+            font-size: 0.85rem;
+            color: var(--secondary-text-color);
+             margin-bottom: 0;
+        }
+
+         /* Add simple connectors (optional, can be enhanced with JS/SVG) */
+        .workflow-step:not(:last-child)::after {
+            content: '→';
+            position: absolute;
+            right: -20px; /* Adjust as needed */
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.5rem;
+            color: var(--primary-color);
+            display: none; /* Hide by default, enable if needed */
+        }
+
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            :root {
+                 --slide-padding: 2rem;
+            }
+            h1 {
+                font-size: 2.25rem; /* 36px */
+            }
+            h2 {
+                font-size: 1.75rem; /* 28px */
+            }
+            h3 {
+                font-size: 1.25rem; /* 20px */
+            }
+            p, li {
+                font-size: 0.95rem; /* ~15px */
+            }
+            .card-container {
+                 grid-template-columns: 1fr; /* Stack cards on smaller screens */
+            }
+             .workflow-viz-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+             .workflow-step:not(:last-child)::after {
+                 display: none; /* Hide arrows in column layout */
+            }
+             .slide-number {
+                font-size: 0.7rem;
+                bottom: 0.5rem;
+                right: 0.8rem;
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="presentation-container">
+
+    <!-- Slide 1: Title Slide -->
+    <section class="slide title-slide">
+        <div class="slide-content">
+            <h1>CTPAT y OEA: Oportunidades Estratégicas para Transportistas</h1>
+            <h4>Cómo <span class="highlight primary">Naviio ERP/TMS</span> Facilita el Cumplimiento y Abre Mercados</h4>
+            <p>Una guía para el equipo comercial</p>
+        </div>
+         <div class="slide-number">1</div>
+    </section>
+
+    <!-- Slide 2: Agenda -->
+    <section class="slide">
+        <div class="slide-content">
+            <h2>Agenda</h2>
+            <ul>
+                <li>Contexto: ¿Por qué CTPAT y OEA son relevantes ahora?</li>
+                <li>Entendiendo CTPAT: Definición, Objetivos y Beneficios Clave.</li>
+                <li>Entendiendo OEA: Definición, Objetivos y Beneficios Clave (Incluyendo ARM).</li>
+                <li>CTPAT vs. OEA: Clarificando la Relación y Sinergias.</li>
+                <li>La Perspectiva del Transportista Mexicano: ¿Por qué certificarse?</li>
+                <li>La Perspectiva del Cliente: ¿Por qué lo exigen?</li>
+                <li>El Camino a la Certificación: Requisitos y Proceso.</li>
+                <li><span class="highlight primary">El Rol de Naviio</span>: Facilitando el Cumplimiento.</li>
+                <li>Argumentos de Venta: Posicionando Naviio.</li>
+                <li>Preguntas y Respuestas (FAQ).</li>
+            </ul>
+        </div>
+         <div class="slide-number">2</div>
+    </section>
+
+    <!-- Slide 3: Contexto -->
+    <section class="slide">
+        <div class="slide-content">
+            <h2>Contexto: ¿Por Qué Ahora?</h2>
+            <p>Nuestros clientes, transportistas mexicanos que operan en la frontera y cruzan a EE.UU., enfrentan un entorno cada vez más exigente en términos de <span class="highlight">seguridad</span> y <span class="highlight">eficiencia</span> en la cadena de suministro.</p>
+            <p>Las certificaciones <strong class="highlight primary">CTPAT</strong> y <strong class="highlight primary">OEA</strong> se están convirtiendo en un estándar de facto y una ventaja competitiva crucial.</p>
+            <div class="card-container">
+                <div class="card">
+                    <h4>Demanda del Cliente</h4>
+                    <p>Importadores y manufactureros (especialmente en EE.UU.) priorizan o exigen trabajar con transportistas certificados para asegurar sus propias cadenas y reducir riesgos.</p>
+                </div>
+                <div class="card">
+                    <h4>Eficiencia Operativa</h4>
+                    <p>Los beneficios como cruces fronterizos más rápidos (carriles FAST) y menos inspecciones impactan directamente la rentabilidad del transportista.</p>
+                </div>
+                 <div class="card">
+                    <h4>Ventaja Competitiva</h4>
+                    <p>Estar certificado diferencia a nuestros clientes de la competencia y les abre puertas a mejores contratos y relaciones comerciales.</p>
+                </div>
+            </div>
+             <p style="margin-top: 2rem;">Entender estas certificaciones es clave para posicionar <strong class="highlight primary">Naviio</strong> como la herramienta indispensable para lograrlas.</p>
+        </div>
+         <div class="slide-number">3</div>
+    </section>
+
+    <!-- Slide 4: Understanding CTPAT -->
+    <section class="slide">
+        <div class="slide-content">
+            <h2>Entendiendo CTPAT</h2>
+            <h4>Customs Trade Partnership Against Terrorism</h4>
+            <p>Es un programa <strong class="highlight">voluntario</strong> de la <strong class="highlight">Aduana y Protección Fronteriza de Estados Unidos (CBP)</strong>, creado post 9/11.</p>
+            <p><strong class="highlight">Objetivo Principal:</strong> Fortalecer la seguridad de las cadenas de suministro internacionales contra el terrorismo, mediante la colaboración entre la CBP y las empresas.</p>
+
+            <div class="card-container">
+                <div class="card">
+                    <h3>Beneficios Clave (EE.UU.)</h3>
+                    <ul>
+                        <li><strong class="highlight">Procesamiento Acelerado:</strong> Cruces más rápidos en aduanas de EE.UU.</li>
+                        <li><strong class="highlight">Menos Inspecciones:</strong> Reducción significativa de inspecciones físicas y documentales por CBP.</li>
+                        <li><strong class="highlight">Carriles FAST:</strong> Acceso a carriles exclusivos en fronteras terrestres (México/Canadá).</li>
+                        <li><strong>Prioridad:</strong> Atención prioritaria si ocurre una inspección.</li>
+                        <li><strong>Confianza:</strong> Reconocimiento como socio comercial de bajo riesgo para CBP.</li>
+                         <li><strong>Continuidad:</strong> Prioridad en reanudación de operaciones post-emergencias.</li>
+                    </ul>
+                </div>
+                 <div class="card">
+                     <h3>¿Cómo Funciona?</h3>
+                     <p>1. Las empresas (transportistas, importadores, etc.) implementan medidas de seguridad específicas (Criterios Mínimos de Seguridad - MSC).</p>
+                     <p>2. Presentan un Perfil de Seguridad detallado a la CBP.</p>
+                     <p>3. La CBP revisa y realiza una validación (auditoría de seguridad) en las instalaciones.</p>
+                     <p>4. Si cumplen, son certificados y obtienen los beneficios.</p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-number">4</div>
+    </section>
+
+    <!-- Slide 5: Understanding OEA -->
+    <section class="slide">
+        <div class="slide-content">
+            <h2>Entendiendo OEA</h2>
+            <h4>Operador Económico Autorizado</h4>
+            <p>Es un concepto <strong class="highlight">internacional</strong> promovido por la <strong class="highlight">Organización Mundial de Aduanas (OMA)</strong> (Marco SAFE).</p>
+            <p><strong class="highlight">Objetivo Principal:</strong> Asegurar la cadena de suministro internacional <span class="highlight">Y</span> facilitar el comercio legítimo. A menudo incluye seguridad, cumplimiento aduanero/fiscal y solvencia.</p>
+            <p><strong class="highlight">Implementación:</strong> Cada país (ej. <strong class="highlight primary">México</strong> a través de SAT/ANAM) tiene su propio programa OEA basado en estándares OMA.</p>
+
+            <div class="card-container">
+                <div class="card">
+                    <h3>Beneficios Clave (Principalmente en el País Emisor, ej. México)</h3>
+                     <ul>
+                        <li><strong class="highlight">Agilización Aduanera:</strong> Potencial procesamiento más rápido y menos inspecciones por la autoridad local (ANAM en México).</li>
+                        <li><strong>Simplificaciones:</strong> Posibles facilidades en trámites aduaneros mexicanos.</li>
+                        <li><strong>Confianza Local:</strong> Reconocimiento como socio confiable por SAT/ANAM.</li>
+                        <li><strong class="highlight primary">Reconocimiento Mutuo (ARM):</strong> ¡Muy importante! Programas OEA de diferentes países pueden reconocerse mutuamente.</li>
+                     </ul>
+                </div>
+                 <div class="card">
+                     <h3>Acuerdos de Reconocimiento Mutuo (ARM)</h3>
+                     <p>México y EE.UU. tienen un ARM. Esto significa:</p>
+                     <ul>
+                         <li>La certificación OEA de México es reconocida por CTPAT (EE.UU.).</li>
+                         <li>La certificación CTPAT es reconocida por OEA (México).</li>
+                     </ul>
+                     <p>Esto <strong class="highlight">refuerza</strong> el estatus de bajo riesgo y puede potenciar beneficios, PERO no reemplaza la necesidad de cada certificación para obtener los beneficios directos en cada país.</p>
+                 </div>
+            </div>
+        </div>
+        <div class="slide-number">5</div>
+    </section>
+
+     <!-- Slide 6: CTPAT vs OEA Clarified -->
+    <section class="slide">
+        <div class="slide-content">
+            <h2>CTPAT vs. OEA: Clarificación Crucial</h2>
+            <p>Son <strong class="highlight primary">dos certificaciones distintas</strong>, tramitadas por separado ante autoridades diferentes.</p>
+
+            <div class="card-container">
+                <div class="card">
+                    <h3>CTPAT (EE.UU. - CBP)</h3>
+                    <ul>
+                        <li><strong class="highlight">Enfoque:</strong> Seguridad anti-terrorismo.</li>
+                        <li><strong class="highlight">Beneficios Principales:</strong> Ocurren en <strong class="highlight">EE.UU.</strong> (Carriles FAST, menos inspecciones CBP).</li>
+                        <li><strong class="highlight">¿Necesario para Cruce Eficiente a EE.UU.?:</strong> <strong class="highlight primary">Sí</strong>, es la clave para los beneficios operativos directos en la frontera estadounidense.</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>OEA (México - SAT/ANAM)</h3>
+                     <ul>
+                        <li><strong class="highlight">Enfoque:</strong> Seguridad + Cumplimiento Aduanero/Fiscal + Solvencia.</li>
+                        <li><strong class="highlight">Beneficios Principales:</strong> Ocurren en <strong class="highlight">México</strong> (Menos inspecciones ANAM, facilidades SAT).</li>
+                        <li><strong class="highlight">¿Otorga Carriles FAST en EE.UU.?:</strong> <strong class="highlight primary">No directamente.</strong> Los beneficios CTPAT requieren la certificación CTPAT.</li>
+                    </ul>
+                </div>
+            </div>
+
+             <h3 style="margin-top: 2rem; text-align: center;">¿Tener Solo OEA da Beneficios CTPAT?</h3>
+             <p style="text-align: center;"><strong class="highlight primary">No.</strong> Para obtener los beneficios operativos clave en EE.UU. (FAST, reducción significativa de inspecciones CBP), se necesita la certificación CTPAT. El ARM refuerza el perfil, pero no sustituye la membresía directa.</p>
+
+             <h3 style="margin-top: 1rem; text-align: center;">El Escenario Ideal para Transportistas Fronterizos:</h3>
+             <p style="text-align: center;"><strong class="highlight primary">¡Obtener AMBAS Certificaciones!</strong> Maximiza beneficios en ambos lados de la frontera y aprovecha al máximo el ARM.</p>
+
+        </div>
+         <div class="slide-number">6</div>
+    </section>
+
+    <!-- Slide 7: Why Carriers NEED This -->
+    <section class="slide">
+        <div class="slide-content">
+            <h2>¿Por Qué un Transportista Mexicano (Fronterizo) Necesita Estas Certificaciones?</h2>
+            <p>Para un transportista cruzando a EE.UU., CTPAT (y OEA como complemento) es una <strong class="highlight">inversión estratégica</strong>, no un gasto.</p>
+
+            <div class="card-container">
+                <div class="card">
+                    <h3>1. Agilidad Fronteriza (CTPAT)</h3>
+                    <p>Acceso a <strong class="highlight primary">Carriles FAST</strong> = Menos tiempo en fila = Más viajes = Más ingresos.</p>
+                     <p>Procesamiento expedito por CBP.</p>
+                </div>
+                 <div class="card">
+                    <h3>2. Menos Inspecciones (CTPAT/OEA)</h3>
+                    <p>Reducción <strong class="highlight primary">significativa</strong> de inspecciones CBP (CTPAT).</p>
+                    <p>Potencial reducción de inspecciones ANAM (OEA).</p>
+                    <p>Menos retrasos, menos riesgo de daños.</p>
+                </div>
+                 <div class="card">
+                    <h3>3. Ventaja Competitiva</h3>
+                    <p>Clientes (importadores/manufactureros) <strong class="highlight primary">prefieren o exigen</strong> transportistas certificados.</p>
+                     <p>Abre puertas a contratos más grandes.</p>
+                </div>
+                <div class="card">
+                    <h3>4. Mayor Seguridad Propia</h3>
+                     <p>Implementar los estándares protege activos, personal y carga contra robos y contaminación.</p>
+                </div>
+                 <div class="card">
+                    <h3>5. Mejor Relación con Aduanas</h3>
+                    <p>Posiciona como socio confiable para CBP (CTPAT) y SAT/ANAM (OEA).</p>
+                 </div>
+                 <div class="card">
+                    <h3>6. Continuidad y Confianza</h3>
+                    <p>Prioridad en reaperturas fronterizas (CTPAT).</p>
+                    <p>El ARM (con ambas) refuerza el estatus de bajo riesgo global.</p>
+                </div>
+            </div>
+        </div>
+         <div class="slide-number">7</div>
+    </section>
+
+    <!-- Slide 8: Why CLIENTS Demand This -->
+    <section class="slide">
+        <div class="slide-content">
+            <h2>¿Por Qué los Clientes del Transportista Exigen CTPAT/OEA?</h2>
+            <p>Entender la perspectiva del cliente final (importador/manufacturero) es clave para nuestra venta.</p>
+             <div class="card-container">
+                <div class="card">
+                    <h3>Cumplimiento Propio (CTPAT)</h3>
+                     <p>Si el cliente es miembro CTPAT, está <strong class="highlight">obligado</strong> a usar socios comerciales (transportistas) que cumplan los estándares. Contratar certificados es la forma más fácil.</p>
+                </div>
+                 <div class="card">
+                    <h3>Reducción de Riesgos</h3>
+                     <p>Un transportista certificado representa <strong class="highlight primary">menor riesgo</strong> para su cadena: menos retrasos por inspección, menor probabilidad de contaminación o robo de su carga.</p>
+                </div>
+                <div class="card">
+                    <h3>Eficiencia y Predictibilidad</h3>
+                    <p>Saben que la carga cruzará <strong class="highlight primary">más rápido</strong> y con menos variabilidad, optimizando sus inventarios (Just-in-Time) y planificación.</p>
+                </div>
+                 <div class="card">
+                    <h3>Confianza y Reputación</h3>
+                    <p>Trabajar con socios certificados demuestra el compromiso del cliente con la <strong class="highlight">seguridad y las buenas prácticas</strong> en toda su cadena de suministro.</p>
+                </div>
+            </div>
+             <p style="margin-top: 2rem;">Para el cliente del transportista, un socio certificado no es un lujo, es una <strong class="highlight">necesidad operativa y de gestión de riesgos</strong>.</p>
+        </div>
+         <div class="slide-number">8</div>
+    </section>
+
+    <!-- Slide 9: Path to Certification -->
+    <section class="slide">
+        <div class="slide-content">
+            <h2>El Camino a la Certificación (Visión General)</h2>
+             <p>Obtener CTPAT y OEA requiere un compromiso serio y la implementación de procesos robustos.</p>
+
+            <h3 style="margin-top: 2rem;">Requisitos Principales Comunes (CTPAT y OEA):</h3>
+             <div class="card-container">
+                <div class="card"><h4>Seguridad Física</h4><p>Instalaciones seguras (cercas, iluminación, CCTV, control accesos).</p></div>
+                <div class="card"><h4>Seguridad de Personal</h4><p>Verificación de antecedentes, control de gafetes, capacitación.</p></div>
+                <div class="card"><h4>Seguridad de Procesos</h4><p>Manejo seguro de carga, uso y control de sellos ISO 17712, inspección de remolques (17 puntos).</p></div>
+                <div class="card"><h4>Seguridad de Transporte</h4><p>Inspección de tractores (7 puntos), seguridad de unidades estacionadas, rastreo GPS.</p></div>
+                 <div class="card"><h4>Seguridad de TI</h4><p>Controles de acceso al sistema, contraseñas seguras, pistas de auditoría.</p></div>
+                 <div class="card"><h4>Entrenamiento</h4><p>Capacitación documentada en seguridad y amenazas.</p></div>
+            </div>
+
+             <h3 style="margin-top: 2rem;">Requisitos Adicionales (Énfasis OEA México):</h3>
+             <div class="card-container" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
+                 <div class="card"><h4>Cumplimiento Aduanero/Fiscal</h4><p>Historial limpio con SAT/ANAM, al corriente en obligaciones.</p></div>
+                 <div class="card"><h4>Solvencia Financiera</h4><p>Demostrar estabilidad económica.</p></div>
+                 <div class="card"><h4>Registros Contables/Logísticos</h4><p>Sistemas ordenados y trazables.</p></div>
+             </div>
+
+            <h3 style="margin-top: 2rem;">Proceso General:</h3>
+            <p>Solicitud en línea -> Completar Perfil de Seguridad detallado -> Revisión por autoridad (CBP/ANAM) -> <strong class="highlight primary">Validación/Auditoría en sitio</strong> -> Certificación -> Revalidaciones periódicas.</p>
+        </div>
+         <div class="slide-number">9</div>
+    </section>
+
+     <!-- Slide 10: Role of Naviio -->
+    <section class="slide">
+        <div class="slide-content">
+            <h2 class="highlight primary">El Rol Estratégico de Naviio ERP/TMS</h2>
+            <p>Naviio no obtiene la certificación, pero es la <strong class="highlight">herramienta fundamental</strong> que permite al transportista <strong class="highlight primary">implementar, controlar, documentar y demostrar</strong> el cumplimiento de CTPAT y OEA.</p>
+
+            <h3 style="margin-top: 2rem;">¿Cómo Ayuda Naviio Específicamente?</h3>
+            <div class="card-container" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+                <div class="card">
+                    <h4><span class="highlight primary">✓</span> Seguridad y Acceso</h4>
+                    <p>Control de usuarios por roles, autenticación segura, <strong class="highlight">pistas de auditoría detalladas</strong> (quién hizo qué, cuándo).</p>
+                </div>
+                <div class="card">
+                    <h4><span class="highlight primary">✓</span> Operaciones y Trazabilidad</h4>
+                    <p>Registro de sellos (ISO 17712) y <strong class="highlight">verificaciones (VVTT)</strong>, registro de <strong class="highlight">inspecciones (7 y 17 puntos)</strong>, rastreo GPS (integración), adjuntar documentos.</p>
+                </div>
+                <div class="card">
+                    <h4><span class="highlight primary">✓</span> Mantenimiento</h4>
+                    <p>Historial de unidades, vinculación de inspecciones con mantenimiento correctivo.</p>
+                </div>
+                <div class="card">
+                    <h4><span class="highlight primary">✓</span> Recursos Humanos</h4>
+                    <p>Registro de <strong class="highlight">verificaciones de antecedentes</strong>, registro y control de <strong class="highlight">capacitaciones de seguridad (CTPAT/OEA)</strong>.</p>
+                </div>
+                 <div class="card">
+                    <h4><span class="highlight primary">✓</span> Cumplimiento (OEA)</h4>
+                    <p>Generación de CFDI con Carta Porte, registros financieros y contables ordenados para demostrar solvencia y cumplimiento fiscal.</p>
+                </div>
+                 <div class="card">
+                    <h4><span class="highlight primary">✓</span> Reportes para Auditoría</h4>
+                    <p>Capacidad de generar <strong class="highlight">reportes específicos</strong> que piden los validadores (historial de sellos, inspecciones, capacitaciones, etc.).</p>
+                </div>
+            </div>
+             <p style="margin-top: 2rem;">Naviio centraliza la información y los controles necesarios, haciendo el cumplimiento <strong class="highlight">manejable, medible y demostrable</strong>.</p>
+        </div>
+         <div class="slide-number">10</div>
+    </section>
+
+     <!-- Slide 11: Selling Points -->
+    <section class="slide">
+        <div class="slide-content">
+            <h2>Argumentos de Venta: Posicionando Naviio</h2>
+            <p>Debemos comunicar claramente cómo Naviio es la <strong class="highlight primary">solución integral</strong> para los transportistas que buscan CTPAT/OEA.</p>
+
+            <h3 style="margin-top: 2rem;">Mensajes Clave:</h3>
+             <div class="card-container">
+                <div class="card">
+                    <h4>1. "Facilitador de CTPAT/OEA"</h4>
+                    <p>Naviio no es solo un ERP/TMS, es su <strong class="highlight">aliado estratégico para lograr y mantener</strong> las certificaciones CTPAT y OEA. Está diseñado con los requisitos en mente.</p>
+                </div>
+                <div class="card">
+                    <h4>2. "Control y Visibilidad Total"</h4>
+                    <p>Centralice el registro de sellos, inspecciones, capacitaciones y accesos. <strong class="highlight">Demuestre fácilmente el cumplimiento</strong> ante auditores con reportes específicos.</p>
+                </div>
+                <div class="card">
+                    <h4>3. "Reducción de Riesgos y Errores"</h4>
+                    <p>Minimice errores manuales, asegure que los procedimientos se sigan (checklists digitales, campos obligatorios) y tenga <strong class="highlight">trazabilidad completa</strong> para investigar incidentes.</p>
+                </div>
+                 <div class="card">
+                    <h4>4. "Eficiencia Operativa = Más Rentabilidad"</h4>
+                     <p>Al facilitar CTPAT, Naviio indirectamente ayuda a <strong class="highlight primary">acceder a carriles FAST y reducir inspecciones</strong>, impactando positivamente la rentabilidad.</p>
+                </div>
+                 <div class="card">
+                    <h4>5. "Cumplimiento Integral"</h4>
+                    <p>Naviio no solo ayuda con seguridad (CTPAT), sino también con los requisitos de <strong class="highlight">cumplimiento fiscal y aduanero</strong> (OEA), incluyendo CFDI con Carta Porte.</p>
+                </div>
+                 <div class="card">
+                    <h4>6. "Preparado para el Futuro"</h4>
+                    <p>Las exigencias de seguridad y cumplimiento solo aumentarán. Naviio le da la <strong class="highlight">plataforma tecnológica robusta</strong> para adaptarse y competir.</p>
+                </div>
+            </div>
+            <p style="margin-top: 2rem;">Enfoque: Naviio no es un costo, es una <strong class="highlight primary">inversión necesaria para competir, cumplir y crecer</strong> en el mercado de transporte transfronterizo.</p>
+        </div>
+         <div class="slide-number">11</div>
+    </section>
+
+    <!-- Slide 12: FAQ -->
+    <section class="slide">
+        <div class="slide-content">
+            <h2>Preguntas Frecuentes (FAQ)</h2>
+
+            <div class="card" style="margin-bottom: 1rem;">
+                <h4>¿CTPAT y OEA son lo mismo?</h4>
+                <p>No. Son certificaciones distintas. CTPAT (EE.UU.) se enfoca en seguridad anti-terrorismo y da beneficios en EE.UU. (FAST, menos inspecciones CBP). OEA (México) cubre seguridad, cumplimiento fiscal/aduanero y da beneficios en México (menos inspecciones ANAM, etc.).</p>
+            </div>
+             <div class="card" style="margin-bottom: 1rem;">
+                <h4>¿Si tengo OEA, ya tengo los beneficios de CTPAT (carriles FAST)?</h4>
+                <p><strong class="highlight primary">No.</strong> Para los beneficios operativos clave en EE.UU. (FAST, reducción significativa inspecciones CBP) se necesita la certificación CTPAT. El Acuerdo de Reconocimiento Mutuo (ARM) ayuda, pero no reemplaza la membresía directa.</p>
+            </div>
+             <div class="card" style="margin-bottom: 1rem;">
+                <h4>¿Un transportista necesita ambas?</h4>
+                <p>Para maximizar beneficios en <strong class="highlight">ambos lados de la frontera</strong>, obtener ambas (CTPAT y OEA México) es la estrategia ideal y más recomendable para transportistas fronterizos.</p>
+            </div>
+            <div class="card" style="margin-bottom: 1rem;">
+                <h4>¿Quién audita?</h4>
+                <p>CTPAT: Un Especialista en Seguridad de la Cadena de Suministro (SCSS) de la <strong class="highlight">CBP de EE.UU.</strong> (Validación).<br>
+                   OEA México: Personal del <strong class="highlight">SAT/ANAM de México</strong> (Auditoría).</p>
+            </div>
+             <div class="card" style="margin-bottom: 1rem;">
+                <h4>¿Cada cuánto auditan?</h4>
+                <p>CTPAT: Validación inicial, luego re-validaciones periódicas basadas en riesgo (no fijas, pueden ser cada ~3-4 años o más/menos frecuente) + revisión anual del perfil.<br>
+                   OEA México: Auditoría inicial, luego auditorías de seguimiento según normativa OEA (puede variar).</p>
+            </div>
+            <div class="card" style="margin-bottom: 1rem;">
+                <h4>¿Naviio garantiza la certificación?</h4>
+                <p>No. La certificación depende de la implementación de <strong class="highlight">TODOS</strong> los requisitos por parte del transportista (infraestructura, procesos, personal). Naviio es la <strong class="highlight primary">herramienta tecnológica clave</strong> que facilita enormemente la gestión, el control, la documentación y la demostración de ese cumplimiento.</p>
+            </div>
+
+        </div>
+         <div class="slide-number">12</div>
+    </section>
+
+     <!-- Slide 13: Q&A -->
+    <section class="slide title-slide">
+        <div class="slide-content">
+            <h1>Preguntas y Discusión</h1>
+            <p>Abrimos el espacio para resolver dudas específicas y discutir cómo podemos integrar estos argumentos en nuestra estrategia comercial.</p>
+            <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMkMyIDE3LjUyIDYuNDggMjIgMTIgMjJDMTcuNTIgMjIgMjIgMTcuNTIgMjIgMTJDMjIgNi40OCAxNy41MiAyIDEyIDJaTTEzIDE3SDExVjE1SDEzVjE3Wk0xMyAxM0gxMVY3SDEzVjEzWiIgZmlsbD0iIzAwN0FGRiIvPjwvc3ZnPg==" alt="Question Icon" style="margin-top: 2rem; width: 80px; height: 80px; opacity: 0.8;"/>
+        </div>
+         <div class="slide-number">13</div>
+    </section>
+
+</div>
+
+</body>
+</html>
+```
+
+**Instrucciones para usar el archivo:**
+
+1.  **Copia** todo el código HTML que he proporcionado arriba.
+2.  Abre un editor de texto plano (como Notepad en Windows, TextEdit en Mac - asegurándote que esté en modo texto plano, no RTF - o VSCode, Sublime Text, etc.).
+3.  **Pega** el código copiado en el editor.
+4.  **Guarda** el archivo con la extensión `.html` (por ejemplo, `Presentacion_CTPAT_OEA_Naviio.html`).
+5.  **Abre** el archivo guardado con cualquier navegador web moderno (Chrome, Firefox, Safari, Edge).
+
+Verás la presentación completa, con el diseño y estructura solicitados. Puedes navegar entre las diapositivas usando el scroll del ratón o la barra de desplazamiento.
+
+Espero que esta presentación sea exactamente lo que necesitas para tu Director Comercial. ¡Avísame si necesitas algún ajuste o tienes más preguntas!
