@@ -84,7 +84,7 @@ async def test_get_db_yields_and_closes_session() -> None:
 
     # Mock the TrackedAsyncSession to return our mock session
     with patch(
-        "app.api.v1.deps.database.TrackedAsyncSession", return_value=mock_session
+        "app.db.session.TrackedAsyncSession", return_value=mock_session
     ) as mock_session_class:
         # Iterate through the generator
         session_generator = get_db()
