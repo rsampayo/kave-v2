@@ -1,1 +1,19 @@
 Generic single-database configuration.
+
+## Migration Refactorings
+
+### Constraint Migrations (2025-04)
+
+Several migrations related to the `mandrill_webhook_secret` unique constraint have been refactored:
+
+- `3d17b3a3f001_add_unique_constraint_to_mandrill_.py`: Empty migration (superseded)
+- `7b40d1074b24_add_unique_constraint_to_mandrill_.py`: Initial implementation with basic error handling
+- `daf60e35187d_fix_unique_constraint_for_postgres.py`: Final implementation with robust error handling
+
+The refactoring:
+1. Removed manual transaction management (`COMMIT` statements) which can lead to inconsistent states
+2. Added proper logging instead of print statements
+3. Added clear documentation about migration relationships
+4. Maintained backward compatibility with existing deployed databases
+
+All migrations are maintained in the chain for compatibility, but later migrations supersede earlier ones.

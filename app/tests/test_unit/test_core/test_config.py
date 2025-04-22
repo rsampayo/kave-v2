@@ -1,6 +1,7 @@
 """Unit tests for application settings configuration."""
 
 import os
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -42,6 +43,47 @@ def test_settings_default_values() -> None:
     assert settings.API_ENV == "development"
     assert settings.DEBUG is True
     assert settings.PROJECT_NAME == "Kave"
+
+
+def test_settings_missing_required_fields() -> None:
+    """Test settings initialization fails when required fields are missing."""
+    # Attempt to create settings without required fields
+    # This should raise a ValidationError from pydantic
+    from pydantic import ValidationError
+
+    # Save original environment variables
+    original_env = {}
+    for key in [
+        "SECRET_KEY",
+        "DATABASE_URL",
+        "MAILCHIMP_API_KEY",
+        "MAILCHIMP_WEBHOOK_SECRET",
+    ]:
+        if key in os.environ:
+            original_env[key] = os.environ[key]
+            del os.environ[key]
+
+    # Temporarily rename .env file if it exists
+    env_path = Path(os.getcwd()) / ".env"
+    temp_env_path = Path(os.getcwd()) / ".env.tmp"
+    env_renamed = False
+
+    if env_path.exists():
+        env_path.rename(temp_env_path)
+        env_renamed = True
+
+    try:
+        # Now with environment variables and .env removed, initialization should fail
+        with pytest.raises(ValidationError):
+            Settings()
+    finally:
+        # Restore original environment variables
+        for key, value in original_env.items():
+            os.environ[key] = value
+
+        # Restore .env file if it was renamed
+        if env_renamed:
+            temp_env_path.rename(env_path)
 
 
 def test_validate_db_url_postgresql() -> None:

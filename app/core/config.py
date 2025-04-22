@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     """Application settings configuration.
 
     Uses pydantic BaseSettings to load config from environment variables.
+    Required environment variables (app will fail to start if missing):
+    - SECRET_KEY: Secret key for security functions
+    - DATABASE_URL: Database connection string
+    - MAILCHIMP_API_KEY: API key for MailChimp integration
+    - MAILCHIMP_WEBHOOK_SECRET: Secret for webhook verification
     """
 
     model_config = SettingsConfigDict(
@@ -27,7 +32,7 @@ class Settings(BaseSettings):
     # API
     API_ENV: str = "development"
     DEBUG: bool = True
-    SECRET_KEY: str
+    SECRET_KEY: str  # Required
     PROJECT_NAME: str = "Kave"
 
     # Authentication
@@ -39,13 +44,13 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER_PASSWORD: Optional[str] = None
 
     # Database
-    DATABASE_URL: str
+    DATABASE_URL: str  # Required
     KAVE_DATABASE_URL: Optional[str] = None
     SQL_ECHO: bool = False
 
     # MailChimp
-    MAILCHIMP_API_KEY: str
-    MAILCHIMP_WEBHOOK_SECRET: str
+    MAILCHIMP_API_KEY: str  # Required
+    MAILCHIMP_WEBHOOK_SECRET: str  # Required
 
     # Default Organization (for backwards compatibility)
     DEFAULT_ORGANIZATION_NAME: str = "Default Organization"
@@ -166,9 +171,5 @@ class Settings(BaseSettings):
 
 
 # settings will be initialized from environment variables or .env file
-settings = Settings(
-    SECRET_KEY="insecure-test-key-if-missing-in-env",
-    DATABASE_URL="postgresql://rsampayo:postgres@localhost:5432/kave_dev",
-    MAILCHIMP_API_KEY="mailchimp-key-if-missing-in-env",
-    MAILCHIMP_WEBHOOK_SECRET="webhook-secret-if-missing-in-env",
-)
+# The application will fail to start if required settings are not provided
+settings = Settings()

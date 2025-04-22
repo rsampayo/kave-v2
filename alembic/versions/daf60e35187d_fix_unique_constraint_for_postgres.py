@@ -6,6 +6,7 @@ Create Date: 2025-04-16 09:19:43.413577
 
 """
 
+import logging
 from typing import Sequence, Union
 
 import sqlalchemy as sa
@@ -19,6 +20,9 @@ revision: str = "daf60e35187d"
 down_revision: Union[str, None] = "443a8e83492a"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
+
+# Configure logging
+logger = logging.getLogger("alembic")
 
 
 def upgrade() -> None:
@@ -47,10 +51,9 @@ def upgrade() -> None:
                         ["mandrill_webhook_secret"],
                     )
                 except (ProgrammingError, OperationalError, InternalError) as e:
-                    # Log the error but continue
-                    print(f"Warning: Could not create constraint: {str(e)}")
-                    # Commit what we've done so far to avoid transaction interruption
-                    conn.execute(sa.text("COMMIT"))
+                    # Log the error but allow Alembic to handle the transaction
+                    logger.warning(f"Could not create constraint: {str(e)}")
+                    # Removed manual COMMIT to let Alembic handle transaction management
 
 
 def downgrade() -> None:
@@ -74,7 +77,6 @@ def downgrade() -> None:
                     type_="unique",
                 )
             except (ProgrammingError, OperationalError, InternalError) as e:
-                # Log the error but continue
-                print(f"Warning: Could not drop constraint: {str(e)}")
-                # Commit what we've done so far to avoid transaction interruption
-                conn.execute(sa.text("COMMIT"))
+                # Log the error but allow Alembic to handle the transaction
+                logger.warning(f"Could not drop constraint: {str(e)}")
+                # Removed manual COMMIT to let Alembic handle transaction management
