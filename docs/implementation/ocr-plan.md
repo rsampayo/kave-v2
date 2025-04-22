@@ -144,20 +144,54 @@
 **Step 4: Create Basic Celery Task Structure**
 
 *   **Goal:** Define the Celery task function signature and basic logging, without OCR logic.
-*   **TDD:** RED - Write a test in `app/tests/test_unit/test_worker.py` named `test_process_pdf_attachment_task_definition`. Use `unittest.mock.patch` to mock `celery.shared_task` if needed, or simply try importing the task function. Verify the function `process_pdf_attachment` exists in `app.worker.tasks`, is decorated as a Celery task, and accepts `attachment_id` as an argument. You can also add a test `test_process_pdf_attachment_task_call` that mocks the task function itself and uses `.delay()` to check if it can be called asynchronously (requires Celery test config like `task_always_eager=True`).
+*   **TDD:** RED - Write a test in `app/tests/test_unit/test_worker.py` named `test_process_pdf_attachment_task_definition`. Use `unittest.mock.patch` to mock `celery.shared_task` if needed, or simply try importing the task function. Verify the function `process_pdf_attachment` exists in `app.worker.tasks`, is decorated as a Celery task, and accepts `attachment_id` as an argument.
+
 *   **Action (GREEN):**
-    1.  Create the file `app/worker/tasks.py`.
-    2.  Add the following basic task structure:
+    1.  First, add new configuration settings to `app/core/config.py`:
+        ```python
+        # app/core/config.py
+        from typing import List
+        from pydantic import Field
+
+        class Settings:
+            # ... existing settings ...
+
+            # PDF Processing Configuration
+            PDF_BATCH_COMMIT_SIZE: int = Field(
+                default=10,
+                description="Number of pages to process before committing. Set to 0 for single transaction per PDF."
+            )
+            PDF_USE_SINGLE_TRANSACTION: bool = Field(
+                default=False,
+                description="If True, processes entire PDF in a single transaction."
+            )
+            PDF_MAX_ERROR_PERCENTAGE: float = Field(
+                default=10.0,
+                description="Maximum percentage of pages that can fail before task fails."
+            )
+
+            # Tesseract Configuration
+            TESSERACT_PATH: str = Field(
+                default="/usr/local/bin/tesseract",  # Default macOS Homebrew path
+                description="Path to Tesseract executable"
+            )
+            TESSERACT_LANGUAGES: List[str] = Field(
+                default=["eng"],
+                description="Languages to use for OCR"
+            )
+        ```
+
+    2.  Create the file `app/worker/tasks.py` with the basic task structure:
         ```python
         # app/worker/tasks.py
         import logging
         from celery import shared_task
         from celery.exceptions import MaxRetriesExceededError, Retry
-        import time # For simulating work
+        from app.core.config import settings
+        import time  # For simulating work
 
         logger = logging.getLogger(__name__)
 
-        # Define the task signature
         @shared_task(bind=True, max_retries=3, default_retry_delay=60, name='app.worker.tasks.process_pdf_attachment')
         def process_pdf_attachment(self, attachment_id: int) -> str:
             """
@@ -181,27 +215,23 @@
                 status_message = f"Task {task_id}: Placeholder success for attachment {attachment_id}"
             except Exception as e:
                 logger.error(f"Task {task_id}: Error in placeholder for attachment {attachment_id}: {e}", exc_info=True)
-                # Example retry logic (will be refined later)
                 try:
                     raise self.retry(exc=e, countdown=int(60 * (self.request.retries + 1)))
                 except MaxRetriesExceededError:
-                     logger.error(f"Task {task_id}: Max retries exceeded for placeholder task {attachment_id}.")
-                     status_message = f"Task {task_id}: Failed attachment {attachment_id} after max retries."
+                    logger.error(f"Task {task_id}: Max retries exceeded for placeholder task {attachment_id}.")
+                    status_message = f"Task {task_id}: Failed attachment {attachment_id} after max retries."
                 except Retry:
-                     # This exception is expected when self.retry is called, don't log as error
-                     raise
+                    raise
                 except Exception as retry_err:
                     logger.error(f"Task {task_id}: Error during retry mechanism for {attachment_id}: {retry_err}")
                     status_message = f"Task {task_id}: Failed attachment {attachment_id}, retry mechanism failed."
 
-
             return status_message
-
         ```
-    3.  Ensure `app/worker/celery_app.py` includes `"app.worker.tasks"` in the `include` list for task discovery.
-*   **Quality Check (REFACTOR):** Run `black .`, `isort .`, `flake8 .`, `mypy app`. Fix issues. Add type hint for return value (`-> str`).
-*   **Test (REFACTOR):** Run `pytest app/tests/test_unit/test_worker.py`. The tests should pass. You might need to configure Celery's `task_always_eager=True` in your test environment (`pytest.ini` or conftest) for the `.delay()` test to work easily without a running broker/worker during unit tests.
-*   **(Self-Verification):** Does `tasks.py` exist? Is the function defined with the correct signature (`self`, `attachment_id`), `bind=True`, and type hints? Does the test calling `.delay()` pass? Do quality checks pass?
+
+*   **Quality Check (REFACTOR):** Run `black .`, `isort .`, `flake8 .`, `mypy app`. Fix issues.
+*   **Test (REFACTOR):** Run `pytest`. The tests should pass.
+*   **(Self-Verification):** Are the new settings added to `Settings`? Is the task function defined with correct signature and type hints? Do tests pass? Do quality checks pass?
 
 ---
 
@@ -341,69 +371,122 @@
     *   Assert `page.get_text("text")` is called for each page.
     *   Assert `db.add` is called for each page with an `AttachmentTextContent` instance containing the correct `attachment_id`, `page_number` (1-based), and the mocked `text_content`.
     *   Assert `db.commit()` is called periodically (if implemented) and/or at the end.
+    *   Add test cases for both transaction modes (single transaction and batched commits).
+    *   Add test cases for error threshold checking.
     *   Add a test case where `page.get_text()` or `db.add()` raises an exception within the loop. Assert `db.rollback()` is called and the loop potentially continues or the task fails/retries appropriately.
 *   **Action (GREEN):**
     1.  Add `from app.models.attachment_text_content import AttachmentTextContent` import.
     2.  Replace the placeholder comment `# --- Page processing logic will go here ---` with the following loop structure inside the `try` block where `doc` is available:
         ```python
-            # Inside the main try block, after doc is created and page count logged
-            page_commit_counter = 0
-            processed_pages = 0
-            errors_on_pages = 0
+        # Inside the main try block, after doc is created and page count logged
+        page_commit_counter = 0
+        processed_pages = 0
+        errors_on_pages = 0
+        total_pages = doc.page_count
 
-            # db.begin() # Consider explicit transaction management if not using context manager
+        def check_error_threshold():
+            if errors_on_pages > 0:
+                error_percentage = (errors_on_pages / total_pages) * 100
+                if error_percentage > settings.PDF_MAX_ERROR_PERCENTAGE:
+                    logger.error(
+                        f"Task {task_id}: Error threshold exceeded "
+                        f"({error_percentage:.1f}% > {settings.PDF_MAX_ERROR_PERCENTAGE}%). "
+                        f"Failing task after {errors_on_pages}/{total_pages} page errors."
+                    )
+                    raise ValueError(
+                        f"Too many page errors ({errors_on_pages}/{total_pages} pages failed)"
+                    )
 
-            for page_num in range(doc.page_count):
+        # Determine transaction strategy
+        if settings.PDF_USE_SINGLE_TRANSACTION:
+            # Process entire PDF in a single transaction
+            with db.begin():
+                for page_num in range(total_pages):
+                    try:
+                        page = doc.load_page(page_num)
+                        # Direct text extraction
+                        page_text = page.get_text("text") or ""  # Default to empty string if None
+
+                        # --- OCR Fallback logic will go here (Step 8) ---
+                        page_text_to_save = page_text  # Use direct text for now
+
+                        # Create and Save AttachmentTextContent record
+                        text_content_entry = AttachmentTextContent(
+                            attachment_id=attachment_id,
+                            page_number=page_num + 1,  # Page numbers are 1-based
+                            text_content=page_text_to_save.strip() if page_text_to_save else None
+                        )
+                        db.add(text_content_entry)
+                        processed_pages += 1
+                        logger.debug(f"Task {task_id}: Added page {page_num + 1}/{total_pages} content for attachment {attachment_id}")
+
+                    except Exception as page_err:
+                        errors_on_pages += 1
+                        logger.error(f"Task {task_id}: Error processing page {page_num + 1} for attachment {attachment_id}: {page_err}")
+                        check_error_threshold()  # May raise ValueError if too many errors
+                        # Continue to next page if within error threshold
+
+        else:
+            # Process PDF with periodic commits
+            for page_num in range(total_pages):
                 try:
                     page = doc.load_page(page_num)
                     # Direct text extraction
-                    page_text = page.get_text("text") or "" # Default to empty string if None
+                    page_text = page.get_text("text") or ""  # Default to empty string if None
 
                     # --- OCR Fallback logic will go here (Step 8) ---
-                    page_text_to_save = page_text # Use direct text for now
+                    page_text_to_save = page_text  # Use direct text for now
 
                     # Create and Save AttachmentTextContent record
                     text_content_entry = AttachmentTextContent(
                         attachment_id=attachment_id,
-                        page_number=page_num + 1, # Page numbers are 1-based
+                        page_number=page_num + 1,  # Page numbers are 1-based
                         text_content=page_text_to_save.strip() if page_text_to_save else None
                     )
                     db.add(text_content_entry)
                     page_commit_counter += 1
                     processed_pages += 1
-                    logger.debug(f"Task {task_id}: Added page {page_num + 1}/{doc.page_count} content for attachment {attachment_id}")
+                    logger.debug(f"Task {task_id}: Added page {page_num + 1}/{total_pages} content for attachment {attachment_id}")
 
-                    # Commit periodically for large PDFs to avoid large transactions
-                    if page_commit_counter >= 10: # Commit every 10 pages
-                       db.commit() # Use sync commit
-                       logger.info(f"Task {task_id}: Committed batch of {page_commit_counter} pages for attachment {attachment_id}")
-                       page_commit_counter = 0
+                    # Commit periodically if batch size is set
+                    if settings.PDF_BATCH_COMMIT_SIZE > 0 and page_commit_counter >= settings.PDF_BATCH_COMMIT_SIZE:
+                        db.commit()  # Use sync commit
+                        logger.info(f"Task {task_id}: Committed batch of {page_commit_counter} pages for attachment {attachment_id}")
+                        page_commit_counter = 0
 
                 except Exception as page_err:
                     errors_on_pages += 1
                     logger.error(f"Task {task_id}: Error processing page {page_num + 1} for attachment {attachment_id}: {page_err}")
-                    db.rollback() # Rollback current batch on page error
-                    page_commit_counter = 0 # Reset counter after rollback
-                    # Decide strategy: continue processing other pages or fail the task?
-                    # For now, we log and continue. If too many errors, could fail task.
+                    db.rollback()  # Rollback current batch on page error
+                    page_commit_counter = 0  # Reset counter after rollback
+                    check_error_threshold()  # May raise ValueError if too many errors
+                    # Continue to next page if within error threshold
 
             # Commit any remaining entries after the loop
             if page_commit_counter > 0:
-                db.commit() # Use sync commit
+                db.commit()  # Use sync commit
                 logger.info(f"Task {task_id}: Committed final batch of {page_commit_counter} pages for attachment {attachment_id}")
 
-            # Final status message
-            status_msg = f"Task {task_id}: Attachment {attachment_id} processed. Pages: {doc.page_count}, Success: {processed_pages}, Errors: {errors_on_pages}."
-            logger.info(status_msg)
-            # Return status based on errors
-            if errors_on_pages > 0:
-                 # Potentially raise an exception or return a specific failure status if needed
-                 logger.warning(f"Task {task_id}: Finished processing attachment {attachment_id} with {errors_on_pages} page errors.")
-            return status_msg # Return detailed status
+        # Final status message
+        status_msg = (
+            f"Task {task_id}: Attachment {attachment_id} processed. "
+            f"Pages: {total_pages}, Success: {processed_pages}, Errors: {errors_on_pages}."
+        )
+        logger.info(status_msg)
+        
+        # Log warning if there were any errors (but below threshold)
+        if errors_on_pages > 0:
+            logger.warning(
+                f"Task {task_id}: Finished processing attachment {attachment_id} "
+                f"with {errors_on_pages} page errors "
+                f"({(errors_on_pages/total_pages)*100:.1f}% error rate)."
+            )
+        
+        return status_msg  # Return detailed status
         ```
 *   **Quality Check (REFACTOR):** Run `black .`, `isort .`, `flake8 .`, `mypy app`. Fix issues.
 *   **Test (REFACTOR):** Run `pytest`. The updated tests should pass.
-*   **(Self-Verification):** Does the code loop through pages? Is `get_text` called? Are `AttachmentTextContent` objects created correctly? Is `db.add` called per page? Is `db.commit` called periodically and at the end? Is `db.rollback` called on page error? Do tests pass? Do quality checks pass?
+*   **(Self-Verification):** Does the code handle both transaction modes correctly? Is the error threshold check implemented? Does the code loop through pages? Is `get_text` called? Are `AttachmentTextContent` objects created correctly? Is `db.add` called per page? Is `db.commit` called according to the selected strategy? Is `db.rollback` called on page error? Do tests pass? Do quality checks pass?
 
 ---
 
@@ -418,6 +501,7 @@
     *   Use `unittest.mock.patch` to mock `app.worker.tasks.Image`. Mock `Image.open`. Make it return a mock image object.
     *   Assert that `page.get_pixmap`, `pix.tobytes`, `Image.open`, and `pytesseract.image_to_string` are called *only* when `get_text` result is short.
     *   Assert that the text saved to the DB comes from `image_to_string` in this fallback case.
+    *   Add test cases for different Tesseract configurations (path and languages).
     *   Add a test case where `pytesseract.image_to_string` raises an error (e.g., `pytesseract.TesseractNotFoundError` or a generic `Exception`). Assert that the original (short) text from `get_text` is still saved and a warning is logged.
 *   **Action (GREEN):**
     1.  Add imports: `import pytesseract`, `from PIL import Image`, `import io`.
@@ -425,44 +509,67 @@
         ```python
             # Inside the page loop's try block (replace previous text extraction)
             page = doc.load_page(page_num)
-            direct_text = page.get_text("text") or "" # Direct text extraction, ensure string
+            direct_text = page.get_text("text") or ""  # Direct text extraction, ensure string
 
-            page_text_to_save = direct_text # Default to direct extraction
+            page_text_to_save = direct_text  # Default to direct extraction
 
             # OCR Fallback Logic
-            TEXT_LENGTH_THRESHOLD = 50 # Chars; Tune this threshold
+            TEXT_LENGTH_THRESHOLD = 50  # Chars; Tune this threshold
             if len(direct_text.strip()) < TEXT_LENGTH_THRESHOLD:
                 logger.info(f"Task {task_id}: Page {page_num+1} has little direct text ({len(direct_text.strip())} chars), attempting OCR.")
                 try:
-                    # Render page to an image (e.g., PNG) at higher DPI for better OCR
-                    zoom = 4 # zoom factor 4 => 300 DPI (approx)
-                    mat = fitz.Matrix(zoom, zoom)
-                    pix = page.get_pixmap(matrix=mat, alpha=False) # alpha=False for non-transparent image
+                    # Configure Tesseract path from settings
+                    pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_PATH
 
-                    img_data = pix.tobytes("png") # Use PNG format
+                    # Render page to an image (e.g., PNG) at higher DPI for better OCR
+                    zoom = 4  # zoom factor 4 => 300 DPI (approx)
+                    mat = fitz.Matrix(zoom, zoom)
+                    pix = page.get_pixmap(matrix=mat, alpha=False)  # alpha=False for non-transparent image
+
+                    img_data = pix.tobytes("png")  # Use PNG format
 
                     if not img_data:
                         logger.warning(f"Task {task_id}: Failed to get image bytes for page {page_num+1}.")
                     else:
                         img = Image.open(io.BytesIO(img_data))
 
-                        # Perform OCR using Pytesseract - ensure Tesseract is installed!
-                        # TESSERACT_PATH might need to be configured via settings if not in system PATH
-                        # pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_PATH
-                        ocr_text = pytesseract.image_to_string(img, lang='eng') # Specify language(s)
+                        # Perform OCR using configured languages
+                        ocr_text = pytesseract.image_to_string(
+                            img,
+                            lang="+".join(settings.TESSERACT_LANGUAGES)
+                        )
 
-                        page_text_to_save = ocr_text # Use OCR text if successful
-                        logger.info(f"Task {task_id}: OCR successful for page {page_num+1}, length: {len(ocr_text)}")
+                        if ocr_text.strip():  # Only use OCR text if it's not empty
+                            page_text_to_save = ocr_text
+                            logger.info(
+                                f"Task {task_id}: OCR successful for page {page_num+1}, "
+                                f"length: {len(ocr_text)}, "
+                                f"languages: {'+'.join(settings.TESSERACT_LANGUAGES)}"
+                            )
+                        else:
+                            logger.warning(
+                                f"Task {task_id}: OCR produced no text for page {page_num+1}, "
+                                f"keeping direct text (length: {len(direct_text)})"
+                            )
 
                 except ImportError:
-                     logger.error("Task {task_id}: Pytesseract or Pillow not installed. Cannot perform OCR fallback.")
-                     # Sticks with direct_text
+                    logger.error(
+                        f"Task {task_id}: Pytesseract or Pillow not installed. "
+                        f"Cannot perform OCR fallback. Path: {settings.TESSERACT_PATH}"
+                    )
+                    # Sticks with direct_text
                 except pytesseract.TesseractNotFoundError:
-                     logger.error(f"Task {task_id}: Tesseract executable not found. Ensure it's installed and in PATH. Cannot perform OCR.")
-                     # Sticks with direct_text
+                    logger.error(
+                        f"Task {task_id}: Tesseract executable not found at {settings.TESSERACT_PATH}. "
+                        "Ensure it's installed and path is correct."
+                    )
+                    # Sticks with direct_text
                 except Exception as ocr_err:
                     # Catch other potential errors (PIL issues, tesseract runtime errors)
-                    logger.warning(f"Task {task_id}: OCR failed for page {page_num+1} of attachment {attachment_id}: {ocr_err}", exc_info=True)
+                    logger.warning(
+                        f"Task {task_id}: OCR failed for page {page_num+1} of attachment {attachment_id}: {ocr_err}",
+                        exc_info=True
+                    )
                     # Sticks with direct_text (which is already in page_text_to_save)
 
             # Create DB entry using page_text_to_save
@@ -473,14 +580,18 @@
             )
             db.add(text_content_entry)
             page_commit_counter += 1
-            processed_pages += 1 # Count success here now
-            logger.debug(f"Task {task_id}: Added page {page_num + 1}/{doc.page_count} content (OCR fallback checked) for attachment {attachment_id}")
+            processed_pages += 1  # Count success here now
+            logger.debug(
+                f"Task {task_id}: Added page {page_num + 1}/{doc.page_count} content "
+                f"(OCR {'used' if page_text_to_save != direct_text else 'not needed'}) "
+                f"for attachment {attachment_id}"
+            )
 
             # (rest of the loop: periodic commit logic...)
         ```
 *   **Quality Check (REFACTOR):** Run `black .`, `isort .`, `flake8 .`, `mypy app`. Fix issues. Ensure necessary libraries (`pytesseract`, `PIL`, `io`) are imported.
-*   **Test (REFACTOR):** Run `pytest`. The updated tests should pass. Ensure you have tests covering the OCR path and the non-OCR path, including OCR errors.
-*   **(Self-Verification):** Are `pytesseract`, `PIL`, `io` imported? Is the length check implemented? Is `page.get_pixmap`, `Image.open`, `pytesseract.image_to_string` called conditionally? Is the OCR result used? Are OCR errors handled gracefully (using direct text)? Do tests pass? Do quality checks pass?
+*   **Test (REFACTOR):** Run `pytest`. The updated tests should pass. Ensure you have tests covering the OCR path and the non-OCR path, including OCR errors and different Tesseract configurations.
+*   **(Self-Verification):** Are `pytesseract`, `PIL`, `io` imported? Is the length check implemented? Is Tesseract configured from settings? Are languages configured from settings? Is `page.get_pixmap`, `Image.open`, `pytesseract.image_to_string` called conditionally? Is the OCR result used only if not empty? Are OCR errors handled gracefully (using direct text)? Do tests pass? Do quality checks pass?
 
 ---
 
@@ -680,16 +791,44 @@
         *   Add `celery[redis]`, `pymupdf`, `pillow`, `pytesseract` to dependencies.
         *   Add **System Dependencies** section:
             *   **macOS:** `brew install tesseract tesseract-lang redis`
-            *   **Heroku:** Requires `heroku/apt` buildpack and an `Aptfile`. Note the need to potentially install `poppler-utils` or other PyMuPDF system dependencies via Aptfile as well.
-        *   Add new environment variables (`CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND`, mention Heroku `REDIS_URL`).
+            *   **Heroku:** Requires `heroku/apt` buildpack and an `Aptfile`. Note the need to install both Tesseract and PyMuPDF system dependencies.
+        *   Add new environment variables:
+            ```
+            # Redis Configuration
+            CELERY_BROKER_URL=redis://localhost:6379/0
+            CELERY_RESULT_BACKEND=redis://localhost:6379/0
+            # Note: On Heroku, these will be overridden by REDIS_URL
+
+            # PDF Processing Configuration
+            PDF_BATCH_COMMIT_SIZE=10  # Set to 0 for single transaction per PDF
+            PDF_USE_SINGLE_TRANSACTION=false
+            PDF_MAX_ERROR_PERCENTAGE=10.0
+
+            # Tesseract Configuration
+            TESSERACT_PATH=/usr/local/bin/tesseract  # Update for your environment
+            TESSERACT_LANGUAGES=eng  # Comma-separated list of language codes
+            ```
         *   Add instructions on starting the Celery worker locally (`celery -A app.worker.celery_app worker -l info`) and mention the need for a worker dyno on Heroku.
-    2.  Create/Update `Aptfile` (for Heroku): Add `tesseract-ocr`, `libtesseract-dev`, `tesseract-ocr-eng`. Check PyMuPDF docs for any other Linux dependencies needed (like `libmu*) and add them.
+    2.  Create/Update `Aptfile` (for Heroku):
         ```
         # Aptfile
+
+        # OCR Dependencies
         tesseract-ocr
         libtesseract-dev
         tesseract-ocr-eng
-        # Add any other system libraries needed by pymupdf on Linux if required
+
+        # PyMuPDF Dependencies (verify against your PyMuPDF version)
+        libmupdf-dev
+        libmupdf1.18  # Version may vary
+        libfreetype6-dev
+        libjpeg-dev
+        libjbig2dec0
+        libopenjp2-7
+        libxext6
+
+        # Additional dependencies that might be needed
+        poppler-utils
         ```
     3.  Create/Update `Procfile` (for Heroku): Add a worker process line.
         ```
@@ -699,12 +838,65 @@
         worker: celery -A app.worker.celery_app worker --loglevel=info
         ```
     4.  Add clear docstrings to:
-        *   `app/models/attachment_text_content.py` -> `AttachmentTextContent` class.
-        *   `app/worker/tasks.py` -> `process_pdf_attachment` function.
+        *   `app/models/attachment_text_content.py` -> `AttachmentTextContent` class:
+            ```python
+            class AttachmentTextContent(Base):
+                """
+                Stores OCR-extracted text content from PDF attachments, page by page.
+
+                This model maintains a one-to-many relationship with the Attachment model,
+                where each record represents the text content of a single page from a PDF attachment.
+                Text is extracted using direct PDF text extraction (via PyMuPDF) with OCR fallback
+                (via Tesseract) when direct extraction yields minimal text.
+
+                Attributes:
+                    id (int): Primary key.
+                    attachment_id (int): Foreign key to the parent Attachment.
+                    page_number (int): 1-based page number within the PDF.
+                    text_content (str): Extracted text content from the page. May be NULL if extraction failed.
+                    attachment (Attachment): Relationship to the parent Attachment model.
+                """
+            ```
+        *   `app/worker/tasks.py` -> `process_pdf_attachment` function:
+            ```python
+            @shared_task(bind=True, max_retries=3, default_retry_delay=60)
+            def process_pdf_attachment(self, attachment_id: int) -> str:
+                """
+                Celery task to extract text from PDF attachments using PyMuPDF with Tesseract OCR fallback.
+
+                The task performs the following steps:
+                1. Retrieves the Attachment record and its PDF data from storage
+                2. Opens the PDF using PyMuPDF
+                3. Processes each page:
+                   - Attempts direct text extraction via PyMuPDF
+                   - If minimal text is found, falls back to Tesseract OCR
+                4. Saves extracted text per page to AttachmentTextContent records
+
+                Transaction handling is configurable:
+                - Single transaction per PDF (PDF_USE_SINGLE_TRANSACTION=True)
+                - Batched commits (PDF_BATCH_COMMIT_SIZE > 0)
+
+                Error handling includes:
+                - Retries for transient failures
+                - Error threshold monitoring (fails if PDF_MAX_ERROR_PERCENTAGE exceeded)
+                - Graceful fallback to direct text if OCR fails
+
+                Args:
+                    self: Task instance (Celery bind=True).
+                    attachment_id: ID of the Attachment record to process.
+
+                Returns:
+                    str: Status message describing the processing outcome.
+
+                Raises:
+                    Retry: For transient errors that should trigger a retry.
+                    ValueError: If error threshold is exceeded.
+                """
+            ```
         *   Any significantly modified methods in `AttachmentService`.
 *   **Quality Check:** Manual review of documentation and Heroku files. Run `flake8` if docstring linting is enabled.
 *   **Test:** Not applicable for documentation/config files directly, but the configurations will be tested during deployment.
-*   **(Self-Verification):** Is README updated (dependencies, Tesseract install for macOS/Heroku, env vars, worker command)? Are `Aptfile` and `Procfile` created/updated correctly for Heroku? Are docstrings added/updated?
+*   **(Self-Verification):** Is README updated with all new dependencies and environment variables? Are `Aptfile` and `Procfile` created with correct content? Are PyMuPDF dependencies included? Are docstrings comprehensive and helpful? Do they follow the project's documentation style?
 
 ---
 
