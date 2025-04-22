@@ -141,7 +141,7 @@ class InitializationService:
         admin_email = "admin@example.com"
 
         # Create admin user
-        logger.info(f"Creating default admin user '{admin_username}'")
+        logger.info(f"Creating default admin user {admin_username!r}")
         user_data = UserCreate(
             username=admin_username,
             email=admin_email,

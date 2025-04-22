@@ -60,7 +60,7 @@ async def upgrade(engine: AsyncEngine) -> None:
             else:
                 # PostgreSQL and most other databases
                 metadata = MetaData()
-                attachments = Table(
+                Table(
                     "attachments",
                     metadata,
                     Column("content", LargeBinary, nullable=True),
@@ -69,7 +69,7 @@ async def upgrade(engine: AsyncEngine) -> None:
 
                 # Modify the column to be nullable
                 alter_stmt = text(
-                    f"ALTER TABLE attachments ALTER COLUMN content DROP NOT NULL"
+                    "ALTER TABLE attachments ALTER COLUMN content DROP NOT NULL"
                 )
                 await conn.execute(alter_stmt)
                 await conn.commit()

@@ -75,7 +75,7 @@ async def create_organization(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Organization with the same webhook secret already exists. "
                 "This is a security risk.",
-            )
+            ) from e
         raise e
 
     # Convert to response model
@@ -134,12 +134,12 @@ async def get_organization(
         # Try to convert to integer first
         org_id = int(organization_id)
         organization = await service.get_organization_by_id(org_id)
-    except ValueError:
+    except ValueError as e:
         # If not a valid integer, handle as a string ID (UUID)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Organization with ID {organization_id} not found",
-        )
+        ) from e
 
     if not organization:
         raise HTTPException(
@@ -212,7 +212,7 @@ async def update_organization(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Organization with the same webhook secret already exists.",
-            )
+            ) from e
         raise e
 
     return OrganizationResponse.model_validate(updated_org)
@@ -281,7 +281,7 @@ async def patch_organization(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Organization with the same webhook secret already exists.",
-            )
+            ) from e
         raise e
 
     return OrganizationResponse.model_validate(updated_org)

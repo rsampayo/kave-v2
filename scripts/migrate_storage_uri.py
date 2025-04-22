@@ -44,7 +44,10 @@ async def migrate_existing_attachments() -> None:
         for i, attachment in enumerate(attachments):
             try:
                 # Generate object key
-                object_key = f"attachments/{attachment.email_id}/{attachment.id}_{attachment.filename}"
+                attachment_id = attachment.id
+                email_id = attachment.email_id
+                filename = attachment.filename
+                object_key = f"attachments/{email_id}/{attachment_id}_{filename}"
 
                 # Skip if no content
                 if not attachment.content:

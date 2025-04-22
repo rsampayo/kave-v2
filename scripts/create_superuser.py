@@ -41,7 +41,7 @@ async def create_superuser(
         existing_user = result.scalars().first()
 
         if existing_user:
-            print(f"User '{username}' already exists.")
+            print(f"User {username!r} already exists.")
             return
 
         # Hash the password
@@ -61,7 +61,7 @@ async def create_superuser(
         await db.commit()
         await db.refresh(user)
 
-        print(f"Superuser '{username}' created successfully with ID {user.id}.")
+        print(f"Superuser {username!r} created successfully with ID {user.id}.")
 
     except Exception as e:
         await db.rollback()

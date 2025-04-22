@@ -201,9 +201,12 @@ pytest==8.3.5
     #   -r requirements/dev.in
     #   pytest-asyncio
     #   pytest-cov
+    #   pytest-mock
 pytest-asyncio==0.23.8
     # via -r requirements/dev.in
 pytest-cov==4.1.0
+    # via -r requirements/dev.in
+pytest-mock==3.14.0
     # via -r requirements/dev.in
 python-dateutil==2.9.0.post0
     # via
@@ -257,8 +260,14 @@ tomli==2.2.1
     #   pytest
 types-aiofiles==24.1.0.20250326
     # via -r /Users/rsampayo/Documents/Proyectos/Kave/requirements/base.in
+types-passlib==1.7.7.20250408
+    # via -r /Users/rsampayo/Documents/Proyectos/Kave/requirements/base.in
+types-pyasn1==0.6.0.20250208
+    # via types-python-jose
 types-python-dateutil==2.9.0.20241206
     # via -r requirements/dev.in
+types-python-jose==3.4.0.20250224
+    # via -r /Users/rsampayo/Documents/Proyectos/Kave/requirements/base.in
 typing-extensions==4.13.1
     # via
     #   alembic

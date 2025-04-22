@@ -96,11 +96,14 @@ def create_database(db_name):
     # Check if database exists
     check_cmd = (
         f"docker exec -it {CONTAINER_NAME} psql -U {PG_USER} -tc "
-        f"\"SELECT 1 FROM pg_database WHERE datname = '{db_name}'\""
+        f'"SELECT 1 FROM pg_database WHERE datname = {db_name!r}"'
     )
     # Command to create database
-    create_cmd = f'docker exec -it {CONTAINER_NAME} psql -U {PG_USER} -c "CREATE DATABASE {db_name}"'
-    # Combined command
+    create_cmd = (
+        f"docker exec -it {CONTAINER_NAME} psql -U {PG_USER} "
+        f'-c "CREATE DATABASE {db_name!r}"'
+    )
+    # Combined command to check existence and create if not found
     cmd = f"{check_cmd} | grep -q 1 || {create_cmd}"
 
     success, output = run_command(
@@ -109,10 +112,10 @@ def create_database(db_name):
     )
 
     if success:
-        print(f"✅ Database '{db_name}' is ready to use.")
+        print(f"✅ Database {db_name!r} is ready to use.")
         return True
     else:
-        print(f"❌ Failed to create database '{db_name}'.")
+        print(f"❌ Failed to create database {db_name!r}.")
         print("   You may need to create it manually with:")
         print(
             f'   docker exec -it {CONTAINER_NAME} psql -U {PG_USER} -c "CREATE DATABASE {db_name}"'

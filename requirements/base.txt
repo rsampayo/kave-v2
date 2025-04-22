@@ -146,6 +146,12 @@ starlette==0.36.3
     # via fastapi
 types-aiofiles==24.1.0.20250326
     # via -r requirements/base.in
+types-passlib==1.7.7.20250408
+    # via -r requirements/base.in
+types-pyasn1==0.6.0.20250208
+    # via types-python-jose
+types-python-jose==3.4.0.20250224
+    # via -r requirements/base.in
 typing-extensions==4.13.1
     # via
     #   alembic

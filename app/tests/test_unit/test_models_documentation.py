@@ -12,9 +12,7 @@ from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.ext.declarative import DeclarativeMeta
 
 from app.models.email_data import Attachment, Email, EmailAttachment
-from app.schemas.webhook_schemas import (
-    DetailedWebhookResponse,
-)
+from app.schemas.webhook_schemas import DetailedWebhookResponse
 from app.schemas.webhook_schemas import EmailAttachment as SchemaEmailAttachment
 from app.schemas.webhook_schemas import (
     InboundEmailData,
@@ -131,10 +129,10 @@ def test_schema_field_documentation() -> None:
             else:
                 # This should never happen with the current schemas, but as a fallback
                 # raise a specific assertion error instead of skipping
-                assert False, (
+                raise AssertionError(
                     f"Could not create instance of {schema_class.__name__}: "
                     f"No constructor pattern defined"
-                )
+                ) from None
 
         # Get the schema fields from model_json_schema
         schema_fields = schema_instance.model_json_schema()["properties"]
@@ -209,9 +207,10 @@ def test_model_and_schema_consistency() -> None:
             )
         else:
             # Any unexpected schema class - should not happen with current test setup
-            assert (
-                False
-            ), f"Unknown schema class {schema_class.__name__}: add creation logic for this class"
+            raise AssertionError(
+                f"Unknown schema class {schema_class.__name__}: "
+                f"add creation logic for this class"
+            )
 
         # Get all fields from the schema
         schema_fields = schema_instance.model_json_schema()["properties"].keys()
