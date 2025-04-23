@@ -1,7 +1,7 @@
 """Module providing Test Attachment Service functionality for the tests test unit test services."""
 
 import base64
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -150,3 +150,76 @@ class TestAttachmentService:
 
         # No need to verify db_session.add since it's a real session, not a mock
         assert result[0].storage_uri is not None  # Verify the storage URI was set
+
+    @pytest.mark.asyncio
+    async def test_process_attachments_dispatches_ocr_task(self):
+        """Test that process_attachments dispatches the OCR task for PDF attachments."""
+        # Arrange
+        mock_db_session = AsyncMock(spec=AsyncSession)
+        mock_storage = AsyncMock(spec=StorageService)
+        mock_storage.save_file = AsyncMock(return_value="test-storage-uri")
+
+        # Create sample attachment data
+        pdf_attachment_data = EmailAttachment(
+            name="test.pdf",
+            type="application/pdf",
+            content=base64.b64encode(b"PDF content").decode("utf-8"),
+            content_id="pdf123",
+            size=123,
+        )
+
+        non_pdf_attachment_data = EmailAttachment(
+            name="test.jpg",
+            type="image/jpeg",
+            content=base64.b64encode(b"JPG content").decode("utf-8"),
+            content_id="jpg123",
+            size=456,
+        )
+
+        # Create service instance
+        service = AttachmentService(db=mock_db_session, storage=mock_storage)
+
+        # Test dispatching OCR task
+        with patch(
+            "app.services.attachment_service.process_pdf_attachment"
+        ) as mock_process_pdf_attachment:
+            # Configure mock DB to set IDs when add is called
+            mock_attachment_pdf = MagicMock(spec=Attachment)
+            mock_attachment_pdf.id = None  # Start with no ID
+            mock_attachment_pdf.content_type = "application/pdf"
+            mock_attachment_pdf.filename = "test.pdf"
+
+            mock_attachment_jpg = MagicMock(spec=Attachment)
+            mock_attachment_jpg.id = None  # Start with no ID
+            mock_attachment_jpg.content_type = "image/jpeg"
+            mock_attachment_jpg.filename = "test.jpg"
+
+            # Mock the Attachment constructor to return our mock objects
+            with patch("app.services.attachment_service.Attachment") as MockAttachment:
+                MockAttachment.side_effect = [mock_attachment_pdf, mock_attachment_jpg]
+
+                # Mock flush to set IDs
+                async def mock_flush(objects=None):
+                    if objects is None or mock_attachment_pdf in objects:
+                        mock_attachment_pdf.id = 1
+                    if objects is None or mock_attachment_jpg in objects:
+                        mock_attachment_jpg.id = 2
+
+                mock_db_session.flush = AsyncMock(side_effect=mock_flush)
+
+                # Call the method with both PDF and non-PDF attachments
+                attachments = await service.process_attachments(
+                    email_id=123,
+                    attachments=[pdf_attachment_data, non_pdf_attachment_data],
+                )
+
+                # Verify both attachments were processed
+                assert len(attachments) == 2
+
+                # Verify the OCR task was called only for the PDF
+                mock_process_pdf_attachment.delay.assert_called_once_with(
+                    attachment_id=1
+                )
+
+                # Verify the task was not called for the non-PDF attachment
+                assert mock_process_pdf_attachment.delay.call_count == 1

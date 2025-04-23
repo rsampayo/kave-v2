@@ -16,6 +16,9 @@ from app.models.email_data import Attachment
 from app.schemas.webhook_schemas import EmailAttachment
 from app.services.storage_service import StorageService
 
+# Import the OCR task
+from app.worker.tasks import process_pdf_attachment
+
 logger = logging.getLogger(__name__)
 
 
@@ -32,7 +35,7 @@ class AttachmentService:
         self.db = db
         self.storage = storage
 
-    async def process_attachments(
+    async def process_attachments(  # noqa: C901
         self, email_id: int, attachments: list[EmailAttachment]
     ) -> list[Attachment]:
         """Process and store email attachments.
@@ -123,7 +126,49 @@ class AttachmentService:
                 # Update the model with the storage URI
                 attachment.storage_uri = storage_uri
 
+            # Add the attachment to the database
             self.db.add(attachment)
+
+            # Flush to get an ID for the attachment
+            try:
+                await self.db.flush([attachment])
+                logger.debug(
+                    f"Attachment {filename!r} flushed, assigned ID: {attachment.id}"
+                )
+
+                # Check if attachment ID was populated
+                if attachment.id is None:
+                    logger.error(
+                        f"Attachment {filename!r} did not get an ID after flush, "
+                        f"cannot dispatch OCR task."
+                    )
+                    result.append(attachment)
+                    continue
+
+                # Check if it's a PDF and dispatch the OCR task
+                is_pdf = content_type == "application/pdf" or filename.lower().endswith(
+                    ".pdf"
+                )
+                if is_pdf:
+                    try:
+                        logger.info(
+                            f"Dispatching OCR task for PDF attachment ID: {attachment.id}, "
+                            f"Filename: {filename}"
+                        )
+                        # Call the Celery task with the attachment ID
+                        process_pdf_attachment.delay(attachment_id=attachment.id)
+                    except Exception as dispatch_err:
+                        # Log error if task dispatch fails, but don't fail the request
+                        logger.error(
+                            f"Failed to dispatch Celery OCR task for attachment {attachment.id}: "
+                            f"{dispatch_err}"
+                        )
+            except Exception as flush_err:
+                logger.error(
+                    f"Failed to flush attachment {filename!r} to get ID: {flush_err}"
+                )
+                # If flush fails, we can't get the ID, so don't dispatch the task
+
             result.append(attachment)
 
         return result
