@@ -33,7 +33,7 @@ def test_process_pdf_attachment_task_definition():
         pytest.fail(f"Failed to verify task definition: {e}")
 
 
-def test_process_pdf_attachment_data_fetching():
+def test_process_pdf_attachment_data_fetching():  # noqa: C901
     """Test the data fetching part of the PDF processing task."""
     # Import the task
     from app.worker.tasks import process_pdf_attachment
@@ -42,6 +42,8 @@ def test_process_pdf_attachment_data_fetching():
     mock_db_session = MagicMock(spec=Session)
     # Add a close method that can be called via async_to_sync
     mock_db_session.close = MagicMock()
+    # Create a get method that will track calls
+    mock_db_session.get = MagicMock(return_value=None)
 
     mock_attachment = MagicMock()
     mock_attachment.id = 1
@@ -65,14 +67,20 @@ def test_process_pdf_attachment_data_fetching():
     ):
 
         # Configure mocks
-        mock_db_session.get.return_value = mock_attachment
         MockAttachment.__name__ = "Attachment"  # For logging
+
+        # Override mock_db_session.get.return_value directly rather than using
+        # the async_to_sync side effect for this specific test
+        mock_db_session.get.return_value = mock_attachment
 
         # Setup async_to_sync to handle different types of calls
         def fake_async_to_sync(func):
             if func == mock_db_session.close:
                 # For session.close(), just return a callable that does nothing
                 return lambda: None
+            elif func == mock_db_session.get:
+                # We'll use the mock directly in this test
+                return mock_db_session.get
             else:
                 # For other cases like storage.get_file
                 return lambda *args, **kwargs: b"pdfbytes"
@@ -99,10 +107,22 @@ def test_process_pdf_attachment_data_fetching():
     ):
 
         # Configure mocks
-        mock_db_session.get.return_value = None
+        # Reset the get mock and set it to return None for the "not found" case
+        mock_db_session.get = MagicMock(return_value=None)
 
-        # Setup async_to_sync for db.close()
-        mock_async_to_sync.side_effect = lambda func: (lambda: None)
+        # Setup async_to_sync to handle different types of calls
+        def fake_async_to_sync_not_found(func):
+            if func == mock_db_session.close:
+                # For session.close(), just return a callable that does nothing
+                return lambda: None
+            elif func == mock_db_session.get:
+                # Return the mock directly
+                return mock_db_session.get
+            else:
+                # For other cases like storage.get_file
+                return lambda *args, **kwargs: b"pdfbytes"
+
+        mock_async_to_sync.side_effect = fake_async_to_sync_not_found
 
         # Call the task function directly
         result = process_pdf_attachment(attachment_id=1)
@@ -120,13 +140,25 @@ def test_process_pdf_attachment_data_fetching():
     ):
 
         # Configure mocks
+        # Create and set attachment without URI
         mock_attachment_no_uri = MagicMock()
         mock_attachment_no_uri.id = 1
         mock_attachment_no_uri.storage_uri = None
-        mock_db_session.get.return_value = mock_attachment_no_uri
+        mock_db_session.get = MagicMock(return_value=mock_attachment_no_uri)
 
-        # Setup async_to_sync for db.close()
-        mock_async_to_sync.side_effect = lambda func: (lambda: None)
+        # Setup async_to_sync to handle different types of calls
+        def fake_async_to_sync_no_uri(func):
+            if func == mock_db_session.close:
+                # For session.close(), just return a callable that does nothing
+                return lambda: None
+            elif func == mock_db_session.get:
+                # Return the mock directly
+                return mock_db_session.get
+            else:
+                # For other cases like storage.get_file
+                return lambda *args, **kwargs: b"pdfbytes"
+
+        mock_async_to_sync.side_effect = fake_async_to_sync_no_uri
 
         # Call the task function directly
         result = process_pdf_attachment(attachment_id=1)
@@ -145,18 +177,24 @@ def test_process_pdf_attachment_data_fetching():
     ):
 
         # Configure mocks
-        mock_db_session.get.return_value = mock_attachment
+        mock_attachment_with_uri = MagicMock()
+        mock_attachment_with_uri.id = 1
+        mock_attachment_with_uri.storage_uri = "test-storage-uri"
+        mock_db_session.get = MagicMock(return_value=mock_attachment_with_uri)
 
         # Setup async_to_sync to handle different types of calls
-        def fake_async_to_sync_none(func):
+        def fake_async_to_sync_none_data(func):
             if func == mock_db_session.close:
                 # For session.close(), just return a callable that does nothing
                 return lambda: None
+            elif func == mock_db_session.get:
+                # Return the mock directly that has a valid URI
+                return mock_db_session.get
             else:
                 # For other cases like storage.get_file, return None
                 return lambda *args, **kwargs: None
 
-        mock_async_to_sync.side_effect = fake_async_to_sync_none
+        mock_async_to_sync.side_effect = fake_async_to_sync_none_data
 
         # Setup retry to raise a specific Celery Retry exception
         mock_retry.side_effect = Retry("Task can be retried", None)
@@ -175,6 +213,8 @@ def test_process_pdf_attachment_open_pdf():
     mock_db_session = MagicMock()
     # Add a close method that can be called via async_to_sync
     mock_db_session.close = MagicMock()
+    # Create a get method that will track calls
+    mock_db_session.get = MagicMock(return_value=None)
 
     mock_attachment = MagicMock()
     mock_attachment.id = 1
@@ -204,6 +244,9 @@ def test_process_pdf_attachment_open_pdf():
             if func == mock_db_session.close:
                 # For session.close(), just return a callable that does nothing
                 return lambda: None
+            elif func == mock_db_session.get:
+                # Return the mock directly
+                return mock_db_session.get
             else:
                 # For other cases like storage.get_file
                 return lambda *args, **kwargs: b"pdfbytes"
@@ -258,6 +301,12 @@ def test_process_pdf_attachment_text_extraction_and_save():  # noqa: C901
 
     # Setup mocks
     mock_db_session = MagicMock()
+    mock_db_session.close = MagicMock()
+    mock_db_session.commit = MagicMock()
+    mock_db_session.rollback = MagicMock()
+    # Create a get method that will track calls
+    mock_db_session.get = MagicMock(return_value=None)
+
     mock_attachment = MagicMock()
     mock_attachment.id = 1
     mock_attachment.storage_uri = "test-storage-uri"
@@ -292,9 +341,6 @@ def test_process_pdf_attachment_text_extraction_and_save():  # noqa: C901
 
         # Configure mocks
         mock_db_session.get.return_value = mock_attachment
-        mock_db_session.close = MagicMock()
-        mock_db_session.commit = MagicMock()
-        mock_db_session.rollback = MagicMock()
 
         # Create counter functions that increment call counts when used
         commit_count = 0
@@ -317,6 +363,9 @@ def test_process_pdf_attachment_text_extraction_and_save():  # noqa: C901
             elif func == mock_db_session.rollback:
                 mock_db_session.rollback()  # Increment the mock's call count
                 return fake_rollback
+            elif func == mock_db_session.get:
+                # Return the mock directly
+                return mock_db_session.get
             else:
                 return lambda *args, **kwargs: b"pdfbytes"
 
@@ -381,6 +430,9 @@ def test_process_pdf_attachment_text_extraction_and_save():  # noqa: C901
             elif func == mock_db_session.rollback:
                 mock_db_session.rollback()  # Increment the mock's call count
                 return fake_rollback
+            elif func == mock_db_session.get:
+                # For db.get, return a callable that returns the mock attachment
+                return lambda model, id: mock_attachment if id == 1 else None
             else:
                 return lambda *args, **kwargs: b"pdfbytes"
 
@@ -443,6 +495,9 @@ def test_process_pdf_attachment_text_extraction_and_save():  # noqa: C901
             elif func == mock_db_session.rollback:
                 mock_db_session.rollback()  # Increment the mock's call count
                 return fake_rollback
+            elif func == mock_db_session.get:
+                # For db.get, return a callable that returns the mock attachment
+                return lambda model, id: mock_attachment if id == 1 else None
             else:
                 return lambda *args, **kwargs: b"pdfbytes"
 

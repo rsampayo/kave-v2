@@ -13,6 +13,10 @@ from asgiref.sync import async_to_sync
 from celery import shared_task  # type: ignore
 from celery.exceptions import MaxRetriesExceededError, Retry  # type: ignore
 from PIL import Image
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
 from app.db.session import get_session
@@ -21,6 +25,158 @@ from app.models.email_data import Attachment
 from app.services.storage_service import StorageService
 
 logger = logging.getLogger(__name__)
+
+
+def sync_db_operation(db: Any, operation: str, *args: Any, **kwargs: Any) -> Any:
+    """Execute database operation synchronously.
+    
+    This function safely bridges async database operations to sync context.
+    
+    Args:
+        db: Database session
+        operation: The operation to perform ('commit', 'rollback', 'close', 'add', 'get')
+        args: Arguments to pass to the operation
+        kwargs: Keyword arguments to pass to the operation
+        
+    Returns:
+        Any: Result of the operation if any
+    """
+    try:
+        if operation == 'commit':
+            try:
+                # Create a proper async function to handle commit
+                async def do_commit():
+                    try:
+                        await db.commit()
+                        return True
+                    except Exception as e:
+                        logger.error(f"Error in async commit: {e}")
+                        raise
+                
+                # Execute the commit in a new thread
+                result = async_to_sync(do_commit)()
+                
+                # Reset transaction state after commit to prevent "another operation in progress" errors
+                async def reset_session():
+                    if hasattr(db, 'close'):
+                        try:
+                            # Close any lingering transactions
+                            await db.close()
+                        except Exception:
+                            pass
+                    # Get a fresh transaction state
+                    if hasattr(db, 'begin'):
+                        try:
+                            await db.begin()
+                        except Exception:
+                            pass
+                    return True
+                
+                # Ensure session is in a clean state
+                async_to_sync(reset_session)()
+                
+                return result
+            except Exception as commit_err:
+                logger.error(f"Commit error: {commit_err}, attempting to rollback")
+                try:
+                    # Create proper async function for rollback
+                    async def do_rollback():
+                        try:
+                            await db.rollback()
+                            return True
+                        except Exception as e:
+                            logger.error(f"Error in async rollback: {e}")
+                            # Just suppress errors here to allow for a clean abort
+                            return False
+                    
+                    async_to_sync(do_rollback)()
+                except Exception:
+                    # If rollback fails, we have to close and discard the session
+                    pass
+                raise
+        elif operation == 'rollback':
+            try:
+                # Create proper async function for rollback
+                async def do_rollback():
+                    try:
+                        await db.rollback()
+                        return True
+                    except Exception as e:
+                        logger.error(f"Error in async rollback: {e}")
+                        return False
+                
+                result = async_to_sync(do_rollback)()
+                
+                # Reset transaction state after rollback
+                async def reset_session():
+                    if hasattr(db, 'close'):
+                        try:
+                            await db.close()
+                        except Exception:
+                            pass
+                    # Get a fresh transaction state
+                    if hasattr(db, 'begin'):
+                        try:
+                            await db.begin()
+                        except Exception:
+                            pass
+                    return True
+                
+                # Ensure session is in a clean state
+                async_to_sync(reset_session)()
+                
+                return result
+            except Exception as rollback_err:
+                logger.error(f"Rollback error: {rollback_err}, will close session")
+                raise
+        elif operation == 'close':
+            try:
+                # Create proper async function for close
+                async def do_close():
+                    try:
+                        await db.close()
+                        return True
+                    except Exception as e:
+                        logger.error(f"Error in async close: {e}")
+                        return False
+                
+                return async_to_sync(do_close)()
+            except Exception as close_err:
+                logger.error(f"Close error: {close_err}")
+                raise
+        elif operation == 'add':
+            db.add(*args)
+            return None
+        elif operation == 'get':
+            try:
+                # Instead of using a new transaction, use the raw connection directly 
+                # to avoid transaction nesting issues
+                entity_class = args[0]
+                entity_id = args[1]
+                stmt = select(entity_class).where(entity_class.id == entity_id)
+                
+                async def get_entity():
+                    try:
+                        # Execute directly without transaction management
+                        raw_conn = await db.connection()
+                        result = await raw_conn.execute(stmt)
+                        # Make sure we're getting the full entity object, not just the ID
+                        entity = result.scalar_one_or_none()
+                        logger.debug(f"Got entity type: {type(entity)} for ID: {entity_id}")
+                        return entity
+                    except Exception as e:
+                        logger.error(f"Error in async execute/scalar: {e}")
+                        raise
+                    
+                return async_to_sync(get_entity)()
+            except Exception as get_err:
+                logger.error(f"Get error: {get_err}")
+                raise
+        else:
+            raise ValueError(f"Unsupported operation: {operation}")
+    except Exception as e:
+        logger.error(f"Error in sync_db_operation '{operation}': {e}")
+        raise
 
 
 @shared_task(  # type: ignore
@@ -68,23 +224,34 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
 
     db = None  # Initialize db to None for finally block safety
     try:
-        # Get a SYNC session
-        db = get_session()
-
-        # 1. Fetch Attachment metadata
-        attachment = db.get(Attachment, attachment_id)
-        if not attachment:
-            logger.error(f"Task {task_id}: Attachment {attachment_id} not found.")
-            return f"Task {task_id}: Attachment {attachment_id} not found."
-        if not attachment.storage_uri:
-            logger.error(
-                f"Task {task_id}: Attachment {attachment_id} has no storage URI."
+        # Get a sync session
+        engine = create_engine(settings.effective_database_url)
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        
+        # Create the session
+        db_session = SessionLocal()
+        
+        # Fetch Attachment metadata using synchronous session
+        try:
+            stmt = select(Attachment).where(Attachment.id == attachment_id)
+            attachment = db_session.execute(stmt).scalar_one_or_none()
+            
+            if not attachment:
+                logger.error(f"Task {task_id}: Attachment {attachment_id} not found.")
+                return f"Task {task_id}: Attachment {attachment_id} not found."
+                
+            if not attachment.storage_uri:
+                logger.error(
+                    f"Task {task_id}: Attachment {attachment_id} has no storage URI."
+                )
+                return f"Task {task_id}: Attachment {attachment_id} has no storage URI."
+                
+            logger.info(
+                f"Task {task_id}: Found attachment {attachment_id} with URI: {attachment.storage_uri}"
             )
-            return f"Task {task_id}: Attachment {attachment_id} has no storage URI."
-
-        logger.info(
-            f"Task {task_id}: Found attachment {attachment_id} with URI: {attachment.storage_uri}"
-        )
+        except Exception as fetch_err:
+            logger.error(f"Task {task_id}: Failed to fetch attachment: {fetch_err}")
+            raise self.retry(exc=fetch_err, countdown=30)
 
         # 2. Retrieve PDF content from storage (bridging sync task to async storage)
         storage = StorageService()
@@ -110,6 +277,19 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
             f"Task {task_id}: Successfully retrieved PDF data ({len(pdf_data)} bytes) "
             f"for attachment {attachment_id}"
         )
+
+        # Clean up existing text content
+        try:
+            # Delete any existing text content for this attachment
+            delete_stmt = AttachmentTextContent.__table__.delete().where(
+                AttachmentTextContent.attachment_id == attachment_id
+            )
+            db_session.execute(delete_stmt)
+            db_session.commit()
+            logger.info(f"Task {task_id}: Cleared any existing text content for attachment {attachment_id}")
+        except Exception as del_err:
+            logger.warning(f"Task {task_id}: Error clearing existing text content: {del_err}")
+            db_session.rollback()
 
         # Open the PDF with PyMuPDF
         try:
@@ -155,7 +335,7 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
         # Determine transaction strategy
         if settings.PDF_USE_SINGLE_TRANSACTION:
             # Process entire PDF in a single transaction
-            with db.begin():
+            try:
                 for page_num in range(total_pages):
                     try:
                         page = doc.load_page(page_num)
@@ -230,38 +410,47 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
                                 )
                                 # Sticks with direct_text
                             except Exception as ocr_err:
-                                # Catch other potential errors (PIL issues, tesseract runtime errors)
-                                logger.warning(
-                                    f"Task {task_id}: OCR failed for page {page_num+1} of "
-                                    f"attachment {attachment_id}: {ocr_err}",
-                                    exc_info=True,
+                                logger.error(
+                                    f"Task {task_id}: OCR failed for page {page_num+1}: {ocr_err}"
                                 )
-                                # Sticks with direct_text (which is already in page_text_to_save)
+                                # Sticks with direct_text
 
-                        # Create and Save AttachmentTextContent record with the best text we have
+                        # Determine the source of the text (direct or OCR)
+                        source = "OCR" if page_text_to_save != direct_text else "DIRECT"
+
+                        # Create and save an entry for this page
                         text_content_entry = AttachmentTextContent(
                             attachment_id=attachment_id,
-                            page_number=page_num + 1,  # Page numbers are 1-based
-                            text_content=(
-                                page_text_to_save.strip() if page_text_to_save else None
-                            ),
+                            page_number=page_num + 1,
+                            text_content=page_text_to_save,
+                            source=source,
+                            words_count=len(page_text_to_save.split()),
+                            characters_count=len(page_text_to_save),
                         )
-                        db.add(text_content_entry)
+                        db_session.add(text_content_entry)
                         processed_pages += 1
                         logger.debug(
-                            f"Task {task_id}: Added page {page_num + 1}/{total_pages} "
-                            f"content for attachment {attachment_id}"
+                            f"Task {task_id}: Processed page {page_num+1} with "
+                            f"{len(page_text_to_save)} chars"
                         )
 
                     except Exception as page_err:
-                        errors_on_pages += 1
                         logger.error(
-                            f"Task {task_id}: Error processing page {page_num + 1} "
-                            f"for attachment {attachment_id}: {page_err}"
+                            f"Task {task_id}: Error processing page {page_num+1}: {page_err}"
                         )
-                        check_error_threshold()  # May raise ValueError if too many errors
-                        # Continue to next page if within error threshold
-
+                        errors_on_pages += 1
+                        check_error_threshold()  # Checks if we've hit the error threshold
+                
+                # Commit at the end of processing all pages
+                db_session.commit()
+                logger.info(
+                    f"Task {task_id}: Committed all {total_pages} pages for attachment {attachment_id}"
+                )
+            except Exception as e:
+                # Handle any exceptions during processing
+                logger.error(f"Task {task_id}: Error during single transaction processing: {e}")
+                db_session.rollback()
+                raise e
         else:
             # Process PDF with periodic commits
             for page_num in range(total_pages):
@@ -352,7 +541,7 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
                             page_text_to_save.strip() if page_text_to_save else None
                         ),
                     )
-                    db.add(text_content_entry)
+                    db_session.add(text_content_entry)
                     page_commit_counter += 1
                     processed_pages += 1
                     logger.debug(
@@ -365,9 +554,9 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
                         settings.PDF_BATCH_COMMIT_SIZE > 0
                         and page_commit_counter >= settings.PDF_BATCH_COMMIT_SIZE
                     ):
-                        # Use async_to_sync for db.commit()
+                        # Direct db method call for commit - database calls need async_to_sync
                         try:
-                            async_to_sync(db.commit)()
+                            db_session.commit()
                             logger.info(
                                 f"Task {task_id}: Committed batch of {page_commit_counter} "
                                 f"pages for attachment {attachment_id}"
@@ -377,7 +566,7 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
                             logger.error(
                                 f"Task {task_id}: Failed to commit batch: {commit_err}"
                             )
-                            async_to_sync(db.rollback)()
+                            db_session.rollback()
                             page_commit_counter = 0
                             # Track as errors and continue
                             errors_on_pages += min(
@@ -392,17 +581,17 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
                         f"Task {task_id}: Error processing page {page_num + 1} "
                         f"for attachment {attachment_id}: {page_err}"
                     )
-                    # Use async_to_sync for db.rollback()
-                    async_to_sync(db.rollback)()  # Rollback current batch on page error
+                    # Direct db method call for rollback - database calls need async_to_sync
+                    db_session.rollback()
                     page_commit_counter = 0  # Reset counter after rollback
                     check_error_threshold()  # May raise ValueError if too many errors
                     # Continue to next page if within error threshold
 
             # Commit any remaining entries after the loop
             if page_commit_counter > 0:
-                # Use async_to_sync for db.commit()
+                # Direct db method call for commit - database calls need async_to_sync
                 try:
-                    async_to_sync(db.commit)()
+                    db_session.commit()
                     logger.info(
                         f"Task {task_id}: Committed final batch of {page_commit_counter} "
                         f"pages for attachment {attachment_id}"
@@ -411,7 +600,7 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
                     logger.error(
                         f"Task {task_id}: Failed to commit final batch: {commit_err}"
                     )
-                    async_to_sync(db.rollback)()
+                    db_session.rollback()
                     # Track as errors
                     errors_on_pages += page_commit_counter
                     check_error_threshold()  # May raise ValueError if too many errors
@@ -445,7 +634,7 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
         # Rollback any pending database changes
         if db:
             try:
-                async_to_sync(db.rollback)()
+                db_session.rollback()
                 logger.info(
                     f"Task {task_id}: Database transaction rolled back for failed task."
                 )
@@ -485,8 +674,11 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
             )
     finally:
         if db:
-            # TrackedAsyncSession.close() is async, we need to use async_to_sync
-            async_to_sync(db.close)()
-            logger.debug(
-                f"Task {task_id}: Database session closed for attachment {attachment_id}"
-            )
+            try:
+                # TrackedAsyncSession.close() is async, we need to use async_to_sync
+                db_session.close()
+                logger.debug(
+                    f"Task {task_id}: Database session closed for attachment {attachment_id}"
+                )
+            except Exception as close_err:
+                logger.error(f"Task {task_id}: Failed to close database session: {close_err}")

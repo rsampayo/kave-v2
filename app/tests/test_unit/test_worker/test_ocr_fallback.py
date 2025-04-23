@@ -11,6 +11,9 @@ def test_process_pdf_attachment_ocr_fallback():
     # Setup mocks
     mock_db_session = MagicMock()
     mock_db_session.close = MagicMock()
+    # Create a get method that will track calls
+    mock_db_session.get = MagicMock(return_value=None)
+
     mock_attachment = MagicMock()
     mock_attachment.id = 1
     mock_attachment.storage_uri = "test-storage-uri"
@@ -78,6 +81,9 @@ def test_process_pdf_attachment_ocr_fallback():
                 return lambda: None
             elif func == mock_db_session.rollback:
                 return lambda: None
+            elif func == mock_db_session.get:
+                # Return the mock directly
+                return mock_db_session.get
             else:
                 return lambda *args, **kwargs: b"pdfbytes"
 
