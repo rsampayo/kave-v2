@@ -3,15 +3,18 @@
 This module will contain task definitions for PDF OCR processing.
 """
 
+import io
 import logging
 from typing import Any, cast
 
 import fitz  # type: ignore[import-untyped]
+import pytesseract  # type: ignore[import-untyped]
 from asgiref.sync import async_to_sync
 from celery import shared_task  # type: ignore
 from celery.exceptions import MaxRetriesExceededError, Retry  # type: ignore
+from PIL import Image
 
-from app.core.config import settings  # noqa: F401 - Will be used in future steps
+from app.core.config import settings
 from app.db.session import get_session
 from app.models.attachment_text_content import AttachmentTextContent
 from app.models.email_data import Attachment
@@ -134,16 +137,92 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
                 for page_num in range(total_pages):
                     try:
                         page = doc.load_page(page_num)
-                        # Direct text extraction
-                        page_text = (
+                        # Direct text extraction first
+                        direct_text = (
                             page.get_text("text") or ""
                         )  # Default to empty string if None
 
-                        # Create and Save AttachmentTextContent record
+                        page_text_to_save = direct_text  # Default to direct extraction
+
+                        # OCR Fallback Logic
+                        TEXT_LENGTH_THRESHOLD = 50  # Chars; Tune this threshold
+                        if len(direct_text.strip()) < TEXT_LENGTH_THRESHOLD:
+                            logger.info(
+                                f"Task {task_id}: Page {page_num+1} has little direct text "
+                                f"({len(direct_text.strip())} chars), attempting OCR."
+                            )
+                            try:
+                                # Configure Tesseract path from settings
+                                pytesseract.pytesseract.tesseract_cmd = (
+                                    settings.TESSERACT_PATH
+                                )
+
+                                # Render page to an image (e.g., PNG) at higher DPI for better OCR
+                                zoom = 4  # zoom factor 4 => 300 DPI (approx)
+                                mat = fitz.Matrix(zoom, zoom)
+                                # alpha=False for non-transparent image
+                                pix = page.get_pixmap(matrix=mat, alpha=False)
+
+                                img_data = pix.tobytes("png")  # Use PNG format
+
+                                if not img_data:
+                                    logger.warning(
+                                        f"Task {task_id}: Failed to get image bytes for page "
+                                        f"{page_num+1}."
+                                    )
+                                else:
+                                    img = Image.open(io.BytesIO(img_data))
+
+                                    # Perform OCR using configured languages
+                                    langs = "+".join(settings.TESSERACT_LANGUAGES)
+                                    ocr_text = pytesseract.image_to_string(
+                                        img, lang=langs
+                                    )
+
+                                    if (
+                                        ocr_text.strip()
+                                    ):  # Only use OCR text if it's not empty
+                                        page_text_to_save = ocr_text
+                                        logger.info(
+                                            f"Task {task_id}: OCR successful for page {page_num+1}, "
+                                            f"length: {len(ocr_text)}, languages: {langs}"
+                                        )
+                                    else:
+                                        logger.warning(
+                                            f"Task {task_id}: OCR produced no text for page "
+                                            f"{page_num+1}, keeping direct text (length: "
+                                            f"{len(direct_text)})"
+                                        )
+
+                            except ImportError:
+                                logger.error(
+                                    f"Task {task_id}: Pytesseract or Pillow not installed. "
+                                    f"Cannot perform OCR fallback. Path: {settings.TESSERACT_PATH}"
+                                )
+                                # Sticks with direct_text
+                            except pytesseract.TesseractNotFoundError:
+                                logger.error(
+                                    f"Task {task_id}: Tesseract executable not found at "
+                                    f"{settings.TESSERACT_PATH}. "
+                                    "Ensure it's installed and path is correct."
+                                )
+                                # Sticks with direct_text
+                            except Exception as ocr_err:
+                                # Catch other potential errors (PIL issues, tesseract runtime errors)
+                                logger.warning(
+                                    f"Task {task_id}: OCR failed for page {page_num+1} of "
+                                    f"attachment {attachment_id}: {ocr_err}",
+                                    exc_info=True,
+                                )
+                                # Sticks with direct_text (which is already in page_text_to_save)
+
+                        # Create and Save AttachmentTextContent record with the best text we have
                         text_content_entry = AttachmentTextContent(
                             attachment_id=attachment_id,
                             page_number=page_num + 1,  # Page numbers are 1-based
-                            text_content=page_text.strip() if page_text else None,
+                            text_content=(
+                                page_text_to_save.strip() if page_text_to_save else None
+                            ),
                         )
                         db.add(text_content_entry)
                         processed_pages += 1
@@ -166,16 +245,90 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
             for page_num in range(total_pages):
                 try:
                     page = doc.load_page(page_num)
-                    # Direct text extraction
-                    page_text = (
+                    # Direct text extraction first
+                    direct_text = (
                         page.get_text("text") or ""
                     )  # Default to empty string if None
 
-                    # Create and Save AttachmentTextContent record
+                    page_text_to_save = direct_text  # Default to direct extraction
+
+                    # OCR Fallback Logic
+                    TEXT_LENGTH_THRESHOLD = 50  # Chars; Tune this threshold
+                    if len(direct_text.strip()) < TEXT_LENGTH_THRESHOLD:
+                        logger.info(
+                            f"Task {task_id}: Page {page_num+1} has little direct text "
+                            f"({len(direct_text.strip())} chars), attempting OCR."
+                        )
+                        try:
+                            # Configure Tesseract path from settings
+                            pytesseract.pytesseract.tesseract_cmd = (
+                                settings.TESSERACT_PATH
+                            )
+
+                            # Render page to an image (e.g., PNG) at higher DPI for better OCR
+                            zoom = 4  # zoom factor 4 => 300 DPI (approx)
+                            mat = fitz.Matrix(zoom, zoom)
+                            # alpha=False for non-transparent image
+                            pix = page.get_pixmap(matrix=mat, alpha=False)
+
+                            img_data = pix.tobytes("png")  # Use PNG format
+
+                            if not img_data:
+                                logger.warning(
+                                    f"Task {task_id}: Failed to get image bytes for page "
+                                    f"{page_num+1}."
+                                )
+                            else:
+                                img = Image.open(io.BytesIO(img_data))
+
+                                # Perform OCR using configured languages
+                                langs = "+".join(settings.TESSERACT_LANGUAGES)
+                                ocr_text = pytesseract.image_to_string(img, lang=langs)
+
+                                if (
+                                    ocr_text.strip()
+                                ):  # Only use OCR text if it's not empty
+                                    page_text_to_save = ocr_text
+                                    logger.info(
+                                        f"Task {task_id}: OCR successful for page {page_num+1}, "
+                                        f"length: {len(ocr_text)}, languages: {langs}"
+                                    )
+                                else:
+                                    logger.warning(
+                                        f"Task {task_id}: OCR produced no text for page "
+                                        f"{page_num+1}, keeping direct text (length: "
+                                        f"{len(direct_text)})"
+                                    )
+
+                        except ImportError:
+                            logger.error(
+                                f"Task {task_id}: Pytesseract or Pillow not installed. "
+                                f"Cannot perform OCR fallback. Path: {settings.TESSERACT_PATH}"
+                            )
+                            # Sticks with direct_text
+                        except pytesseract.TesseractNotFoundError:
+                            logger.error(
+                                f"Task {task_id}: Tesseract executable not found at "
+                                f"{settings.TESSERACT_PATH}. "
+                                "Ensure it's installed and path is correct."
+                            )
+                            # Sticks with direct_text
+                        except Exception as ocr_err:
+                            # Catch other potential errors (PIL issues, tesseract runtime errors)
+                            logger.warning(
+                                f"Task {task_id}: OCR failed for page {page_num+1} of "
+                                f"attachment {attachment_id}: {ocr_err}",
+                                exc_info=True,
+                            )
+                            # Sticks with direct_text (which is already in page_text_to_save)
+
+                    # Create and Save AttachmentTextContent record with the best text we have
                     text_content_entry = AttachmentTextContent(
                         attachment_id=attachment_id,
                         page_number=page_num + 1,  # Page numbers are 1-based
-                        text_content=page_text.strip() if page_text else None,
+                        text_content=(
+                            page_text_to_save.strip() if page_text_to_save else None
+                        ),
                     )
                     db.add(text_content_entry)
                     page_commit_counter += 1
