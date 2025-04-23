@@ -6,6 +6,7 @@ This module will contain task definitions for PDF OCR processing.
 import logging
 from typing import Any, cast
 
+import fitz  # type: ignore[import-untyped]
 from asgiref.sync import async_to_sync
 from celery import shared_task  # type: ignore
 from celery.exceptions import MaxRetriesExceededError, Retry  # type: ignore
@@ -85,11 +86,25 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
             f"for attachment {attachment_id}"
         )
 
-        # --- PDF processing logic (Next Steps) ---
-        # Placeholder success return for this step
-        return (
-            f"Task {task_id}: Successfully fetched data for attachment {attachment_id}"
-        )
+        # Open the PDF with PyMuPDF
+        try:
+            doc = fitz.open(stream=pdf_data, filetype="pdf")
+            logger.info(
+                f"Task {task_id}: Opened PDF for attachment {attachment_id}. "
+                f"Page count: {doc.page_count}"
+            )
+        except Exception as pdf_err:
+            logger.error(
+                f"Task {task_id}: Failed to open PDF for attachment {attachment_id}: "
+                f"{pdf_err}"
+            )
+            # Decide if this is retryable. Corrupt PDF likely isn't.
+            # For now, we'll just return failure status. Could retry if it might be transient.
+            return f"Task {task_id}: Failed to open PDF for attachment {attachment_id}"
+
+        # --- Page processing logic will go here ---
+        # Placeholder success for this step
+        return f"Task {task_id}: Successfully opened PDF for {attachment_id}, pages: {doc.page_count}"
 
     except Retry:
         # Important: Re-raise Retry exceptions to let Celery handle them

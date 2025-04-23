@@ -51,12 +51,17 @@ def test_process_pdf_attachment_data_fetching():
     mock_storage_get_file = AsyncMock(return_value=b"pdfbytes")
     mock_storage.get_file = mock_storage_get_file
 
+    # Create a mock document with page count
+    mock_doc = MagicMock()
+    mock_doc.page_count = 3
+
     # 2. Test successful data fetching
     with (
         patch("app.worker.tasks.get_session", return_value=mock_db_session),
         patch("app.worker.tasks.StorageService", return_value=mock_storage),
         patch("app.worker.tasks.async_to_sync") as mock_async_to_sync,
         patch("app.worker.tasks.Attachment") as MockAttachment,
+        patch("app.worker.tasks.fitz.open", return_value=mock_doc),
     ):
 
         # Configure mocks
@@ -81,7 +86,7 @@ def test_process_pdf_attachment_data_fetching():
         mock_db_session.get.assert_called_once()
 
         # Verify the task returned a success message
-        assert "Successfully fetched data" in result
+        assert "Successfully opened PDF" in result
 
     # 3. Test attachment not found
     with (
@@ -89,6 +94,7 @@ def test_process_pdf_attachment_data_fetching():
         patch("app.worker.tasks.StorageService", return_value=mock_storage),
         patch("app.worker.tasks.async_to_sync") as mock_async_to_sync,
         patch("app.worker.tasks.Attachment") as MockAttachment,
+        patch("app.worker.tasks.fitz.open", return_value=mock_doc),
     ):
 
         # Configure mocks
@@ -109,6 +115,7 @@ def test_process_pdf_attachment_data_fetching():
         patch("app.worker.tasks.StorageService", return_value=mock_storage),
         patch("app.worker.tasks.async_to_sync") as mock_async_to_sync,
         patch("app.worker.tasks.Attachment") as MockAttachment,
+        patch("app.worker.tasks.fitz.open", return_value=mock_doc),
     ):
 
         # Configure mocks
@@ -132,6 +139,7 @@ def test_process_pdf_attachment_data_fetching():
         patch("app.worker.tasks.StorageService", return_value=mock_storage),
         patch("app.worker.tasks.async_to_sync") as mock_async_to_sync,
         patch("app.worker.tasks.Attachment") as MockAttachment,
+        patch("app.worker.tasks.fitz.open", return_value=mock_doc),
         patch("app.worker.tasks.process_pdf_attachment.retry") as mock_retry,
     ):
 
@@ -155,3 +163,87 @@ def test_process_pdf_attachment_data_fetching():
         # Expect task to raise Retry exception if the data isn't found
         with pytest.raises(Retry):
             process_pdf_attachment(attachment_id=1)
+
+
+def test_process_pdf_attachment_open_pdf():
+    """Test that the task opens the PDF and gets the page count."""
+    # Import the task
+    from app.worker.tasks import process_pdf_attachment
+
+    # Setup mocks
+    mock_db_session = MagicMock()
+    # Add a close method that can be called via async_to_sync
+    mock_db_session.close = MagicMock()
+
+    mock_attachment = MagicMock()
+    mock_attachment.id = 1
+    mock_attachment.storage_uri = "test-storage-uri"
+
+    mock_storage = MagicMock()
+    mock_storage_get_file = AsyncMock(return_value=b"pdfbytes")
+    mock_storage.get_file = mock_storage_get_file
+
+    # Create a mock document with page count
+    mock_doc = MagicMock()
+    mock_doc.page_count = 3
+
+    # Mock fitz.open to return our mock document
+    with (
+        patch("app.worker.tasks.get_session", return_value=mock_db_session),
+        patch("app.worker.tasks.StorageService", return_value=mock_storage),
+        patch("app.worker.tasks.async_to_sync") as mock_async_to_sync,
+        patch("app.worker.tasks.fitz.open", return_value=mock_doc) as mock_fitz_open,
+    ):
+
+        # Configure mocks
+        mock_db_session.get.return_value = mock_attachment
+
+        # Setup async_to_sync to handle different types of calls
+        def fake_async_to_sync(func):
+            if func == mock_db_session.close:
+                # For session.close(), just return a callable that does nothing
+                return lambda: None
+            else:
+                # For other cases like storage.get_file
+                return lambda *args, **kwargs: b"pdfbytes"
+
+        mock_async_to_sync.side_effect = fake_async_to_sync
+
+        # Call the task
+        result = process_pdf_attachment(attachment_id=1)
+
+        # Verify fitz.open was called with the correct arguments
+        mock_fitz_open.assert_called_once_with(stream=b"pdfbytes", filetype="pdf")
+
+        # Verify the page count is logged (indirectly through success message)
+        assert "pages: 3" in result.lower()
+
+    # Test error when opening PDF
+    with (
+        patch("app.worker.tasks.get_session", return_value=mock_db_session),
+        patch("app.worker.tasks.StorageService", return_value=mock_storage),
+        patch("app.worker.tasks.async_to_sync") as mock_async_to_sync,
+        patch(
+            "app.worker.tasks.fitz.open", side_effect=Exception("PDF open error")
+        ) as mock_fitz_open,
+    ):
+
+        # Configure mocks
+        mock_db_session.get.return_value = mock_attachment
+
+        # Setup async_to_sync for different function calls
+        def fake_async_to_sync(func):
+            if func == mock_db_session.close:
+                # For session.close(), just return a callable that does nothing
+                return lambda: None
+            else:
+                # For other cases like storage.get_file
+                return lambda *args, **kwargs: b"pdfbytes"
+
+        mock_async_to_sync.side_effect = fake_async_to_sync
+
+        # Call the task
+        result = process_pdf_attachment(attachment_id=1)
+
+        # Verify error handling
+        assert "failed to open pdf" in result.lower()
