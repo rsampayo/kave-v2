@@ -247,7 +247,7 @@ def test_process_pdf_attachment_open_pdf():
         result = process_pdf_attachment(attachment_id=1)
 
         # Verify error handling
-        assert "failed to open pdf" in result.lower()
+        assert "failed attachment" in result.lower()
 
 
 def test_process_pdf_attachment_text_extraction_and_save():  # noqa: C901
@@ -461,3 +461,7 @@ def test_process_pdf_attachment_text_extraction_and_save():  # noqa: C901
         assert "pages: 3" in result.lower()
         assert "success: 2" in result.lower()  # 2 out of 3 pages succeeded
         assert "errors: 1" in result.lower()  # 1 page had an error
+
+
+def raise_(ex):
+    raise ex

@@ -102,9 +102,10 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
                 f"Task {task_id}: Failed to open PDF for attachment {attachment_id}: "
                 f"{pdf_err}"
             )
-            # Decide if this is retryable. Corrupt PDF likely isn't.
-            # For now, we'll just return failure status. Could retry if it might be transient.
-            return f"Task {task_id}: Failed to open PDF for attachment {attachment_id}"
+            # Retry if this could be a transient issue
+            raise self.retry(
+                exc=pdf_err, countdown=int(60 * (self.request.retries + 1))
+            ) from pdf_err
 
         # Initialize counters
         total_pages = doc.page_count
@@ -344,12 +345,25 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
                         and page_commit_counter >= settings.PDF_BATCH_COMMIT_SIZE
                     ):
                         # Use async_to_sync for db.commit()
-                        async_to_sync(db.commit)()
-                        logger.info(
-                            f"Task {task_id}: Committed batch of {page_commit_counter} "
-                            f"pages for attachment {attachment_id}"
-                        )
-                        page_commit_counter = 0
+                        try:
+                            async_to_sync(db.commit)()
+                            logger.info(
+                                f"Task {task_id}: Committed batch of {page_commit_counter} "
+                                f"pages for attachment {attachment_id}"
+                            )
+                            page_commit_counter = 0
+                        except Exception as commit_err:
+                            logger.error(
+                                f"Task {task_id}: Failed to commit batch: {commit_err}"
+                            )
+                            async_to_sync(db.rollback)()
+                            page_commit_counter = 0
+                            # Track as errors and continue
+                            errors_on_pages += min(
+                                settings.PDF_BATCH_COMMIT_SIZE,
+                                total_pages - processed_pages,
+                            )
+                            check_error_threshold()  # May raise ValueError if too many errors
 
                 except Exception as page_err:
                     errors_on_pages += 1
@@ -366,11 +380,20 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
             # Commit any remaining entries after the loop
             if page_commit_counter > 0:
                 # Use async_to_sync for db.commit()
-                async_to_sync(db.commit)()
-                logger.info(
-                    f"Task {task_id}: Committed final batch of {page_commit_counter} "
-                    f"pages for attachment {attachment_id}"
-                )
+                try:
+                    async_to_sync(db.commit)()
+                    logger.info(
+                        f"Task {task_id}: Committed final batch of {page_commit_counter} "
+                        f"pages for attachment {attachment_id}"
+                    )
+                except Exception as commit_err:
+                    logger.error(
+                        f"Task {task_id}: Failed to commit final batch: {commit_err}"
+                    )
+                    async_to_sync(db.rollback)()
+                    # Track as errors
+                    errors_on_pages += page_commit_counter
+                    check_error_threshold()  # May raise ValueError if too many errors
 
         # Final status message
         status_msg = (
@@ -397,7 +420,20 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
             f"Task {task_id}: Error processing attachment {attachment_id}: {e}",
             exc_info=True,
         )
-        # Rollback not needed yet
+
+        # Rollback any pending database changes
+        if db:
+            try:
+                async_to_sync(db.rollback)()
+                logger.info(
+                    f"Task {task_id}: Database transaction rolled back for failed task."
+                )
+            except Exception as rb_err:
+                logger.error(
+                    f"Task {task_id}: Failed to rollback transaction: {rb_err}"
+                )
+
+        # Retry logic
         try:
             # Retry the task with exponential backoff
             logger.warning(
