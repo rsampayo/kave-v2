@@ -1,0 +1,18 @@
+# Aptfile
+
+# OCR Dependencies
+tesseract-ocr
+libtesseract-dev
+tesseract-ocr-eng
+
+# PyMuPDF Dependencies
+libmupdf-dev
+libmupdf1.18  # Version may vary
+libfreetype6-dev
+libjpeg-dev
+libjbig2dec0
+libopenjp2-7
+libxext6
+
+# Additional dependencies that might be needed
+poppler-utils 

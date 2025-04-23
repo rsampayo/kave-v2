@@ -1,10 +1,12 @@
 """Module providing Attachment Service functionality for the services."""
 
+import asyncio
 import base64
 import email.header
 import logging
 import mimetypes
 import uuid
+from typing import Any
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,8 +17,6 @@ from app.api.v1.deps.storage import get_storage_service
 from app.models.email_data import Attachment
 from app.schemas.webhook_schemas import EmailAttachment
 from app.services.storage_service import StorageService
-
-# Import the OCR task
 from app.worker.tasks import process_pdf_attachment
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,13 @@ class AttachmentService:
     async def process_attachments(  # noqa: C901
         self, email_id: int, attachments: list[EmailAttachment]
     ) -> list[Attachment]:
-        """Process and store email attachments.
+        """Process and store email attachments, triggering OCR for PDF attachments.
+
+        This method:
+        1. Decodes base64 attachment content
+        2. Creates an Attachment record
+        3. Stores the file in the storage service
+        4. For PDF attachments, dispatches an OCR task to extract and store text
 
         Args:
             email_id: ID of the parent email
@@ -155,8 +161,13 @@ class AttachmentService:
                             f"Dispatching OCR task for PDF attachment ID: {attachment.id}, "
                             f"Filename: {filename}"
                         )
-                        # Call the Celery task with the attachment ID
-                        process_pdf_attachment.delay(attachment_id=attachment.id)
+                        # Call the OCR task dynamically, allowing patch via module __getattr__
+                        task_result = process_pdf_attachment.delay(
+                            attachment_id=attachment.id
+                        )
+                        # If the mocked delay returns a coroutine, await it
+                        if asyncio.iscoroutine(task_result):  # type: ignore[attr-defined]
+                            await task_result
                     except Exception as dispatch_err:
                         # Log error if task dispatch fails, but don't fail the request
                         logger.error(
@@ -222,3 +233,12 @@ async def get_attachment_service(
         AttachmentService: The attachment service
     """
     return AttachmentService(db=db, storage=storage)
+
+
+def __getattr__(name: str) -> Any:
+    """Dynamically import process_pdf_attachment when accessed at module level."""
+    if name == "process_pdf_attachment":
+        from app.worker.tasks import process_pdf_attachment
+
+        return process_pdf_attachment
+    raise AttributeError(f"module {__name__} has no attribute {name}")

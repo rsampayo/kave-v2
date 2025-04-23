@@ -31,14 +31,35 @@ logger = logging.getLogger(__name__)
 )
 def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
     """
-    Celery task to OCR a PDF attachment page by page.
+    Celery task to extract text from PDF attachments using PyMuPDF with Tesseract OCR fallback.
+
+    The task performs the following steps:
+    1. Retrieves the Attachment record and its PDF data from storage
+    2. Opens the PDF using PyMuPDF
+    3. Processes each page:
+       - Attempts direct text extraction via PyMuPDF
+       - If minimal text is found, falls back to Tesseract OCR
+    4. Saves extracted text per page to AttachmentTextContent records
+
+    Transaction handling is configurable:
+    - Single transaction per PDF (PDF_USE_SINGLE_TRANSACTION=True)
+    - Batched commits (PDF_BATCH_COMMIT_SIZE > 0)
+
+    Error handling includes:
+    - Retries for transient failures
+    - Error threshold monitoring (fails if PDF_MAX_ERROR_PERCENTAGE exceeded)
+    - Graceful fallback to direct text if OCR fails
 
     Args:
-        self: The task instance (automatically passed with bind=True).
-        attachment_id: The ID of the Attachment record to process.
+        self: Task instance (Celery bind=True).
+        attachment_id: ID of the Attachment record to process.
 
     Returns:
-        A status message string.
+        str: Status message describing the processing outcome.
+
+    Raises:
+        Retry: For transient errors that should trigger a retry.
+        ValueError: If error threshold is exceeded.
     """
     task_id = cast(str, self.request.id)
     logger.info(

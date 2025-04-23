@@ -10,6 +10,7 @@ Kave is designed to be a comprehensive AI agent platform. In this first phase, i
 2. Parsing and validating email content
 3. Storing emails and their attachments in a database
 4. Providing a solid foundation for future AI agent capabilities
+5. Extracting text from PDF attachments via OCR
 
 Future phases will include:
 - Sentiment analysis of emails
@@ -211,4 +212,56 @@ This will:
 2. Create an ngrok tunnel to expose your local server
 3. Display the URL to use in your Mandrill webhook configuration
 
-For more detailed information, see [docs/ngrok_webhook_testing.md](docs/ngrok_webhook_testing.md). 
+For more detailed information, see [docs/ngrok_webhook_testing.md](docs/ngrok_webhook_testing.md).
+
+## PDF OCR Functionality
+
+This application includes functionality to automatically extract text from PDF attachments using OCR:
+
+### Features
+- Automatic OCR processing of PDF attachments received via email webhooks
+- Text extraction using PyMuPDF with Pytesseract OCR fallback for image-based PDFs
+- Text storage per page in the database for easy searching and retrieval
+- Asynchronous processing using Celery to avoid impacting webhook response times
+
+### System Dependencies
+
+#### macOS Development
+```bash
+# Install required system dependencies
+brew install tesseract tesseract-lang redis
+
+# Start Redis for Celery
+brew services start redis
+```
+
+#### Heroku Deployment
+The application requires additional buildpacks for Tesseract and PDF processing on Heroku:
+```bash
+heroku buildpacks:add --index 1 https://github.com/heroku/heroku-buildpack-apt
+```
+
+### Environment Variables
+```
+# Redis Configuration (Celery)
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/0
+# Note: On Heroku, these will be overridden by REDIS_URL
+
+# PDF Processing Configuration
+PDF_BATCH_COMMIT_SIZE=10  # Set to 0 for single transaction per PDF
+PDF_USE_SINGLE_TRANSACTION=false
+PDF_MAX_ERROR_PERCENTAGE=10.0
+
+# Tesseract Configuration
+TESSERACT_PATH=/usr/local/bin/tesseract  # Update for your environment
+TESSERACT_LANGUAGES=eng  # Comma-separated list of language codes
+```
+
+### Starting the Celery Worker
+```bash
+# Development
+celery -A app.worker.celery_app worker -l info
+
+# On Heroku, the worker is defined in the Procfile
+``` 

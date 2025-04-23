@@ -61,3 +61,7 @@ python_functions = "test_*"
 python_classes = "Test*"
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "session"
+env = [
+    "CELERY_TASK_ALWAYS_EAGER=True",
+    "CELERY_TASK_EAGER_PROPAGATES=True"
+]

@@ -397,3 +397,28 @@ def patch_settings():
 
     # Restore original values
     settings.DATABASE_URL = original_db_url
+
+
+@pytest.fixture(autouse=True)
+def celery_eager():
+    """Configure Celery to execute tasks eagerly (synchronously) during tests."""
+    try:
+        from app.worker.celery_app import celery_app
+
+        # Store original configuration
+        original_task_always_eager = celery_app.conf.task_always_eager
+        original_task_eager_propagates = celery_app.conf.task_eager_propagates
+
+        # Set eager execution for tests
+        celery_app.conf.task_always_eager = True
+        celery_app.conf.task_eager_propagates = True
+
+        yield celery_app
+
+        # Restore original configuration
+        celery_app.conf.task_always_eager = original_task_always_eager
+        celery_app.conf.task_eager_propagates = original_task_eager_propagates
+    except ImportError:
+        # If celery is not installed or app is not found, skip this fixture
+        pytest.skip("Celery not available")
+        yield None

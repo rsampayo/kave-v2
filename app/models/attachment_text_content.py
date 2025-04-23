@@ -17,6 +17,15 @@ class AttachmentTextContent(Base):
 
     This model maintains a one-to-many relationship with the Attachment model,
     where each record represents the text content of a single page from a PDF attachment.
+    Text is extracted using direct PDF text extraction (via PyMuPDF) with OCR fallback
+    (via Tesseract) when direct extraction yields minimal text.
+
+    Attributes:
+        id (int): Primary key.
+        attachment_id (int): Foreign key to the parent Attachment.
+        page_number (int): 1-based page number within the PDF.
+        text_content (str): Extracted text content from the page. May be NULL if extraction failed.
+        attachment (Attachment): Relationship to the parent Attachment model.
     """
 
     __tablename__ = "attachment_text_content"
