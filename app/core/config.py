@@ -97,25 +97,24 @@ class Settings(BaseSettings):
     PDF_BATCH_COMMIT_SIZE: int = Field(
         default=10,
         description="Number of pages to process before committing. "
-        "Set to 0 for single transaction per PDF."
+        "Set to 0 for single transaction per PDF.",
     )
     PDF_USE_SINGLE_TRANSACTION: bool = Field(
         default=False,
-        description="If True, processes entire PDF in a single transaction."
+        description="If True, processes entire PDF in a single transaction.",
     )
     PDF_MAX_ERROR_PERCENTAGE: float = Field(
         default=10.0,
-        description="Maximum percentage of pages that can fail before task fails."
+        description="Maximum percentage of pages that can fail before task fails.",
     )
 
     # Tesseract Configuration
     TESSERACT_PATH: str = Field(
         default="/usr/local/bin/tesseract",  # Default macOS Homebrew path
-        description="Path to Tesseract executable"
+        description="Path to Tesseract executable",
     )
     TESSERACT_LANGUAGES: List[str] = Field(
-        default=["eng"],
-        description="Languages to use for OCR"
+        default=["eng"], description="Languages to use for OCR"
     )
 
     @property
