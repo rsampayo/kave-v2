@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -11,6 +11,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
 
 if TYPE_CHECKING:
+    from app.models.attachment_text_content import (  # Import for type checking
+        AttachmentTextContent,
+    )
     from app.models.organization import Organization  # Import only for type checking
 
 
@@ -159,6 +162,13 @@ class Attachment(Base):
 
     # Relationship with the parent email - Reference to the parent email
     email: Mapped["Email"] = relationship("Email", back_populates="attachments")
+
+    # Relationship with text contents from OCR - List of OCR text contents for PDF pages
+    text_contents: Mapped[List["AttachmentTextContent"]] = relationship(
+        "AttachmentTextContent",
+        back_populates="attachment",
+        cascade="all, delete-orphan",
+    )
 
 
 class EmailAttachment:

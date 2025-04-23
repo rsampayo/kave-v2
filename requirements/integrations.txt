@@ -20,22 +20,29 @@ aiosignal==1.3.2
     # via aiohttp
 alembic==1.15.2
     # via -r /Users/rsampayo/Documents/Proyectos/Kave/requirements/base.in
+amqp==5.3.1
+    # via kombu
 annotated-types==0.7.0
     # via pydantic
 anyio==4.9.0
     # via
     #   httpx
     #   starlette
+asgiref==3.7.2
+    # via -r requirements/integrations.in
 async-timeout==5.0.1
     # via
     #   aiohttp
     #   asyncpg
+    #   redis
 asyncpg==0.29.0
     # via -r /Users/rsampayo/Documents/Proyectos/Kave/requirements/base.in
 attrs==25.3.0
     # via aiohttp
 bcrypt==4.3.0
     # via -r /Users/rsampayo/Documents/Proyectos/Kave/requirements/base.in
+billiard==4.2.1
+    # via celery
 boto3==1.34.69
     # via
     #   -r /Users/rsampayo/Documents/Proyectos/Kave/requirements/base.in
@@ -45,6 +52,8 @@ botocore==1.34.69
     #   aiobotocore
     #   boto3
     #   s3transfer
+celery[redis]==5.3.6
+    # via -r requirements/integrations.in
 certifi==2025.1.31
     # via
     #   httpcore
@@ -55,7 +64,18 @@ certifi==2025.1.31
 charset-normalizer==3.4.1
     # via requests
 click==8.1.8
-    # via uvicorn
+    # via
+    #   celery
+    #   click-didyoumean
+    #   click-plugins
+    #   click-repl
+    #   uvicorn
+click-didyoumean==0.3.1
+    # via celery
+click-plugins==1.1.1
+    # via celery
+click-repl==0.3.0
+    # via celery
 dnspython==2.7.0
     # via email-validator
 ecdsa==0.19.1
@@ -93,6 +113,8 @@ jmespath==1.0.1
     # via
     #   boto3
     #   botocore
+kombu==5.5.3
+    # via celery
 mailchimp-marketing==3.0.80
     # via -r requirements/integrations.in
 mailchimp-transactional==1.0.56
@@ -105,8 +127,16 @@ multidict==6.4.2
     # via
     #   aiohttp
     #   yarl
+packaging==25.0
+    # via pytesseract
 passlib==1.7.4
     # via -r /Users/rsampayo/Documents/Proyectos/Kave/requirements/base.in
+pillow==10.2.0
+    # via
+    #   -r requirements/integrations.in
+    #   pytesseract
+prompt-toolkit==3.0.51
+    # via click-repl
 propcache==0.3.1
     # via
     #   aiohttp
@@ -126,10 +156,17 @@ pydantic-core==2.33.1
     # via pydantic
 pydantic-settings==2.8.1
     # via -r /Users/rsampayo/Documents/Proyectos/Kave/requirements/base.in
+pymupdf==1.23.26
+    # via -r requirements/integrations.in
+pymupdfb==1.23.22
+    # via pymupdf
+pytesseract==0.3.13
+    # via -r requirements/integrations.in
 python-dateutil==2.9.0.post0
     # via
     #   -r requirements/integrations.in
     #   botocore
+    #   celery
     #   mailchimp-marketing
     #   mailchimp-transactional
 python-dotenv==1.1.0
@@ -140,6 +177,8 @@ python-jose==3.4.0
     # via -r /Users/rsampayo/Documents/Proyectos/Kave/requirements/base.in
 python-multipart==0.0.9
     # via -r /Users/rsampayo/Documents/Proyectos/Kave/requirements/base.in
+redis==5.2.1
+    # via celery
 requests==2.32.3
     # via
     #   mailchimp-marketing
@@ -176,6 +215,7 @@ typing-extensions==4.13.1
     # via
     #   alembic
     #   anyio
+    #   asgiref
     #   fastapi
     #   multidict
     #   pydantic
@@ -185,6 +225,10 @@ typing-extensions==4.13.1
     #   uvicorn
 typing-inspection==0.4.0
     # via pydantic
+tzdata==2025.2
+    # via
+    #   celery
+    #   kombu
 urllib3==1.26.20
     # via
     #   botocore
@@ -193,6 +237,13 @@ urllib3==1.26.20
     #   requests
 uvicorn==0.28.1
     # via -r /Users/rsampayo/Documents/Proyectos/Kave/requirements/base.in
+vine==5.1.0
+    # via
+    #   amqp
+    #   celery
+    #   kombu
+wcwidth==0.2.13
+    # via prompt-toolkit
 wrapt==1.17.2
     # via aiobotocore
 yarl==1.19.0

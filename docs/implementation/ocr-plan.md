@@ -2,6 +2,12 @@
 
 **AI Assistant Task: Implement PDF OCR for Email Attachments (macOS Dev / Heroku Prod)**
 
+**IMPORTANT WORKFLOW INSTRUCTIONS:**
+* IMPLEMENT ONLY ONE STEP AT A TIME. After completing a step, STOP and ask for permission before proceeding to the next step.
+* Each step should be fully implemented, tested, and verified before moving on.
+* Clearly indicate which step you've completed and wait for explicit approval before starting the next one.
+* If anything is unclear, ask for clarification before proceeding.
+
 **Overall Goal:** Add functionality to OCR PDF attachments received via email webhooks using Celery, PyMuPDF, and Pytesseract (as fallback). Store the extracted text per page in a new database table. Deployable on Heroku.
 
 **Mandatory Guidelines:** Strictly follow the provided "Development Guidelines" document, including:
