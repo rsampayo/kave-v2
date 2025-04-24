@@ -3,7 +3,8 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import attachments, auth, email_webhooks, organizations
-from app.api.endpoints import redis_demo
+# Will add redis_demo support later when file is moved
+# from app.api.v1.endpoints import redis_demo
 
 # Create a v1 router with prefix
 api_v1_router = APIRouter(prefix="/v1")
@@ -19,4 +20,4 @@ api_v1_router.include_router(
 api_v1_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 
 # Include Redis demo endpoints (for testing Redis integration)
-api_v1_router.include_router(redis_demo.router, prefix="/redis-demo")
+# api_v1_router.include_router(redis_demo.router, prefix="/redis-demo")
