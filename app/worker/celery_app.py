@@ -51,6 +51,7 @@ celery_app.conf.update(
     # Recommended Celery settings for reliability
     task_acks_late=True,
     worker_prefetch_multiplier=1,  # Process one task at a time per worker process
+    broker_connection_retry_on_startup=True,  # Retry connection during startup
 )
 
 logger.info(f"Celery App {celery_app.main!r} initialized.")
