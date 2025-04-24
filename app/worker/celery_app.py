@@ -1,6 +1,8 @@
 """Celery application configuration for asynchronous task processing."""
 
 import logging
+import ssl
+from urllib.parse import urlparse
 
 from celery import Celery  # type: ignore
 
@@ -17,10 +19,29 @@ if settings.REDIS_URL and settings.REDIS_URL != settings.CELERY_BROKER_URL:
 if settings.REDIS_URL and settings.REDIS_URL != settings.CELERY_RESULT_BACKEND:
     logger.info(f"Using REDIS_URL from environment for Celery backend: {backend_url}")
 
+# Configure SSL options for secure Redis connections
+broker_options = {}
+backend_options = {}
+
+# Check if Redis URL uses secure connection (rediss://)
+if broker_url and urlparse(broker_url).scheme == 'rediss':
+    broker_options = {
+        'ssl_cert_reqs': ssl.CERT_NONE
+    }
+    logger.info("Configuring SSL options for secure Redis broker connection")
+
+if backend_url and urlparse(backend_url).scheme == 'rediss':
+    backend_options = {
+        'ssl_cert_reqs': ssl.CERT_NONE
+    }
+    logger.info("Configuring SSL options for secure Redis backend connection")
+
 celery_app = Celery(
     "worker",
     broker=broker_url,
     backend=backend_url,
+    broker_transport_options=broker_options,
+    redis_backend_transport_options=backend_options,
     include=["app.worker.tasks"],
 )
 
@@ -38,6 +59,10 @@ celery_app.conf.update(
 logger.info(f"Celery App {celery_app.main!r} initialized.")
 logger.info(f"Broker URL: {celery_app.conf.broker_url}")
 logger.info(f"Result Backend: {celery_app.conf.result_backend}")
+if broker_options:
+    logger.info(f"Broker SSL options: {broker_options}")
+if backend_options:
+    logger.info(f"Backend SSL options: {backend_options}")
 
 
 if __name__ == "__main__":
