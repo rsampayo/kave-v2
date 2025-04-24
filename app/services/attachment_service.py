@@ -238,6 +238,8 @@ async def get_attachment_service(
 def __getattr__(name: str) -> Any:
     """Dynamically import process_pdf_attachment when accessed at module level."""
     if name == "process_pdf_attachment":
+        # Import the celery_app first to ensure it's properly configured with Redis URL
+        from app.worker.celery_app import celery_app
         from app.worker.tasks import process_pdf_attachment
 
         return process_pdf_attachment
