@@ -356,7 +356,7 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
                             try:
                                 # Configure Tesseract path from settings
                                 pytesseract.pytesseract.tesseract_cmd = (
-                                    settings.TESSERACT_PATH
+                                    settings.effective_tesseract_path
                                 )
 
                                 # Render page to an image (e.g., PNG) at higher DPI for better OCR
@@ -399,13 +399,13 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
                             except ImportError:
                                 logger.error(
                                     f"Task {task_id}: Pytesseract or Pillow not installed. "
-                                    f"Cannot perform OCR fallback. Path: {settings.TESSERACT_PATH}"
+                                    f"Cannot perform OCR fallback. Path: {settings.effective_tesseract_path}"
                                 )
                                 # Sticks with direct_text
                             except pytesseract.TesseractNotFoundError:
                                 logger.error(
                                     f"Task {task_id}: Tesseract executable not found at "
-                                    f"{settings.TESSERACT_PATH}. "
+                                    f"{settings.effective_tesseract_path}. "
                                     "Ensure it's installed and path is correct."
                                 )
                                 # Sticks with direct_text
@@ -473,7 +473,7 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
                         try:
                             # Configure Tesseract path from settings
                             pytesseract.pytesseract.tesseract_cmd = (
-                                settings.TESSERACT_PATH
+                                settings.effective_tesseract_path
                             )
 
                             # Render page to an image (e.g., PNG) at higher DPI for better OCR
@@ -514,13 +514,13 @@ def process_pdf_attachment(self: Any, attachment_id: int) -> str:  # noqa: C901
                         except ImportError:
                             logger.error(
                                 f"Task {task_id}: Pytesseract or Pillow not installed. "
-                                f"Cannot perform OCR fallback. Path: {settings.TESSERACT_PATH}"
+                                f"Cannot perform OCR fallback. Path: {settings.effective_tesseract_path}"
                             )
                             # Sticks with direct_text
                         except pytesseract.TesseractNotFoundError:
                             logger.error(
                                 f"Task {task_id}: Tesseract executable not found at "
-                                f"{settings.TESSERACT_PATH}. "
+                                f"{settings.effective_tesseract_path}. "
                                 "Ensure it's installed and path is correct."
                             )
                             # Sticks with direct_text

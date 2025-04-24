@@ -187,6 +187,35 @@ class Settings(BaseSettings):
 
         return db_url
 
+    @property
+    def effective_tesseract_path(self) -> str:
+        """Get the effective tesseract path based on environment.
+        
+        For Heroku deployments, if the path is not explicitly configured,
+        default to the apt buildpack installation path.
+        
+        Returns:
+            str: The path to the tesseract executable
+        """
+        import os
+        import platform
+        
+        # Use explicit path if set
+        if self.TESSERACT_PATH and os.path.exists(self.TESSERACT_PATH):
+            return self.TESSERACT_PATH
+            
+        # Check for Heroku environment
+        if os.environ.get("DYNO"):
+            return "/app/.apt/usr/bin/tesseract"
+            
+        # Platform-specific defaults
+        if platform.system() == "Darwin":  # macOS
+            return "/usr/local/bin/tesseract"
+        elif platform.system() == "Linux":
+            return "/usr/bin/tesseract"
+        else:
+            return "tesseract"  # Hope it's in PATH
+
     @classmethod
     @field_validator("DATABASE_URL")
     def validate_db_url(cls, v: str) -> str:
