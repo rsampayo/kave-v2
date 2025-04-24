@@ -12,7 +12,6 @@ tesseract-ocr-eng
 
 # PyMuPDF Dependencies
 libmupdf-dev
-libmupdf1.21
 libfreetype6-dev
 libjpeg-dev
 libjbig2dec0
