@@ -6,13 +6,13 @@ libtesseract-dev
 tesseract-ocr-eng
 
 # Additional language data packs (if needed)
-# tesseract-ocr-fra  # French
-# tesseract-ocr-spa  # Spanish
-# tesseract-ocr-deu  # German
+# tesseract-ocr-fra
+# tesseract-ocr-spa
+# tesseract-ocr-deu
 
 # PyMuPDF Dependencies
 libmupdf-dev
-libmupdf1.18  # Version may vary - check compatibility with your pymupdf version
+libmupdf1.21
 libfreetype6-dev
 libjpeg-dev
 libjbig2dec0
