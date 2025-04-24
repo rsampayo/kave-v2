@@ -19,29 +19,26 @@ if settings.REDIS_URL and settings.REDIS_URL != settings.CELERY_BROKER_URL:
 if settings.REDIS_URL and settings.REDIS_URL != settings.CELERY_RESULT_BACKEND:
     logger.info(f"Using REDIS_URL from environment for Celery backend: {backend_url}")
 
-# Configure SSL options for secure Redis connections
+# Configure Celery app - We need to handle rediss:// URLs differently
+broker_scheme = urlparse(broker_url).scheme if broker_url else None
+backend_scheme = urlparse(backend_url).scheme if backend_url else None
+
 broker_options = {}
 backend_options = {}
 
-# Check if Redis URL uses secure connection (rediss://)
-if broker_url and urlparse(broker_url).scheme == 'rediss':
-    broker_options = {
-        'ssl_cert_reqs': ssl.CERT_NONE
-    }
+# Configure app with appropriate parameters based on URL schemes
+if broker_scheme == 'rediss':
     logger.info("Configuring SSL options for secure Redis broker connection")
+    broker_url = broker_url + "?ssl_cert_reqs=CERT_NONE"
 
-if backend_url and urlparse(backend_url).scheme == 'rediss':
-    backend_options = {
-        'ssl_cert_reqs': ssl.CERT_NONE
-    }
+if backend_scheme == 'rediss':
     logger.info("Configuring SSL options for secure Redis backend connection")
+    backend_url = backend_url + "?ssl_cert_reqs=CERT_NONE"
 
 celery_app = Celery(
     "worker",
     broker=broker_url,
     backend=backend_url,
-    broker_transport_options=broker_options,
-    redis_backend_transport_options=backend_options,
     include=["app.worker.tasks"],
 )
 
@@ -59,11 +56,6 @@ celery_app.conf.update(
 logger.info(f"Celery App {celery_app.main!r} initialized.")
 logger.info(f"Broker URL: {celery_app.conf.broker_url}")
 logger.info(f"Result Backend: {celery_app.conf.result_backend}")
-if broker_options:
-    logger.info(f"Broker SSL options: {broker_options}")
-if backend_options:
-    logger.info(f"Backend SSL options: {backend_options}")
-
 
 if __name__ == "__main__":
     # This allows running the worker directly using `python -m app.worker.celery_app worker ...`
