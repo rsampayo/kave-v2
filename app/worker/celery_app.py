@@ -52,6 +52,8 @@ celery_app.conf.update(
     task_acks_late=True,
     worker_prefetch_multiplier=1,  # Process one task at a time per worker process
     broker_connection_retry_on_startup=True,  # Retry connection during startup
+    # Worker recycling to prevent memory leaks
+    worker_max_tasks_per_child=5,  # Restart worker process after 5 tasks to prevent memory leaks
 )
 
 logger.info(f"Celery App {celery_app.main!r} initialized.")
