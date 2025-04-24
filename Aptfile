@@ -5,9 +5,9 @@ tesseract-ocr
 libtesseract-dev
 tesseract-ocr-eng
 
-# Additional language data packs (if needed)
+# Additional language packs
+tesseract-ocr-spa
 # tesseract-ocr-fra
-# tesseract-ocr-spa
 # tesseract-ocr-deu
 
 # PyMuPDF Dependencies
