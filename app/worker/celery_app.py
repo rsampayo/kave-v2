@@ -29,11 +29,13 @@ backend_options = {}
 # Configure app with appropriate parameters based on URL schemes
 if broker_scheme == 'rediss':
     logger.info("Configuring SSL options for secure Redis broker connection")
-    broker_url = broker_url + "?ssl_cert_reqs=CERT_NONE"
+    # More comprehensive SSL options to handle connection issues
+    broker_url = broker_url + "?ssl_cert_reqs=CERT_NONE&socket_connect_timeout=10&socket_timeout=30&retry_on_timeout=true"
 
 if backend_scheme == 'rediss':
     logger.info("Configuring SSL options for secure Redis backend connection")
-    backend_url = backend_url + "?ssl_cert_reqs=CERT_NONE"
+    # More comprehensive SSL options to handle connection issues
+    backend_url = backend_url + "?ssl_cert_reqs=CERT_NONE&socket_connect_timeout=10&socket_timeout=30&retry_on_timeout=true"
 
 celery_app = Celery(
     "worker",
@@ -52,6 +54,7 @@ celery_app.conf.update(
     task_acks_late=True,
     worker_prefetch_multiplier=1,  # Process one task at a time per worker process
     broker_connection_retry_on_startup=True,  # Retry connection during startup
+    broker_connection_max_retries=10,  # Maximum number of retries for broker connection
     # Worker recycling to prevent memory leaks
     worker_max_tasks_per_child=5,  # Restart worker process after 5 tasks to prevent memory leaks
 )
