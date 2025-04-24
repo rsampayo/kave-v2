@@ -17,6 +17,8 @@ from app.api.v1.deps.storage import get_storage_service
 from app.models.email_data import Attachment
 from app.schemas.webhook_schemas import EmailAttachment
 from app.services.storage_service import StorageService
+# Import celery_app first to ensure proper configuration
+from app.worker.celery_app import celery_app
 from app.worker.tasks import process_pdf_attachment
 
 logger = logging.getLogger(__name__)
