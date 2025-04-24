@@ -29,13 +29,13 @@ backend_options = {}
 # Configure app with appropriate parameters based on URL schemes
 if broker_scheme == 'rediss':
     logger.info("Configuring SSL options for secure Redis broker connection")
-    # More comprehensive SSL options to handle connection issues
-    broker_url = broker_url + "?ssl_cert_reqs=CERT_NONE&socket_connect_timeout=10&socket_timeout=30&retry_on_timeout=true"
+    # Only use ssl_cert_reqs parameter for Kombu compatibility
+    broker_url = broker_url + "?ssl_cert_reqs=CERT_NONE"
 
 if backend_scheme == 'rediss':
     logger.info("Configuring SSL options for secure Redis backend connection")
-    # More comprehensive SSL options to handle connection issues
-    backend_url = backend_url + "?ssl_cert_reqs=CERT_NONE&socket_connect_timeout=10&socket_timeout=30&retry_on_timeout=true"
+    # Only use ssl_cert_reqs parameter for Kombu compatibility
+    backend_url = backend_url + "?ssl_cert_reqs=CERT_NONE"
 
 celery_app = Celery(
     "worker",
@@ -55,6 +55,8 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,  # Process one task at a time per worker process
     broker_connection_retry_on_startup=True,  # Retry connection during startup
     broker_connection_max_retries=10,  # Maximum number of retries for broker connection
+    # Broker connection timeout settings - added separately from URL
+    broker_connection_timeout=10,
     # Worker recycling to prevent memory leaks
     worker_max_tasks_per_child=5,  # Restart worker process after 5 tasks to prevent memory leaks
 )
