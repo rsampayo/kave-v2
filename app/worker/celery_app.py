@@ -30,13 +30,13 @@ backend_options = {}
 if broker_scheme == 'rediss':
     logger.info("Configuring SSL options for secure Redis broker connection")
     # Add SSL cert requirements to the URL as required by Celery
-    broker_url = broker_url + "?ssl_cert_reqs=CERT_REQUIRED"
+    broker_url = broker_url + "?ssl_cert_reqs=CERT_OPTIONAL"
     logger.info(f"Using Redis broker URL with SSL: {broker_url}")
 
 if backend_scheme == 'rediss':
     logger.info("Configuring SSL options for secure Redis backend connection")
     # Add SSL cert requirements to the URL as required by Celery
-    backend_url = backend_url + "?ssl_cert_reqs=CERT_REQUIRED"
+    backend_url = backend_url + "?ssl_cert_reqs=CERT_OPTIONAL"
     logger.info(f"Using Redis backend URL with SSL: {backend_url}")
 
 celery_app = Celery(
