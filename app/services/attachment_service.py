@@ -159,6 +159,9 @@ class AttachmentService:
                 )
                 if is_pdf:
                     try:
+                        # Commit the transaction to ensure attachment is in database before OCR task runs
+                        await self.db.commit()
+                        
                         logger.info(
                             f"Dispatching OCR task for PDF attachment ID: {attachment.id}, "
                             f"Filename: {filename}"
@@ -170,6 +173,9 @@ class AttachmentService:
                         # If the mocked delay returns a coroutine, await it
                         if asyncio.iscoroutine(task_result):  # type: ignore[attr-defined]
                             await task_result
+                            
+                        # Start a new transaction for any remaining attachments
+                        await self.db.begin()
                     except Exception as dispatch_err:
                         # Log error if task dispatch fails, but don't fail the request
                         logger.error(
