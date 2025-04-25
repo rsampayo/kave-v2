@@ -29,19 +29,22 @@ backend_options = {}
 # Configure app with appropriate parameters based on URL schemes
 if broker_scheme == 'rediss':
     logger.info("Configuring SSL options for secure Redis broker connection")
-    # Only use ssl_cert_reqs parameter for Kombu compatibility
-    broker_url = broker_url + "?ssl_cert_reqs=CERT_NONE"
+    # Require SSL certificate validation for the broker
+    broker_options['broker_use_ssl'] = {'cert_reqs': ssl.CERT_REQUIRED}
 
 if backend_scheme == 'rediss':
     logger.info("Configuring SSL options for secure Redis backend connection")
-    # Only use ssl_cert_reqs parameter for Kombu compatibility
-    backend_url = backend_url + "?ssl_cert_reqs=CERT_NONE"
+    # Require SSL certificate validation for the result backend
+    backend_options['result_backend_use_ssl'] = {'cert_reqs': ssl.CERT_REQUIRED}
 
 celery_app = Celery(
     "worker",
     broker=broker_url,
     backend=backend_url,
     include=["app.worker.tasks"],
+    # Apply SSL options for broker and backend
+    **broker_options,
+    **backend_options,
 )
 
 celery_app.conf.update(
