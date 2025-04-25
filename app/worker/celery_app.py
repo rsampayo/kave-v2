@@ -29,22 +29,21 @@ backend_options = {}
 # Configure app with appropriate parameters based on URL schemes
 if broker_scheme == 'rediss':
     logger.info("Configuring SSL options for secure Redis broker connection")
-    # Require SSL certificate validation for the broker
-    broker_options['broker_use_ssl'] = {'cert_reqs': ssl.CERT_REQUIRED}
+    # Add SSL cert requirements to the URL as required by Celery
+    broker_url = broker_url + "?ssl_cert_reqs=CERT_REQUIRED"
+    logger.info(f"Using Redis broker URL with SSL: {broker_url}")
 
 if backend_scheme == 'rediss':
     logger.info("Configuring SSL options for secure Redis backend connection")
-    # Require SSL certificate validation for the result backend
-    backend_options['result_backend_use_ssl'] = {'cert_reqs': ssl.CERT_REQUIRED}
+    # Add SSL cert requirements to the URL as required by Celery
+    backend_url = backend_url + "?ssl_cert_reqs=CERT_REQUIRED"
+    logger.info(f"Using Redis backend URL with SSL: {backend_url}")
 
 celery_app = Celery(
     "worker",
     broker=broker_url,
     backend=backend_url,
     include=["app.worker.tasks"],
-    # Apply SSL options for broker and backend
-    **broker_options,
-    **backend_options,
 )
 
 celery_app.conf.update(
